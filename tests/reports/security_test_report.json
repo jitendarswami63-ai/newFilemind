@@ -1,0 +1,92 @@
+[
+  {
+    "name": "Unauthenticated GET /api/documents",
+    "status": "PASS",
+    "evidence": "Received HTTP 401 Unauthorized"
+  },
+  {
+    "name": "Unauthenticated GET /api/documents/[id]",
+    "status": "PASS",
+    "evidence": "Received HTTP 401 Unauthorized"
+  },
+  {
+    "name": "Unauthenticated GET /api/documents/[id]/download",
+    "status": "PASS",
+    "evidence": "Received HTTP 401 Unauthorized"
+  },
+  {
+    "name": "Cross-user download (User B on User A doc)",
+    "status": "PASS",
+    "evidence": "Received HTTP 404 Not Found (ownership check enforced, no IDOR)"
+  },
+  {
+    "name": "Cross-user delete (User B deleting User A doc)",
+    "status": "PASS",
+    "evidence": "Received HTTP 404 Not Found (storage/DB delete blocked)"
+  },
+  {
+    "name": "Storage cross-user upload (User B into User A folder)",
+    "status": "PASS",
+    "evidence": "Storage RLS rejected upload: \"new row violates row-level security policy\""
+  },
+  {
+    "name": "Database RLS: SELECT isolation",
+    "status": "PASS",
+    "evidence": "User B query for User A doc returned 0 rows"
+  },
+  {
+    "name": "Database RLS: INSERT with foreign user_id",
+    "status": "PASS",
+    "evidence": "Rejected by RLS: \"new row violates row-level security policy for table \"documents\"\""
+  },
+  {
+    "name": "Database RLS: UPDATE user_id hijacking",
+    "status": "PASS",
+    "evidence": "User A document ownership retained; User B update had zero effect"
+  },
+  {
+    "name": "RPC Security: Anonymous invocation",
+    "status": "PASS",
+    "evidence": "Explicitly denied: \"permission denied for function create_document_with_quota\""
+  },
+  {
+    "name": "RPC Security: Caller/User ID mismatch",
+    "status": "PASS",
+    "evidence": "Rejected: \"Unauthorized: user_id mismatch or not authenticated\""
+  },
+  {
+    "name": "RPC Security: Non-existent storage object",
+    "status": "PASS",
+    "evidence": "Rejected: \"Storage object does not exist\""
+  },
+  {
+    "name": "Upload Attack: Magic bytes validation",
+    "status": "PASS",
+    "evidence": "Server detected invalid magic bytes and rejected with 400 (\"The uploaded file is not a valid PDF.\")"
+  },
+  {
+    "name": "Upload Attack: Path segment mismatch / session replay",
+    "status": "PASS",
+    "evidence": "Rejected with HTTP 400"
+  },
+  {
+    "name": "Upload Attack: Confirm non-existent storage object",
+    "status": "PASS",
+    "evidence": "Rejected with HTTP 400"
+  },
+  {
+    "name": "Upload Attack: Filename path traversal sanitization",
+    "status": "PASS",
+    "evidence": "Sanitized path traversal safely to \"dcc19e01-3c34-4f48-adc7-42edda46e049/ad9870ff-8caa-456c-95b0-10f036c480a3/passwd.pdf\""
+  },
+  {
+    "name": "Upload Attack: XSS filename sanitization",
+    "status": "PASS",
+    "evidence": "Handled safely: \"dcc19e01-3c34-4f48-adc7-42edda46e049/692713ba-53ef-4105-81e7-b42ba2806885/script>.pdf\""
+  },
+  {
+    "name": "Upload Attack: Oversized file check (> 25 MB)",
+    "status": "PASS",
+    "evidence": "Rejected with HTTP 400 (\"File must be under 25 MB.\")"
+  }
+]

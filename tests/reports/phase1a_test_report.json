@@ -1,0 +1,117 @@
+[
+  {
+    "name": "Zod: Reject page_count mismatch",
+    "status": "PASS",
+    "evidence": "Correctly rejected pages.length (1) !== page_count (2)"
+  },
+  {
+    "name": "Zod: Reject non-contiguous pages [1, 3]",
+    "status": "PASS",
+    "evidence": "Correctly rejected non-contiguous page sequence"
+  },
+  {
+    "name": "Zod: Reject duplicate pages [1, 1]",
+    "status": "PASS",
+    "evidence": "Correctly rejected duplicate page numbers"
+  },
+  {
+    "name": "Zod: Reject page text > 100,000 characters",
+    "status": "PASS",
+    "evidence": "Correctly rejected ballooning page text"
+  },
+  {
+    "name": "Zod: Reject number metadata without value_number",
+    "status": "PASS",
+    "evidence": "Correctly rejected missing value_number"
+  },
+  {
+    "name": "Zod: Reject date with invalid format",
+    "status": "PASS",
+    "evidence": "Correctly rejected non-YYYY-MM-DD date string"
+  },
+  {
+    "name": "Zod: Normalize metadata and strip irrelevant fields",
+    "status": "PASS",
+    "evidence": "Preserved type consistency and stripped foreign keys"
+  },
+  {
+    "name": "API Protection: GET /api/documents does NOT leak processing_token",
+    "status": "FAIL",
+    "evidence": "fetch failed"
+  },
+  {
+    "name": "API Protection: GET /api/documents/[id] does NOT leak processing_token",
+    "status": "FAIL",
+    "evidence": "fetch failed"
+  },
+  {
+    "name": "Retry Authorization: Unauthenticated call",
+    "status": "FAIL",
+    "evidence": "fetch failed"
+  },
+  {
+    "name": "Retry Authorization: Cross-user retry attempt",
+    "status": "FAIL",
+    "evidence": "fetch failed"
+  },
+  {
+    "name": "Retry State: Pending document retry",
+    "status": "FAIL",
+    "evidence": "fetch failed"
+  },
+  {
+    "name": "RPC Security: Authenticated acquire_document_processing",
+    "status": "PASS",
+    "evidence": "Explicitly denied: \"permission denied for function acquire_document_processing\""
+  },
+  {
+    "name": "RPC Security: Authenticated finalize_document_processing",
+    "status": "PASS",
+    "evidence": "Explicitly denied: \"permission denied for function finalize_document_processing\""
+  },
+  {
+    "name": "RPC Security: Authenticated mark_document_processing_failed",
+    "status": "PASS",
+    "evidence": "Explicitly denied: \"permission denied for function mark_document_processing_failed\""
+  },
+  {
+    "name": "Table Security: Authenticated direct UPDATE on documents",
+    "status": "PASS",
+    "evidence": "Denied: \"permission denied for table documents\""
+  },
+  {
+    "name": "Table Security: Authenticated direct INSERT into document_pages",
+    "status": "PASS",
+    "evidence": "Denied: \"permission denied for table document_pages\""
+  },
+  {
+    "name": "Concurrency: Atomic acquisition race",
+    "status": "PASS",
+    "evidence": "First worker acquired lease; second simultaneous acquisition received null"
+  },
+  {
+    "name": "Fencing: Stale worker finalize rejected",
+    "status": "PASS",
+    "evidence": "RPC returned false; stale worker prevented from overwriting"
+  },
+  {
+    "name": "Fencing: Stale worker markFailed rejected",
+    "status": "PASS",
+    "evidence": "RPC returned false; stale worker prevented from failing document"
+  },
+  {
+    "name": "Current Worker: Finalize with active token",
+    "status": "PASS",
+    "evidence": "Atomic transaction committed document and pages"
+  },
+  {
+    "name": "RLS Isolation: Owner SELECT on document_pages",
+    "status": "PASS",
+    "evidence": "Owner successfully read 1 page row"
+  },
+  {
+    "name": "RLS Isolation: Cross-user SELECT on document_pages",
+    "status": "PASS",
+    "evidence": "User B query for User A pages returned 0 rows"
+  }
+]

@@ -1,0 +1,87 @@
+[
+  {
+    "name": "Chunking: Contiguous 0-indexing across pages",
+    "status": "PASS",
+    "evidence": "Created 2 contiguous chunks starting at index 0"
+  },
+  {
+    "name": "Chunking: Page range validity",
+    "status": "PASS",
+    "evidence": "All chunks map to valid [page_start, page_end]"
+  },
+  {
+    "name": "Chunking: Deterministic SHA-256 content_hash",
+    "status": "PASS",
+    "evidence": "Two consecutive runs produced identical 64-char hashes"
+  },
+  {
+    "name": "Chunking: Empty and whitespace input handling",
+    "status": "PASS",
+    "evidence": "Empty and whitespace pages returned empty array"
+  },
+  {
+    "name": "Chunk Integrity: validateChunksIntegrity assertions",
+    "status": "PASS",
+    "evidence": "Correctly rejected non-contiguous index, inverted pages, and invalid hash"
+  },
+  {
+    "name": "Vector Validation: 768-dimensional strict enforcement",
+    "status": "PASS",
+    "evidence": "Accepted valid 768-dim float vector; rejected short, long, NaN, and Infinity"
+  },
+  {
+    "name": "RRF Formula: Dual-channel fusion (k=60)",
+    "status": "PASS",
+    "evidence": "Dual Rank 1 = 0.032787, single channel = 0.016393"
+  },
+  {
+    "name": "RRF Ranking: Exact identifier boost priority",
+    "status": "PASS",
+    "evidence": "Rank 10 with exact boost (0.078571) correctly outranks Rank 1 non-exact (0.032787)"
+  },
+  {
+    "name": "Snippet Bounding: Length <= 750 and contextual anchoring",
+    "status": "PASS",
+    "evidence": "Short preserved intact; long bounded to 756 chars anchored around target"
+  },
+  {
+    "name": "Search API: Unauthenticated GET /api/search rejected",
+    "status": "PASS",
+    "evidence": "Received HTTP 401 Unauthorized"
+  },
+  {
+    "name": "Search API: Empty query validation",
+    "status": "PASS",
+    "evidence": "Received HTTP 400 for empty query"
+  },
+  {
+    "name": "Search API: Query length limit (>500 chars) enforced",
+    "status": "PASS",
+    "evidence": "Received HTTP 400 for oversized query"
+  },
+  {
+    "name": "Data Protection: Zero vector or token leakage in search results",
+    "status": "PASS",
+    "evidence": "Output strictly excludes embedding, embedding_token, and fts_tokens"
+  },
+  {
+    "name": "Reindex API: Unauthenticated POST rejected",
+    "status": "PASS",
+    "evidence": "Received HTTP 401 Unauthorized"
+  },
+  {
+    "name": "Reindex API: Cross-origin CSRF defense",
+    "status": "PASS",
+    "evidence": "Received HTTP 403 Invalid origin"
+  },
+  {
+    "name": "Reindex API: Authoritative database ownership check",
+    "status": "PASS",
+    "evidence": "Received HTTP 404 Not Found"
+  },
+  {
+    "name": "Database RPC & Table Migration Check",
+    "status": "PENDING_MIGRATION",
+    "evidence": "supabase_phase1b_setup.sql must be applied in remote Supabase SQL Editor"
+  }
+]
