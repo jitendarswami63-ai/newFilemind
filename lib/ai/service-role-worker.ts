@@ -12,6 +12,12 @@ export interface AuthoritativeDocument {
   processing_attempts: number
   processing_locked_at: string | null
   processing_token: string | null
+  doc_category?: string | null
+  tags?: string[] | null
+  extracted_data?: NormalizedMetadataItem[] | null
+  is_scanned?: boolean | null
+  embedding_status?: string | null
+  embedding_error?: string | null
 }
 
 export interface FinalizePayload {
@@ -51,10 +57,6 @@ export function getServiceRoleClient(): SupabaseClient {
   return cachedServiceClient
 }
 
-/**
- * Resolves authoritative document details directly from public.documents.
- * Never trusts client or browser-supplied user_id or storage_path.
- */
 export async function getAuthoritativeDocument(
   documentId: string
 ): Promise<AuthoritativeDocument | null> {
@@ -62,7 +64,9 @@ export async function getAuthoritativeDocument(
 
   const { data, error } = await client
     .from('documents')
-    .select('id, user_id, filename, storage_path, status, processing_attempts, processing_locked_at, processing_token')
+    .select(
+      'id, user_id, filename, storage_path, status, processing_attempts, processing_locked_at, processing_token, doc_category, tags, extracted_data, is_scanned, embedding_status, embedding_error'
+    )
     .eq('id', documentId)
     .single()
 
@@ -79,13 +83,15 @@ export async function getAuthoritativeDocument(
     processing_attempts: data.processing_attempts,
     processing_locked_at: data.processing_locked_at,
     processing_token: data.processing_token || null,
+    doc_category: data.doc_category || null,
+    tags: data.tags || null,
+    extracted_data: data.extracted_data || null,
+    is_scanned: data.is_scanned || null,
+    embedding_status: data.embedding_status || null,
+    embedding_error: data.embedding_error || null,
   }
 }
 
-/**
- * Calls the atomic acquisition RPC acquire_document_processing.
- * Returns the fresh UUID processing_token on success, or null if lock acquisition failed.
- */
 export async function acquireLock(
   documentId: string,
   authoritativeUserId: string
@@ -104,11 +110,6 @@ export async function acquireLock(
   return (data as string) || null
 }
 
-/**
- * Calls the atomic finalization RPC finalize_document_processing.
- * Returns true if results were committed and token was cleared,
- * or false if the token was stale (fenced out).
- */
 export async function finalizeResults(
   documentId: string,
   authoritativeUserId: string,
@@ -136,11 +137,6 @@ export async function finalizeResults(
   return Boolean(data)
 }
 
-/**
- * Calls the fenced failure RPC mark_document_processing_failed.
- * Returns true if error was recorded and token was cleared,
- * or false if the token was stale (fenced out).
- */
 export async function markFailed(
   documentId: string,
   authoritativeUserId: string,
@@ -163,10 +159,116 @@ export async function markFailed(
   return Boolean(data)
 }
 
-/**
- * Securely downloads the PDF file buffer directly from Supabase Storage
- * using the isolated service-role client and the authoritative storage_path.
- */
+export async function updateDocumentProcessingStage(
+  documentId: string,
+  stage: string,
+  fencingToken: string
+): Promise<boolean> {
+  const client = getServiceRoleClient()
+
+  const { error } = await client
+    .from('documents')
+    .update({
+      processing_stage: stage,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', documentId)
+    .eq('processing_token', fencingToken)
+
+  return !error
+}
+
+export async function saveSegmentPagesCheckpoint({
+  documentId,
+  userId,
+  fencingToken,
+  pages,
+  stage,
+}: {
+  documentId: string
+  userId: string
+  fencingToken: string
+  pages: Array<{ page_number: number; text: string }>
+  stage: string
+}): Promise<boolean> {
+  const client = getServiceRoleClient()
+
+  const { data: doc, error: fenceErr } = await client
+    .from('documents')
+    .select('id')
+    .eq('id', documentId)
+    .eq('user_id', userId)
+    .eq('processing_token', fencingToken)
+    .single()
+
+  if (fenceErr || !doc) {
+    console.warn(`[Checkpoint] Fencing token mismatch for doc ${documentId}. Aborting checkpoint.`)
+    return false
+  }
+
+  if (pages.length > 0) {
+    const { error: pageErr } = await client
+      .from('document_pages')
+      .upsert(
+        pages.map((p) => ({
+          document_id: documentId,
+          page_number: p.page_number,
+          extracted_text: p.text,
+        })),
+        { onConflict: 'document_id,page_number' }
+      )
+
+    if (pageErr) {
+      console.error(`[Checkpoint] Failed to upsert pages for doc ${documentId}:`, pageErr.message)
+      return false
+    }
+  }
+
+  const { error: stageErr } = await client
+    .from('documents')
+    .update({
+      processing_stage: stage,
+      processing_locked_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', documentId)
+    .eq('processing_token', fencingToken)
+
+  return !stageErr
+}
+
+export async function getCompletedPageNumbers(documentId: string): Promise<Set<number>> {
+  const client = getServiceRoleClient()
+  const completed = new Set<number>()
+  const pageSize = 1000
+  let from = 0
+
+  while (true) {
+    const to = from + pageSize - 1
+    const { data, error } = await client
+      .from('document_pages')
+      .select('page_number')
+      .eq('document_id', documentId)
+      .range(from, to)
+
+    if (error || !data || data.length === 0) {
+      break
+    }
+
+    for (const r of data as Array<{ page_number: number }>) {
+      completed.add(r.page_number)
+    }
+
+    if (data.length < pageSize) {
+      break
+    }
+
+    from += pageSize
+  }
+
+  return completed
+}
+
 export async function downloadDocumentBuffer(storagePath: string): Promise<Buffer> {
   const client = getServiceRoleClient()
 
@@ -187,30 +289,41 @@ export interface PageRecord {
   extracted_text: string
 }
 
-/**
- * Reads all page texts for a document from public.document_pages,
- * sorted strictly by page_number.
- */
 export async function getDocumentPages(documentId: string): Promise<PageRecord[]> {
   const client = getServiceRoleClient()
+  const allPages: PageRecord[] = []
+  const pageSize = 1000
+  let from = 0
 
-  const { data, error } = await client
-    .from('document_pages')
-    .select('page_number, extracted_text')
-    .eq('document_id', documentId)
-    .order('page_number', { ascending: true })
+  while (true) {
+    const to = from + pageSize - 1
+    const { data, error } = await client
+      .from('document_pages')
+      .select('page_number, extracted_text')
+      .eq('document_id', documentId)
+      .order('page_number', { ascending: true })
+      .range(from, to)
 
-  if (error) {
-    throw new Error(`Failed to read document pages: ${error.message}`)
+    if (error) {
+      throw new Error(`Failed to read document pages: ${error.message}`)
+    }
+
+    if (!data || data.length === 0) {
+      break
+    }
+
+    allPages.push(...(data as PageRecord[]))
+
+    if (data.length < pageSize) {
+      break
+    }
+
+    from += pageSize
   }
 
-  return (data as PageRecord[]) || []
+  return allPages
 }
 
-/**
- * Calls Phase 1B atomic acquisition RPC acquire_document_indexing.
- * Returns the fresh UUID embedding_token on success, or null if lock acquisition failed.
- */
 export async function acquireIndexingLock(
   documentId: string,
   authoritativeUserId: string
@@ -235,14 +348,9 @@ export interface ChunkInsertPayload {
   chunk_index: number
   content: string
   content_hash: string
-  embedding: string // formatted vector string e.g. "[0.123,...]"
+  embedding: string
 }
 
-/**
- * Calls Phase 1B atomic finalization RPC finalize_document_indexing.
- * Atomically replaces all document chunks and marks embedding_status = completed.
- * Returns false if the token was stale / fenced out.
- */
 export async function finalizeIndexing(
   documentId: string,
   authoritativeUserId: string,
@@ -266,10 +374,6 @@ export async function finalizeIndexing(
   return Boolean(data)
 }
 
-/**
- * Calls Phase 1B fenced failure RPC mark_document_indexing_failed.
- * Sets embedding_status = failed and records error message.
- */
 export async function markIndexingFailed(
   documentId: string,
   authoritativeUserId: string,
@@ -304,9 +408,6 @@ export interface UpdateOptimizedSizeParams {
   status: string
 }
 
-/**
- * Uploads an optimized PDF buffer to a new versioned storage path using service-role.
- */
 export async function storeOptimizedDocument(
   storagePath: string,
   buffer: Buffer
@@ -326,9 +427,6 @@ export async function storeOptimizedDocument(
   return true
 }
 
-/**
- * Verifies that a storage object exists and returns its byte size.
- */
 export async function verifyStorageObject(
   storagePath: string
 ): Promise<{ size: number } | null> {
@@ -352,9 +450,6 @@ export async function verifyStorageObject(
   return { size }
 }
 
-/**
- * Invokes the atomic update_document_optimized_size RPC.
- */
 export async function updateDocumentOptimizedSize(
   params: UpdateOptimizedSizeParams
 ): Promise<boolean> {
@@ -379,9 +474,6 @@ export async function updateDocumentOptimizedSize(
   return Boolean(data)
 }
 
-/**
- * Safely removes a storage object using service-role.
- */
 export async function deleteStorageObject(storagePath: string): Promise<boolean> {
   const client = getServiceRoleClient()
   const { error } = await client.storage
@@ -394,4 +486,3 @@ export async function deleteStorageObject(storagePath: string): Promise<boolean>
   }
   return true
 }
-

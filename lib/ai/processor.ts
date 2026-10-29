@@ -1,6 +1,7 @@
 import 'server-only'
 import { GoogleGenAI, FileState, Type } from '@google/genai'
 import crypto from 'crypto'
+import { PDFDocument } from 'pdf-lib'
 import {
   getAuthoritativeDocument,
   acquireLock,
@@ -11,16 +12,45 @@ import {
   verifyStorageObject,
   updateDocumentOptimizedSize,
   deleteStorageObject,
+  updateDocumentProcessingStage,
+  saveSegmentPagesCheckpoint,
+  getCompletedPageNumbers,
+  getDocumentPages,
 } from './service-role-worker'
-import { DocumentAiOutputSchema, validatePageIntegrity } from './schema'
+import { DocumentAiOutputSchema, validatePageIntegrity, DocumentAiOutput, NormalizedMetadataItem } from './schema'
 import { indexDocument } from './index-document'
 import { optimizePdfBuffer } from '@/lib/storage/optimizer'
 import { sanitizeFilename } from '@/lib/validation/filename'
+import {
+  MAX_DOCUMENT_PAGES,
+  MAX_TOTAL_DOCUMENT_PAGES,
+  getAndValidatePdfPageCount,
+  categorizeDocumentError,
+} from './pdf-page-validator'
+import {
+  computeSegmentPlan,
+  extractPdfSegment,
+  remapSegmentPagesToOriginal,
+  validateSegmentExtractionCompleteness,
+  subdivideSegmentRange,
+  ExtractionIncompleteError,
+  SegmentRange,
+} from './pdf-splitter'
+import {
+  extractNativePdfText,
+  extractIntroductorySample,
+} from './native-pdf-extractor'
+import {
+  synthesizeDocumentMetadataWithGemini,
+} from './metadata-synthesizer'
 
-/**
- * Hardcoded system instruction enforcing prompt injection defense
- * and strict adherence to structured extraction.
- */
+export {
+  MAX_DOCUMENT_PAGES,
+  MAX_TOTAL_DOCUMENT_PAGES,
+  getAndValidatePdfPageCount,
+  categorizeDocumentError,
+}
+
 const SYSTEM_INSTRUCTION = `You are a secure, authoritative PDF document analyzer.
 Your task is to analyze the uploaded document and extract structured data:
 1. Document category (e.g. Invoice, Receipt, Contract, Financial Report, Identity, Manual, Letter, Form, Other).
@@ -38,10 +68,6 @@ CRITICAL SECURITY RULES:
 - Ensure page_number is 1-indexed (1, 2, 3... page_count).
 - Do not serialize null values. Omit optional fields if not present.`
 
-/**
- * Gemini response schema definition matching Section 8.
- * Omits nullable: true and specifies required/types.
- */
 const GEMINI_RESPONSE_SCHEMA = {
   type: Type.OBJECT,
   properties: {
@@ -85,151 +111,38 @@ const GEMINI_RESPONSE_SCHEMA = {
   required: ['doc_category', 'tags', 'metadata', 'pages', 'page_count', 'is_scanned'],
 }
 
-/**
- * Main AI document processor entrypoint.
- * Receives ONLY documentId. Resolves all authoritative state from DB.
- */
-export async function processDocument(
-  documentId: string,
-  preAcquiredToken?: string
-): Promise<boolean> {
-  // 1. Authoritative DB lookup
-  const doc = await getAuthoritativeDocument(documentId)
-  if (!doc) {
-    console.warn(`[DocumentAI] docId=${documentId} stage=lookup attempt=0 status=not_found`)
-    return false
-  }
+interface ExtractGeminiOptions {
+  geminiClient: GoogleGenAI
+  pdfBuffer: Buffer
+  displayName: string
+  documentId: string
+  activeAttempt: number
+  promptText?: string
+  expectedPageCount?: number
+}
 
-  const authoritativeUserId = doc.user_id
-  const storagePath = doc.storage_path
-  const currentAttempts = doc.processing_attempts
-
-  console.log(`[DocumentAI] docId=${documentId} stage=lookup attempt=${currentAttempts} status=found`)
-
-  // 2. Resolve atomic lease & fencing token
-  let token: string | null = null
-
-  if (preAcquiredToken) {
-    // Lock was already acquired atomically by claim_next_pending_document or system claim RPC
-    // Verify fencing token matches authoritative DB state
-    const isTokenValid = doc.processing_token === preAcquiredToken && doc.status === 'processing'
-    if (!isTokenValid) {
-      console.warn(`[DocumentAI] docId=${documentId} stage=acquire status=preacquired_token_mismatch`)
-      return false
-    }
-    token = preAcquiredToken
-  } else {
-    // Acquire atomic lease & fencing token via acquire_document_processing
-    token = await acquireLock(documentId, authoritativeUserId)
-    if (!token) {
-      console.log(`[DocumentAI] docId=${documentId} stage=acquire attempt=${currentAttempts + 1} status=lock_denied`)
-      return false
-    }
-  }
-
-  const activeAttempt = preAcquiredToken ? currentAttempts : currentAttempts + 1
-  console.log(`[DocumentAI] docId=${documentId} stage=acquire attempt=${activeAttempt} status=acquired`)
-
+async function extractStructuredDataWithGemini({
+  geminiClient,
+  pdfBuffer,
+  displayName,
+  documentId,
+  activeAttempt,
+  promptText = 'Analyze this uploaded PDF document thoroughly and extract the category, tags, key metadata, and page-by-page text matching the specified schema.',
+  expectedPageCount,
+}: ExtractGeminiOptions): Promise<DocumentAiOutput> {
   let uploadedFileName: string | null = null
-  let geminiClient: GoogleGenAI | null = null
 
   try {
-    // 3. Securely download PDF buffer from storage
-    console.log(`[DocumentAI] docId=${documentId} stage=download attempt=${activeAttempt} status=started`)
-    const pdfBuffer = await downloadDocumentBuffer(storagePath)
-    console.log(`[DocumentAI] docId=${documentId} stage=download attempt=${activeAttempt} status=completed`)
 
-    // Attempt safe structural PDF optimization (Phase Optimization)
-    // CRITICAL: OPTIMIZATION FAILURE MUST NEVER FAIL DOCUMENT UNDERSTANDING.
-    let canonicalBuffer = pdfBuffer
-    let currentStoragePath = storagePath
-
-    try {
-      console.log(`[DocumentAI] docId=${documentId} stage=optimization attempt=${activeAttempt} status=started`)
-      const optResult = await optimizePdfBuffer(pdfBuffer)
-
-      if (optResult.status === 'optimized' && optResult.wasOptimized && optResult.buffer) {
-        // Safe versioned storage replacement flow:
-        // 1. Generate versioned path under user namespace: {userId}/{documentId}/optimized-{hash}-{filename}
-        const contentHash = crypto.createHash('sha256').update(optResult.buffer).digest('hex').slice(0, 12)
-        const sanitizedFilename = doc.filename ? sanitizeFilename(doc.filename) : 'document.pdf'
-        const baseName = sanitizedFilename.replace(/\.pdf$/i, '')
-        const newStoragePath = `${authoritativeUserId}/${documentId}/optimized-${contentHash}-${baseName}.pdf`
-
-        // 2. Upload optimized PDF to new versioned storage path
-        const uploaded = await storeOptimizedDocument(newStoragePath, optResult.buffer)
-        if (uploaded) {
-          // 3. Verify optimized object exists and stored byte size matches
-          const verifyObj = await verifyStorageObject(newStoragePath)
-          if (verifyObj && verifyObj.size === optResult.optimizedSize) {
-            // 4. Atomically update document metadata via secure RPC
-            const updatedDb = await updateDocumentOptimizedSize({
-              documentId,
-              userId: authoritativeUserId,
-              expectedStoragePath: currentStoragePath,
-              newStoragePath,
-              optimizedSize: optResult.optimizedSize,
-              originalSize: optResult.originalSize,
-              savedBytes: optResult.savedBytes,
-              savingsPercent: optResult.savingsPercent,
-              status: 'completed',
-            })
-
-            if (updatedDb) {
-              console.log(
-                `[DocumentAI] docId=${documentId} stage=optimization attempt=${activeAttempt} status=completed saved=${optResult.savedBytes}b (${optResult.savingsPercent}%)`
-              )
-              // 5. Safely delete old storage object only after successful DB switch
-              await deleteStorageObject(currentStoragePath).catch((delErr) => {
-                console.warn(
-                  `[DocumentAI] docId=${documentId} safe cleanup warning for old path ${currentStoragePath}:`,
-                  delErr
-                )
-              })
-              currentStoragePath = newStoragePath
-              canonicalBuffer = optResult.buffer
-            } else {
-              // DB switch failed (e.g. race condition); delete the new optimized object and retain original
-              console.warn(
-                `[DocumentAI] docId=${documentId} stage=optimization status=db_switch_failed, rolling back new object`
-              )
-              await deleteStorageObject(newStoragePath).catch(() => {})
-            }
-          } else {
-            console.warn(
-              `[DocumentAI] docId=${documentId} stage=optimization status=storage_verify_failed, rolling back new object`
-            )
-            await deleteStorageObject(newStoragePath).catch(() => {})
-          }
-        }
-      } else {
-        console.log(
-          `[DocumentAI] docId=${documentId} stage=optimization status=${optResult.status} reason=${optResult.reason || 'none'}`
-        )
-      }
-    } catch (optErr) {
-      console.warn(
-        `[DocumentAI] docId=${documentId} stage=optimization status=error (falling back to original buffer):`,
-        optErr
-      )
-    }
-
-    // 4. Initialize Gemini client
-    const apiKey = process.env.GEMINI_API_KEY
-    if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not configured on the server')
-    }
-
-    geminiClient = new GoogleGenAI({ apiKey })
-
-    // 5. Upload canonical PDF to Gemini Files API
-    console.log(`[DocumentAI] docId=${documentId} stage=upload attempt=${activeAttempt} status=started`)
-    const blob = new Blob([new Uint8Array(canonicalBuffer)], { type: 'application/pdf' })
+    console.log(
+      `[DocumentAI] docId=${documentId} stage=upload attempt=${activeAttempt} name="${displayName}" status=started`
+    )
+    const blob = new Blob([new Uint8Array(pdfBuffer)], { type: 'application/pdf' })
     const uploadResult = await geminiClient.files.upload({
       file: blob,
       config: {
         mimeType: 'application/pdf',
-        displayName: doc.filename || 'document.pdf',
+        displayName: displayName || 'document.pdf',
       },
     })
 
@@ -240,7 +153,6 @@ export async function processDocument(
     uploadedFileName = uploadResult.name
     console.log(`[DocumentAI] docId=${documentId} stage=upload attempt=${activeAttempt} status=completed`)
 
-    // 6. Handle Gemini Files API state (poll boundedly if PROCESSING)
     let currentFile = uploadResult
     const MAX_POLL_ATTEMPTS = 30
     let pollAttempts = 0
@@ -264,19 +176,17 @@ export async function processDocument(
 
     console.log(`[DocumentAI] docId=${documentId} stage=poll attempt=${activeAttempt} status=active`)
 
-    // 7. Call Gemini Multimodal Model with candidate cascade, strict schema, and bounded backoff
-    // Priority order:
-    // 1. process.env.GEMINI_MODEL (if explicitly configured)
-    // 2. 'gemini-3.6-flash' (verified stable default model)
-    // 3. 'gemini-3.8-flash' (high-performance model with bounded retries and fallback)
-    // 4. 'gemini-3-flash-preview' (optional preview fallback)
-    // 5. process.env.GEMINI_FALLBACK_MODEL (if explicitly configured)
-    // Note: 'gemini-3.5-flash' is removed as Google automatically routes it to gemini-3.6-flash.
     const candidateModels = Array.from(
       new Set(
         [
           process.env.GEMINI_MODEL,
+          'gemini-3.5-flash-lite',
+          'gemini-flash-lite-latest',
+          'gemini-3.1-flash-lite',
+          'gemini-flash-latest',
+          'gemini-3.5-flash',
           'gemini-3.6-flash',
+          'gemini-3.7-flash',
           'gemini-3.8-flash',
           'gemini-3-flash-preview',
           process.env.GEMINI_FALLBACK_MODEL,
@@ -303,7 +213,7 @@ export async function processDocument(
                 },
               },
               {
-                text: 'Analyze this uploaded PDF document thoroughly and extract the category, tags, key metadata, and page-by-page text matching the specified schema.',
+                text: promptText,
               },
             ],
             config: {
@@ -330,21 +240,44 @@ export async function processDocument(
             errStr.includes('429') ||
             errStr.includes('RESOURCE_EXHAUSTED')
 
+          const isPermanentModelLimit =
+            errStr.includes('exceeds the supported page limit') ||
+            errStr.includes('page limit') ||
+            errStr.includes('token count exceeds') ||
+            errStr.includes('tokens allowed') ||
+            errStr.includes('exceeded your current quota') ||
+            errStr.includes('per day limit') ||
+            errStr.includes('generate_content_free_tier_requests')
+
           console.warn(
             `[DocumentAI] docId=${documentId} model=${modelName} attempt=${attempt + 1}/3 error:`,
             errStr.slice(0, 150)
           )
 
+          if (isPermanentModelLimit) {
+            break
+          }
+
           if (isTransient && attempt < 2) {
-            const delayMs = 1500 * Math.pow(2, attempt) + Math.random() * 500
-            await new Promise((r) => setTimeout(r, delayMs))
+            const delay = 1500 * Math.pow(2, attempt) + Math.random() * 500
+            await new Promise((r) => setTimeout(r, delay))
           } else {
-            break // Fallback to next candidate model
+            break
           }
         }
       }
 
       if (response && response.text) {
+        break
+      }
+
+      const lastErrStr = String(lastGenError instanceof Error ? lastGenError.message : lastGenError)
+      if (
+        lastErrStr.includes('exceeds the supported page limit') ||
+        lastErrStr.includes('page limit') ||
+        lastErrStr.includes('token count exceeds') ||
+        lastErrStr.includes('tokens allowed')
+      ) {
         break
       }
     }
@@ -360,34 +293,454 @@ export async function processDocument(
       throw new Error('Empty response from AI model')
     }
 
-    // 8. Parse and validate with Zod
-    console.log(`[DocumentAI] docId=${documentId} stage=validate attempt=${activeAttempt} status=started`)
     let parsedJson: unknown
     try {
       parsedJson = JSON.parse(responseText)
-    } catch {
-      throw new Error('AI response was not valid JSON')
+    } catch (parseErr: unknown) {
+      throw new Error(
+        `AI response was not valid JSON: ${
+          parseErr instanceof Error ? parseErr.message : 'Truncated or malformed output'
+        }`
+      )
+    }
+
+    if (expectedPageCount && typeof parsedJson === 'object' && parsedJson !== null) {
+      const obj = parsedJson as Record<string, unknown>
+      if (Array.isArray(obj.pages) && obj.pages.length === expectedPageCount) {
+        obj.page_count = expectedPageCount
+      }
     }
 
     const validatedData = DocumentAiOutputSchema.parse(parsedJson)
 
-    // 9. Page integrity validation
-    validatePageIntegrity(validatedData.pages, validatedData.page_count)
-    console.log(`[DocumentAI] docId=${documentId} stage=validate attempt=${activeAttempt} status=completed`)
+    if (expectedPageCount) {
+      const completeness = validateSegmentExtractionCompleteness(
+        validatedData.pages,
+        expectedPageCount
+      )
+      if (!completeness.isValid) {
+        throw new ExtractionIncompleteError(
+          completeness.errorMessage ||
+            `Extraction incomplete: received ${validatedData.pages.length}/${expectedPageCount} pages`,
+          completeness
+        )
+      }
+    }
 
-    // 10. Atomic commit via finalize_document_processing
+    return validatedData
+  } finally {
+    if (uploadedFileName) {
+      try {
+        await geminiClient.files.delete({ name: uploadedFileName })
+        console.log(
+          `[DocumentAI] docId=${documentId} stage=cleanup attempt=${activeAttempt} name="${uploadedFileName}" status=cleaned`
+        )
+      } catch {} }
+  }
+}
+
+interface ProcessSegmentOptions {
+  geminiClient: GoogleGenAI
+  loadedPdfDoc: PDFDocument
+  segment: SegmentRange
+  documentId: string
+  activeAttempt: number
+  docFilename?: string
+  depth?: number
+  isFirstSegment?: boolean
+}
+
+async function processSegmentWithAdaptiveBisection({
+  geminiClient,
+  loadedPdfDoc,
+  segment,
+  documentId,
+  activeAttempt,
+  docFilename,
+  depth = 0,
+  isFirstSegment = false,
+}: ProcessSegmentOptions): Promise<{
+  pages: Array<{ page_number: number; text: string }>
+  metadata?: {
+    doc_category?: string
+    tags?: string[]
+    metadata?: NormalizedMetadataItem[]
+    is_scanned?: boolean
+  }
+}> {
+  const segDisplayName = `${docFilename || 'document.pdf'} (Part ${segment.segmentIndex}/${segment.totalSegments})`
+  const segPrompt = isFirstSegment
+    ? 'Analyze this initial segment (Part 1) of the document. Extract the overall category, key semantic tags, document metadata, and page-by-page text matching the specified schema.'
+    : `Analyze segment Part ${segment.segmentIndex} (pages ${segment.pageStart} to ${segment.pageEnd}) of the document. Extract page-by-page text, relevant tags, and metadata matching the specified schema.`
+
+  try {
+    const segmentBuffer = await extractPdfSegment(loadedPdfDoc, segment.pageStart, segment.pageEnd)
+
+    const segmentData = await extractStructuredDataWithGemini({
+      geminiClient,
+      pdfBuffer: segmentBuffer,
+      displayName: segDisplayName,
+      documentId,
+      activeAttempt,
+      promptText: segPrompt,
+      expectedPageCount: segment.pageCount,
+    })
+
+    const remappedPages = remapSegmentPagesToOriginal(
+      segmentData.pages,
+      segment.pageStart,
+      segment.pageEnd
+    )
+
+    return {
+      pages: remappedPages,
+      metadata: {
+        doc_category: segmentData.doc_category,
+        tags: segmentData.tags,
+        metadata: segmentData.metadata,
+        is_scanned: segmentData.is_scanned,
+      },
+    }
+  } catch (err: unknown) {
+    const errStr = String(err instanceof Error ? err.message : err)
+    const isTruncationOrIncomplete =
+      err instanceof ExtractionIncompleteError ||
+      errStr.includes('AI response was not valid JSON') ||
+      errStr.includes('Unexpected end of JSON input') ||
+      errStr.includes('MAX_TOKENS') ||
+      errStr.includes('Extraction incomplete')
+
+    if (isTruncationOrIncomplete && segment.pageCount > 1 && depth < 3) {
+      console.warn(
+        `[DocumentAI] docId=${documentId} segment pages=${segment.pageStart}..${segment.pageEnd} hit extraction or token limit. Performing adaptive bisection (depth ${depth + 1})...`
+      )
+      const subs = subdivideSegmentRange(segment)
+      if (subs) {
+        const [sub1, sub2] = subs
+        const res1 = await processSegmentWithAdaptiveBisection({
+          geminiClient,
+          loadedPdfDoc,
+          segment: sub1,
+          documentId,
+          activeAttempt,
+          docFilename,
+          depth: depth + 1,
+          isFirstSegment: isFirstSegment && sub1.pageStart === 1,
+        })
+
+        await new Promise((r) => setTimeout(r, 1000))
+
+        const res2 = await processSegmentWithAdaptiveBisection({
+          geminiClient,
+          loadedPdfDoc,
+          segment: sub2,
+          documentId,
+          activeAttempt,
+          docFilename,
+          depth: depth + 1,
+          isFirstSegment: false,
+        })
+
+        const combinedPages = [...res1.pages, ...res2.pages].sort((a, b) => a.page_number - b.page_number)
+        return {
+          pages: combinedPages,
+          metadata: res1.metadata || res2.metadata,
+        }
+      }
+    }
+
+    throw err
+  }
+}
+
+export async function processDocument(
+  documentId: string,
+  preAcquiredToken?: string
+): Promise<boolean> {
+  const doc = await getAuthoritativeDocument(documentId)
+  if (!doc) {
+    console.warn(`[DocumentAI] docId=${documentId} stage=lookup attempt=0 status=not_found`)
+    return false
+  }
+
+  const authoritativeUserId = doc.user_id
+  const storagePath = doc.storage_path
+  const currentAttempts = doc.processing_attempts
+
+  console.log(`[DocumentAI] docId=${documentId} stage=lookup attempt=${currentAttempts} status=found`)
+
+  let token: string | null = null
+
+  if (preAcquiredToken) {
+    const isTokenValid = doc.processing_token === preAcquiredToken && doc.status === 'processing'
+    if (!isTokenValid) {
+      console.warn(`[DocumentAI] docId=${documentId} stage=acquire status=preacquired_token_mismatch`)
+      return false
+    }
+    token = preAcquiredToken
+  } else {
+    token = await acquireLock(documentId, authoritativeUserId)
+    if (!token) {
+      console.log(`[DocumentAI] docId=${documentId} stage=acquire attempt=${currentAttempts + 1} status=lock_denied`)
+      return false
+    }
+  }
+
+  const activeAttempt = preAcquiredToken ? currentAttempts : currentAttempts + 1
+  console.log(`[DocumentAI] docId=${documentId} stage=acquire attempt=${activeAttempt} status=acquired`)
+
+  try {
+    console.log(`[DocumentAI] docId=${documentId} stage=download attempt=${activeAttempt} status=started`)
+    const pdfBuffer = await downloadDocumentBuffer(storagePath)
+    console.log(`[DocumentAI] docId=${documentId} stage=download attempt=${activeAttempt} status=completed`)
+
+    let canonicalBuffer = pdfBuffer
+    let currentStoragePath = storagePath
+
+    try {
+      console.log(`[DocumentAI] docId=${documentId} stage=optimization attempt=${activeAttempt} status=started`)
+      const optResult = await optimizePdfBuffer(pdfBuffer)
+
+      if (optResult.status === 'optimized' && optResult.wasOptimized && optResult.buffer) {
+        const contentHash = crypto.createHash('sha256').update(optResult.buffer).digest('hex').slice(0, 12)
+        const sanitizedFilename = doc.filename ? sanitizeFilename(doc.filename) : 'document.pdf'
+        const baseName = sanitizedFilename.replace(/\.pdf$/i, '')
+        const newStoragePath = `${authoritativeUserId}/${documentId}/optimized-${contentHash}-${baseName}.pdf`
+
+        const uploaded = await storeOptimizedDocument(newStoragePath, optResult.buffer)
+        if (uploaded) {
+          const verifyObj = await verifyStorageObject(newStoragePath)
+          if (verifyObj && verifyObj.size === optResult.optimizedSize) {
+            const updatedDb = await updateDocumentOptimizedSize({
+              documentId,
+              userId: authoritativeUserId,
+              expectedStoragePath: currentStoragePath,
+              newStoragePath,
+              optimizedSize: optResult.optimizedSize,
+              originalSize: optResult.originalSize,
+              savedBytes: optResult.savedBytes,
+              savingsPercent: optResult.savingsPercent,
+              status: 'completed',
+            })
+
+            if (updatedDb) {
+              console.log(
+                `[DocumentAI] docId=${documentId} stage=optimization attempt=${activeAttempt} status=completed saved=${optResult.savedBytes}b (${optResult.savingsPercent}%)`
+              )
+              await deleteStorageObject(currentStoragePath).catch((delErr) => {
+                console.warn(
+                  `[DocumentAI] docId=${documentId} safe cleanup warning for old path ${currentStoragePath}:`,
+                  delErr
+                )
+              })
+              currentStoragePath = newStoragePath
+              canonicalBuffer = optResult.buffer
+            } else {
+              console.warn(
+                `[DocumentAI] docId=${documentId} stage=optimization status=db_switch_failed, rolling back new object`
+              )
+              await deleteStorageObject(newStoragePath).catch(() => {})
+            }
+          } else {
+            console.warn(
+              `[DocumentAI] docId=${documentId} stage=optimization status=storage_verify_failed, rolling back new object`
+            )
+            await deleteStorageObject(newStoragePath).catch(() => {})
+          }
+        }
+      } else {
+        console.log(
+          `[DocumentAI] docId=${documentId} stage=optimization status=${optResult.status} reason=${optResult.reason || 'none'}`
+        )
+      }
+    } catch (optErr: unknown) {
+      console.warn(
+        `[DocumentAI] docId=${documentId} stage=optimization status=error (falling back to original buffer):`,
+        optErr
+      )
+    }
+
+    console.log(`[DocumentAI] docId=${documentId} stage=validate_page_count attempt=${activeAttempt} status=started`)
+    const validatedPageCount = await getAndValidatePdfPageCount(canonicalBuffer, MAX_TOTAL_DOCUMENT_PAGES)
+    console.log(
+      `[DocumentAI] docId=${documentId} stage=validate_page_count attempt=${activeAttempt} status=completed pages=${validatedPageCount} max=${MAX_TOTAL_DOCUMENT_PAGES}`
+    )
+
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) {
+      throw new Error('GEMINI_API_KEY is not configured on the server')
+    }
+
+    const geminiClient = new GoogleGenAI({ apiKey })
+
+    const segmentPlan = computeSegmentPlan(validatedPageCount, canonicalBuffer.length)
+
+    const loadedPdfDoc = await PDFDocument.load(canonicalBuffer, {
+      ignoreEncryption: true,
+      throwOnInvalidObject: false,
+    })
+
+    const alreadyCompletedPages = await getCompletedPageNumbers(documentId)
+
+    let docCategory = doc.doc_category || 'Other'
+    let accumulatedTags: string[] = doc.tags || []
+    let accumulatedMetadata: NormalizedMetadataItem[] = []
+    let isScannedDoc = false
+
+    console.log(
+      `[DocumentAI] docId=${documentId} stage=segmentation segments=${segmentPlan.totalSegments} segmentSize=${segmentPlan.segmentSize} totalPages=${validatedPageCount} cachedPages=${alreadyCompletedPages.size}`
+    )
+
+    if (alreadyCompletedPages.size < validatedPageCount) {
+      console.log(`[DocumentAI] docId=${documentId} stage=native_extract attempt=${activeAttempt} status=started`)
+      const nativeResult = await extractNativePdfText(canonicalBuffer)
+      console.log(
+        `[DocumentAI] docId=${documentId} stage=native_extract attempt=${activeAttempt} status=completed isDigital=${nativeResult.isDigital} pages=${nativeResult.pages.length} nonBlankPages=${nativeResult.nonBlankPagesCount} totalChars=${nativeResult.totalCharacters}`
+      )
+
+      if (nativeResult.isDigital && nativeResult.pages.length === validatedPageCount) {
+        console.log(
+          `[DocumentAI] docId=${documentId} stage=native_extract status=active_fast_path pages=${nativeResult.pages.length} - Bypassing visual OCR segments`
+        )
+
+        for (let i = 0; i < nativeResult.pages.length; i += 100) {
+          const pageBatch = nativeResult.pages.slice(i, i + 100)
+          await saveSegmentPagesCheckpoint({
+            documentId,
+            userId: authoritativeUserId,
+            fencingToken: token,
+            pages: pageBatch,
+            stage: `native_pages_${i + 1}_to_${Math.min(i + 100, nativeResult.pages.length)}`,
+          })
+          for (const p of pageBatch) {
+            alreadyCompletedPages.add(p.page_number)
+          }
+        }
+
+        const candidateModels = Array.from(
+          new Set(
+            [
+              process.env.GEMINI_MODEL,
+              'gemini-3.5-flash-lite',
+              'gemini-flash-lite-latest',
+              'gemini-3.1-flash-lite',
+              'gemini-flash-latest',
+              'gemini-3.5-flash',
+              'gemini-3.6-flash',
+              'gemini-3.7-flash',
+              'gemini-3.8-flash',
+              'gemini-3-flash-preview',
+              process.env.GEMINI_FALLBACK_MODEL,
+            ].filter(Boolean) as string[]
+          )
+        )
+
+        const introText = extractIntroductorySample(nativeResult.pages, 8, 6000)
+        const metaResult = await synthesizeDocumentMetadataWithGemini({
+          geminiClient,
+          introText,
+          filename: doc.filename,
+          candidateModels,
+        })
+
+        docCategory = metaResult.doc_category
+        accumulatedTags = metaResult.tags
+        accumulatedMetadata = metaResult.metadata
+        isScannedDoc = false
+      }
+    }
+
+    for (const segment of segmentPlan.segments) {
+      let isSegmentComplete = true
+      for (let p = segment.pageStart; p <= segment.pageEnd; p++) {
+        if (!alreadyCompletedPages.has(p)) {
+          isSegmentComplete = false
+          break
+        }
+      }
+
+      if (isSegmentComplete) {
+        console.log(
+          `[DocumentAI] docId=${documentId} stage=segment_process segment=${segment.segmentIndex}/${segment.totalSegments} pages=${segment.pageStart}..${segment.pageEnd} status=already_completed (resumed)`
+        )
+        continue
+      }
+
+      console.log(
+        `[DocumentAI] docId=${documentId} stage=segment_process segment=${segment.segmentIndex}/${segment.totalSegments} pages=${segment.pageStart}..${segment.pageEnd} attempt=${activeAttempt} status=started`
+      )
+
+      await updateDocumentProcessingStage(
+        documentId,
+        `segment_${segment.segmentIndex}_of_${segment.totalSegments}`,
+        token
+      )
+
+      const segmentResult = await processSegmentWithAdaptiveBisection({
+        geminiClient,
+        loadedPdfDoc,
+        segment,
+        documentId,
+        activeAttempt,
+        docFilename: doc.filename,
+        depth: 0,
+        isFirstSegment: segment.segmentIndex === 1,
+      })
+
+      await saveSegmentPagesCheckpoint({
+        documentId,
+        userId: authoritativeUserId,
+        fencingToken: token,
+        pages: segmentResult.pages,
+        stage: `segment_${segment.segmentIndex}_of_${segment.totalSegments}`,
+      })
+
+      for (const p of segmentResult.pages) {
+        alreadyCompletedPages.add(p.page_number)
+      }
+
+      if (segmentResult.metadata) {
+        if (segment.segmentIndex === 1 && segmentResult.metadata.doc_category) {
+          docCategory = segmentResult.metadata.doc_category
+        }
+        if (segmentResult.metadata.tags) {
+          accumulatedTags = Array.from(new Set([...accumulatedTags, ...segmentResult.metadata.tags])).slice(0, 20)
+        }
+        if (segmentResult.metadata.metadata) {
+          accumulatedMetadata = [...accumulatedMetadata, ...segmentResult.metadata.metadata].slice(0, 50)
+        }
+        if (segmentResult.metadata.is_scanned) {
+          isScannedDoc = true
+        }
+      }
+
+      console.log(
+        `[DocumentAI] docId=${documentId} stage=segment_process segment=${segment.segmentIndex}/${segment.totalSegments} attempt=${activeAttempt} status=checkpointed pages=${segmentResult.pages.length}`
+      )
+
+      if (segment.segmentIndex < segmentPlan.totalSegments) {
+        await new Promise((r) => setTimeout(r, 1200))
+      }
+    }
+
+    console.log(`[DocumentAI] docId=${documentId} stage=verify_all_pages attempt=${activeAttempt} status=started`)
+    const allDbPages = await getDocumentPages(documentId)
+
+    const finalPages = allDbPages.map((p) => ({ page_number: p.page_number, text: p.extracted_text }))
+    validatePageIntegrity(finalPages, validatedPageCount)
+
     console.log(`[DocumentAI] docId=${documentId} stage=finalize attempt=${activeAttempt} status=started`)
     const finalized = await finalizeResults(
       documentId,
       authoritativeUserId,
       token,
       {
-        doc_category: validatedData.doc_category,
-        tags: validatedData.tags,
-        metadata: validatedData.metadata,
-        pages: validatedData.pages,
-        page_count: validatedData.page_count,
-        is_scanned: validatedData.is_scanned,
+        doc_category: docCategory,
+        tags: accumulatedTags,
+        metadata: accumulatedMetadata,
+        pages: finalPages,
+        page_count: validatedPageCount,
+        is_scanned: isScannedDoc,
       }
     )
 
@@ -398,58 +751,23 @@ export async function processDocument(
 
     console.log(`[DocumentAI] docId=${documentId} stage=finalize attempt=${activeAttempt} status=completed`)
 
-    // Trigger Phase 1B indexing asynchronously without blocking Phase 1A completion
     try {
       indexDocument(documentId).catch((idxErr) => {
         console.error(`[DocumentIndex] Background indexing failed for doc ${documentId}:`, idxErr)
       })
-    } catch {
-      // Keep Phase 1A independently valid
-    }
-
+    } catch {}
     return true
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error during AI document processing'
     console.error(`[DocumentAI] docId=${documentId} stage=error attempt=${activeAttempt} status=failed detail:`, errorMsg.slice(0, 300))
 
-    // Safe error categorizer for user-facing status
-    let categorizedError = 'Analysis failed. Please try again.'
-    const msgLower = errorMsg.toLowerCase()
-    if (msgLower.includes('storage') || msgLower.includes('download')) {
-      categorizedError = 'Failed to retrieve document from storage.'
-    } else if (
-      msgLower.includes('files api') ||
-      msgLower.includes('gemini') ||
-      msgLower.includes('503') ||
-      msgLower.includes('429') ||
-      msgLower.includes('high demand') ||
-      msgLower.includes('unavailable') ||
-      msgLower.includes('resource_exhausted') ||
-      msgLower.includes('rate limit')
-    ) {
-      categorizedError = 'AI service temporarily busy (high demand). Retrying automatically.'
-    } else if (msgLower.includes('json') || msgLower.includes('validate') || msgLower.includes('integrity') || msgLower.includes('schema')) {
-      categorizedError = 'Could not parse structured content from document.'
-    } else if (msgLower.includes('timeout')) {
-      categorizedError = 'AI analysis timed out. Click to retry.'
-    }
+    const categorizedError = categorizeDocumentError(errorMsg, MAX_TOTAL_DOCUMENT_PAGES)
 
-    // Call fenced mark_document_processing_failed
     const failedCommitted = await markFailed(documentId, authoritativeUserId, token, categorizedError)
     if (!failedCommitted) {
       console.warn(`[DocumentAI] docId=${documentId} stage=fail attempt=${activeAttempt} status=stale_aborted`)
     }
 
     return false
-  } finally {
-    // 11. Proactive Gemini Files cleanup inside finally
-    if (geminiClient && uploadedFileName) {
-      try {
-        await geminiClient.files.delete({ name: uploadedFileName })
-        console.log(`[DocumentAI] docId=${documentId} stage=cleanup attempt=${activeAttempt} status=cleaned`)
-      } catch {
-        // Silently ignore cleanup errors to prevent masking primary execution status
-      }
-    }
   }
 }

@@ -3,13 +3,19 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node tests/test_bulk_upload_suite.mjs && node tests/test_optimization_suite.js",
+    "test": "node tests/test_bulk_upload_suite.mjs && node tests/test_optimization_suite.js && node tests/test_hybrid_search_relevance.mjs && node tests/test_ask_ai_suite.mjs && node tests/test_pdf_limits_suite.mjs && node tests/test_pdf_splitting_suite.mjs && node tests/test_hybrid_pdf_pipeline.mjs && node tests/test_ask_ai_bugfixes_suite.mjs && node tests/test_conversation_persistence_suite.mjs",
     "test:bulk": "node tests/test_bulk_upload_suite.mjs",
-    "test:opt": "node tests/test_optimization_suite.js"
+    "test:opt": "node tests/test_optimization_suite.js",
+    "test:relevance": "node tests/test_hybrid_search_relevance.mjs",
+    "test:ask": "node tests/test_ask_ai_suite.mjs",
+    "test:limits": "node tests/test_pdf_limits_suite.mjs",
+    "test:split": "node tests/test_pdf_splitting_suite.mjs",
+    "test:hybrid": "node tests/test_hybrid_pdf_pipeline.mjs",
+    "test:conversations": "node tests/test_conversation_persistence_suite.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.22.0",
@@ -21,6 +27,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1",
+    "unpdf": "^1.9.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {
