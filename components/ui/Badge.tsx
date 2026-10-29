@@ -6,17 +6,17 @@ export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement> {
 
 export function Badge({ className = '', variant = 'default', children, ...props }: BadgeProps) {
   const variantStyles = {
-    default: 'bg-[#007ba7]/20 text-[#38bdf8] border-[#007ba7]/40 shadow-[0_0_10px_rgba(0,123,167,0.15)]',
-    secondary: 'bg-[#12141e] text-slate-200 border-white/15',
-    success: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.15)]',
-    warning: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-    danger: 'bg-[#ff2d95]/15 text-[#ff5ca8] border-[#ff2d95]/35 shadow-[0_0_10px_rgba(255,45,149,0.15)]',
-    outline: 'bg-transparent text-slate-300 border-white/15',
+    default: 'bg-[#EAE8E3] text-[#242424] border-[#D8D6CE]',
+    secondary: 'bg-[#F2F1ED] text-[#57564F] border-[#E2E0D8]',
+    success: 'bg-[#EBF2EE] text-[#2A5443] border-[#D4E3DB]',
+    warning: 'bg-[#FEF7EC] text-[#8C5E1E] border-[#F5E2C4]',
+    danger: 'bg-[#FDF0EE] text-[#9C3A33] border-[#F5D6D2]',
+    outline: 'bg-transparent text-[#77756F] border-[#E7E5E0]',
   }
 
   return (
     <div
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold select-none transition-colors ${variantStyles[variant]} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium select-none transition-colors ${variantStyles[variant]} ${className}`}
       {...props}
     >
       {children}

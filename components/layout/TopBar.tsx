@@ -54,18 +54,18 @@ export function TopBar({ documentId, filename }: TopBarProps) {
   }
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border border-white/10 bg-gradient-to-r from-[#0d1017]/95 via-[#0f121d]/95 to-[#120f18]/95 backdrop-blur-2xl px-5 py-3.5 mb-6 rounded-2xl shadow-xl w-full">
+    <div className="flex flex-wrap items-center justify-between gap-3 border border-[#E7E5E0] bg-white px-5 py-3 mb-6 rounded-xl shadow-xs w-full">
       {/* Left: Back Link & Filename */}
       <div className="flex items-center gap-3 min-w-0 flex-1 max-w-[60%] sm:max-w-[70%]">
         <Link
           href="/documents"
-          className="min-h-[38px] px-3 flex items-center gap-2 text-xs font-bold text-slate-300 hover:text-white bg-white/[0.04] hover:bg-white/[0.08] rounded-xl border border-white/10 hover:border-[#00d2ff]/50 transition-all flex-shrink-0 shadow-sm"
+          className="min-h-[36px] px-3 flex items-center gap-2 text-xs font-medium text-[#242424] hover:text-[#000000] bg-[#F2F1ED] hover:bg-[#EAE8E3] rounded-lg border border-[#E7E5E0] transition-colors flex-shrink-0"
         >
           <ArrowLeft className="h-4 w-4" />
           <span className="hidden sm:inline">Documents</span>
         </Link>
-        <span className="h-5 w-px bg-white/10 flex-shrink-0 hidden sm:inline-block" />
-        <h2 className="text-sm sm:text-base font-bold text-white truncate tracking-tight" title={filename}>
+        <span className="h-4 w-px bg-[#E7E5E0] flex-shrink-0 hidden sm:inline-block" />
+        <h2 className="text-sm sm:text-base font-semibold text-[#242424] truncate tracking-tight" title={filename}>
           {filename}
         </h2>
       </div>
@@ -77,35 +77,29 @@ export function TopBar({ documentId, filename }: TopBarProps) {
           size="sm"
           onClick={handleDownload}
           disabled={downloading}
-          className="text-xs font-semibold rounded-xl"
+          className="text-xs font-medium rounded-lg"
           title="Download original PDF"
         >
           {downloading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
           <span className="hidden sm:inline">Download</span>
         </Button>
 
-        {/* Disabled Phase 1 placeholder: Ask This Document */}
-        <div className="relative group">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled
-            className="text-xs opacity-50 cursor-not-allowed border-dashed rounded-xl"
-          >
-            <Sparkles className="h-3.5 w-3.5 text-[#ff2d95]" />
-            <span className="hidden md:inline">Ask AI</span>
-          </Button>
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block bg-[#0e111a] border border-white/10 text-slate-200 text-[11px] py-1.5 px-3 rounded-xl shadow-2xl pointer-events-none whitespace-nowrap z-50">
-            Ask Document (Phase 1 preview) — Coming soon
-          </div>
-        </div>
+        {/* Ask AI for this document */}
+        <Link
+          href={`/ask?documentId=${documentId}&docName=${encodeURIComponent(filename)}`}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[#315C4C] hover:bg-[#26493C] text-white shadow-xs transition-colors cursor-pointer"
+          title="Ask AI questions grounded in this document"
+        >
+          <Sparkles className="h-3.5 w-3.5 text-white/90" />
+          <span className="hidden sm:inline">Ask AI</span>
+        </Link>
 
         <Button
           variant="danger"
           size="sm"
           onClick={handleDelete}
           disabled={deleting}
-          className="text-xs font-semibold rounded-xl"
+          className="text-xs font-medium rounded-lg"
           title="Delete document"
         >
           {deleting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
