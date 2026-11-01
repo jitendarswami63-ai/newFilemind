@@ -1,8 +1,5 @@
 import { z } from 'zod'
 
-/**
- * Normalized metadata item representation.
- */
 export interface NormalizedMetadataItem {
   key: string
   type: 'string' | 'number' | 'date' | 'boolean'
@@ -12,9 +9,6 @@ export interface NormalizedMetadataItem {
   currency?: string
 }
 
-/**
- * Raw input schema for single metadata item before transformation.
- */
 const RawMetadataItemSchema = z
   .object({
     key: z.string().trim().min(1, 'Metadata key is required').max(100),
@@ -69,7 +63,7 @@ const RawMetadataItemSchema = z
     }
   })
   .transform((val): NormalizedMetadataItem => {
-    // Strip irrelevant fields based on type
+
     const sanitizedKey = val.key.replace(/[\x00-\x1F\x7F]/g, '').trim()
 
     if (val.type === 'string') {
@@ -100,7 +94,6 @@ const RawMetadataItemSchema = z
       }
     }
 
-    // type === 'date'
     return {
       key: sanitizedKey,
       type: 'date',
@@ -108,17 +101,11 @@ const RawMetadataItemSchema = z
     }
   })
 
-/**
- * Raw page item schema.
- */
 const RawPageSchema = z.object({
   page_number: z.number().int('Page number must be an integer'),
   text: z.string().max(100_000, 'Page text exceeds 100,000 characters limit'),
 })
 
-/**
- * Sanitize doc_category.
- */
 const DocCategorySchema = z
   .string()
   .max(100)
@@ -127,16 +114,13 @@ const DocCategorySchema = z
     return cleaned.length > 0 ? cleaned : 'Uncategorized'
   })
 
-/**
- * Sanitize tags: bounded count, max 50 chars each, no control chars, deduplicated.
- */
 const TagsSchema = z
   .array(z.string())
   .transform((rawTags) => {
     const cleaned = rawTags
       .map((t) => t.replace(/[\x00-\x1F\x7F]/g, '').trim())
       .filter((t) => t.length > 0 && t.length <= 50)
-    // Deduplicate preserving case
+
     const seen = new Set<string>()
     const deduped: string[] = []
     for (const tag of cleaned) {
@@ -149,9 +133,6 @@ const TagsSchema = z
     return deduped.slice(0, 20)
   })
 
-/**
- * Full AI structured output schema.
- */
 export const DocumentAiOutputSchema = z
   .object({
     doc_category: DocCategorySchema,
@@ -162,7 +143,7 @@ export const DocumentAiOutputSchema = z
     is_scanned: z.boolean(),
   })
   .superRefine((val, ctx) => {
-    // Page count matching
+
     if (val.pages.length !== val.page_count) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -172,7 +153,6 @@ export const DocumentAiOutputSchema = z
       return
     }
 
-    // Contiguous page numbers check: 1 to page_count
     const pageNumbers = val.pages.map((p) => p.page_number).sort((a, b) => a - b)
     for (let i = 0; i < pageNumbers.length; i++) {
       const expected = i + 1
@@ -189,10 +169,6 @@ export const DocumentAiOutputSchema = z
 
 export type DocumentAiOutput = z.infer<typeof DocumentAiOutputSchema>
 
-/**
- * Page integrity verification function.
- * Throws an Error if integrity validation fails.
- */
 export function validatePageIntegrity(
   pages: Array<{ page_number: number; text: string }>,
   pageCount: number

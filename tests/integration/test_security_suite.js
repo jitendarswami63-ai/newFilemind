@@ -21,7 +21,6 @@ async function runTests() {
     console.log(`[${status}] ${name} -> ${evidence}`);
   }
 
-  // 1. Create two test accounts: User A and User B
   const timestamp = Date.now();
   const userA_email = `test_user_a_${timestamp}@test.com`;
   const userB_email = `test_user_b_${timestamp}@test.com`;
@@ -44,13 +43,11 @@ async function runTests() {
   const tokenA = signUpA.data.session?.access_token;
   const tokenB = signUpB.data.session?.access_token;
 
-  // Let User A upload a valid PDF
   const testDocId = crypto.randomUUID();
   const testFileName = 'usera_test.pdf';
   const testStoragePath = `${userA.id}/${testDocId}/${testFileName}`;
-  const pdfHeader = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]); // %PDF-1.4
+  const pdfHeader = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]);
 
-  // Upload object to storage as User A
   const uploadRes = await clientA.storage.from('documents').upload(testStoragePath, pdfHeader, {
     contentType: 'application/pdf',
     upsert: true
@@ -60,7 +57,6 @@ async function runTests() {
     console.error('User A Storage Upload failed:', uploadRes.error);
   }
 
-  // Call create_document_with_quota as User A
   const rpcRes = await clientA.rpc('create_document_with_quota', {
     p_id: testDocId,
     p_user_id: userA.id,
@@ -69,7 +65,6 @@ async function runTests() {
     p_file_size: pdfHeader.length
   });
 
-  // --- TEST: Unauthenticated API Access ---
   try {
     const res = await fetch(`${BASE_URL}/api/documents`);
     if (res.status === 401) {
@@ -103,9 +98,6 @@ async function runTests() {
     record('Unauthenticated GET /api/documents/[id]/download', 'FAIL', err.message);
   }
 
-  // --- TEST: Cross-User Download via API ---
-  // Using User B's auth token in cookie / headers
-  // For Next.js route handlers with @supabase/ssr, auth is parsed from cookie `sb-<ref>-auth-token`
   const projectRef = new URL(SUPABASE_URL).hostname.split('.')[0];
   const cookieName = `sb-${projectRef}-auth-token`;
   const cookieB = `${cookieName}=${encodeURIComponent(JSON.stringify(signUpB.data.session))}`;
@@ -124,11 +116,10 @@ async function runTests() {
     record('Cross-user download (User B on User A doc)', 'FAIL', err.message);
   }
 
-  // --- TEST: Cross-User Delete via API ---
   try {
     const res = await fetch(`${BASE_URL}/api/documents/${testDocId}`, {
       method: 'DELETE',
-      headers: { 
+      headers: {
         Cookie: cookieB,
         Origin: BASE_URL
       }
@@ -142,8 +133,6 @@ async function runTests() {
     record('Cross-user delete (User B deleting User A doc)', 'FAIL', err.message);
   }
 
-  // --- TEST: Storage cross-user access/upload ---
-  // User B attempts to upload into User A's folder: `${userA.id}/${crypto.randomUUID()}/attack.pdf`
   const attackPath = `${userA.id}/${crypto.randomUUID()}/attack.pdf`;
   const storageAttack = await clientB.storage.from('documents').upload(attackPath, pdfHeader, {
     contentType: 'application/pdf'
@@ -156,8 +145,6 @@ async function runTests() {
     record('Storage cross-user upload (User B into User A folder)', 'FAIL', `Upload unexpectedly succeeded!`);
   }
 
-  // --- TEST: Database RLS Isolation ---
-  // 1. SELECT isolation: User B queries documents table
   const selectB = await clientB.from('documents').select('*').eq('id', testDocId);
   if (selectB.data && selectB.data.length === 0) {
     record('Database RLS: SELECT isolation', 'PASS', `User B query for User A doc returned 0 rows`);
@@ -165,7 +152,6 @@ async function runTests() {
     record('Database RLS: SELECT isolation', 'FAIL', `User B saw ${selectB.data?.length} rows belonging to User A`);
   }
 
-  // 2. INSERT policy: User B tries to insert a row with User A's user_id
   const insertAttack = await clientB.from('documents').insert({
     id: crypto.randomUUID(),
     user_id: userA.id,
@@ -179,9 +165,7 @@ async function runTests() {
     record('Database RLS: INSERT with foreign user_id', 'FAIL', `INSERT unexpectedly succeeded`);
   }
 
-  // 3. UPDATE policy: User B tries to change User A's doc or adopt a doc
   const updateAttack = await clientB.from('documents').update({ user_id: userB.id }).eq('id', testDocId);
-  // With RLS, update on 0 matching rows affects 0 rows, or returns error
   const checkAfterUpdate = await clientA.from('documents').select('user_id').eq('id', testDocId).single();
   if (checkAfterUpdate.data?.user_id === userA.id) {
     record('Database RLS: UPDATE user_id hijacking', 'PASS', `User A document ownership retained; User B update had zero effect`);
@@ -189,8 +173,6 @@ async function runTests() {
     record('Database RLS: UPDATE user_id hijacking', 'FAIL', `Ownership was modified!`);
   }
 
-  // --- TEST: RPC Security Tests (create_document_with_quota) ---
-  // 1. Anonymous call to RPC
   const anonClient = createClient(SUPABASE_URL, ANON_KEY, { auth: { persistSession: false } });
   const anonRpc = await anonClient.rpc('create_document_with_quota', {
     p_id: crypto.randomUUID(),
@@ -205,10 +187,9 @@ async function runTests() {
     record('RPC Security: Anonymous invocation', 'FAIL', `Anon call not rejected as expected: ${JSON.stringify(anonRpc)}`);
   }
 
-  // 2. User B calls RPC spoofing User A's user_id
   const spoofRpc = await clientB.rpc('create_document_with_quota', {
     p_id: crypto.randomUUID(),
-    p_user_id: userA.id, // Mismatch with auth.uid()
+    p_user_id: userA.id,
     p_filename: 'spoof.pdf',
     p_storage_path: `${userA.id}/spoof/spoof.pdf`,
     p_file_size: 100
@@ -221,7 +202,6 @@ async function runTests() {
     record('RPC Security: Caller/User ID mismatch', 'FAIL', `Mismatched RPC call succeeded!`);
   }
 
-  // 3. User A calls RPC pointing to nonexistent storage object
   const nonExistentRpc = await clientA.rpc('create_document_with_quota', {
     p_id: crypto.randomUUID(),
     p_user_id: userA.id,
@@ -237,9 +217,6 @@ async function runTests() {
     record('RPC Security: Non-existent storage object', 'FAIL', `Ghost object insert succeeded`);
   }
 
-  // --- TEST: Upload Attack Tests ---
-  // 1. Non-PDF with application/pdf header -> Magic bytes failure
-  // Upload a text file disguised as PDF to User A's folder
   const fakeDocId = crypto.randomUUID();
   const fakeStoragePath = `${userA.id}/${fakeDocId}/fake.pdf`;
   const textBuffer = Buffer.from('THIS_IS_NOT_A_PDF_FILE_HEADER_TEXT');
@@ -269,17 +246,16 @@ async function runTests() {
     record('Upload Attack: Magic bytes validation', 'FAIL', `Status: ${confirmFakeRes.status}, Error: ${fakeData.error}`);
   }
 
-  // 2. confirm-upload with wrong storagePath (belonging to different user)
   const crossPathRes = await fetch(`${BASE_URL}/api/documents/confirm-upload`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Cookie: cookieB, // Authenticated as User B
+      Cookie: cookieB,
       Origin: BASE_URL
     },
     body: JSON.stringify({
       documentId: testDocId,
-      storagePath: testStoragePath, // Belonging to User A
+      storagePath: testStoragePath,
       fileSize: 100
     })
   });
@@ -289,7 +265,6 @@ async function runTests() {
     record('Upload Attack: Path segment mismatch / session replay', 'FAIL', `Expected 400, got ${crossPathRes.status}`);
   }
 
-  // 3. confirm-upload without prepare-upload (non-existent object)
   const nonExistentConfirm = await fetch(`${BASE_URL}/api/documents/confirm-upload`, {
     method: 'POST',
     headers: {
@@ -309,7 +284,6 @@ async function runTests() {
     record('Upload Attack: Confirm non-existent storage object', 'FAIL', `Expected 400, got ${nonExistentConfirm.status}`);
   }
 
-  // 4. prepare-upload filename sanitization: Path traversal
   const traversalRes = await fetch(`${BASE_URL}/api/documents/prepare-upload`, {
     method: 'POST',
     headers: {
@@ -330,7 +304,6 @@ async function runTests() {
     record('Upload Attack: Filename path traversal sanitization', 'FAIL', `Result: ${traversalData.storagePath}`);
   }
 
-  // 5. prepare-upload filename sanitization: XSS payload
   const xssRes = await fetch(`${BASE_URL}/api/documents/prepare-upload`, {
     method: 'POST',
     headers: {
@@ -351,7 +324,6 @@ async function runTests() {
     record('Upload Attack: XSS filename sanitization', 'PASS', `Handled safely: "${xssData.storagePath}"`);
   }
 
-  // 6. Oversized file (> 25MB) check in prepare-upload
   const oversizeRes = await fetch(`${BASE_URL}/api/documents/prepare-upload`, {
     method: 'POST',
     headers: {
@@ -361,7 +333,7 @@ async function runTests() {
     },
     body: JSON.stringify({
       filename: 'huge.pdf',
-      fileSize: 30 * 1024 * 1024, // 30 MB
+      fileSize: 30 * 1024 * 1024,
       mimeType: 'application/pdf'
     })
   });
@@ -371,9 +343,8 @@ async function runTests() {
     record('Upload Attack: Oversized file check (> 25 MB)', 'FAIL', `Expected 400, got ${oversizeRes.status}`);
   }
 
-  // Output JSON report
   fs.writeFileSync('security_test_report.json', JSON.stringify(results, null, 2));
   console.log('\n--- ALL SECURITY TESTS FINISHED ---');
 }
 
-runTests().catch(console.error);
+runTests().catch(console.error) {} ;

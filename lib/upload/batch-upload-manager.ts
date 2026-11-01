@@ -82,6 +82,19 @@ export class BatchUploadManager {
     rejected += files.length - filesToProcess.length
 
     for (const file of filesToProcess) {
+      const isDuplicateInBatch = this.items.some(
+        (existing) =>
+          existing.name === file.name &&
+          existing.size === file.size &&
+          existing.file.lastModified === file.lastModified &&
+          existing.status !== 'failed'
+      )
+
+      if (isDuplicateInBatch) {
+        rejected++
+        continue
+      }
+
       const item: BatchFileItem = {
         id: crypto.randomUUID(),
         file,
@@ -106,25 +119,45 @@ export class BatchUploadManager {
     const item = this.items.find((i) => i.id === id)
     if (!item) return
 
-    item.status = 'queued'
-    item.uploadProgress = 0
     item.error = null
-    this.notify()
-    this.processUploadQueue()
-    this.processProcessingQueue()
+
+    if (item.documentId && item.storagePath && item.uploadProgress >= 90) {
+      item.status = 'secured'
+      this.notify()
+      this.processProcessingQueue()
+    } else {
+      item.documentId = null
+      item.storagePath = null
+      item.status = 'queued'
+      item.uploadProgress = 0
+      this.notify()
+      this.processUploadQueue()
+    }
   }
 
   public retryAllFailed() {
+    let hasUploadRetries = false
+    let hasAiRetries = false
+
     for (const item of this.items) {
       if (item.status === 'failed') {
-        item.status = 'queued'
-        item.uploadProgress = 0
         item.error = null
+        if (item.documentId && item.storagePath && item.uploadProgress >= 90) {
+          item.status = 'secured'
+          hasAiRetries = true
+        } else {
+          item.documentId = null
+          item.storagePath = null
+          item.status = 'queued'
+          item.uploadProgress = 0
+          hasUploadRetries = true
+        }
       }
     }
+
     this.notify()
-    this.processUploadQueue()
-    this.processProcessingQueue()
+    if (hasUploadRetries) this.processUploadQueue()
+    if (hasAiRetries) this.processProcessingQueue()
   }
 
   public cancelItem(id: string) {
@@ -160,9 +193,6 @@ export class BatchUploadManager {
     this.notify()
   }
 
-  /**
-   * Upload Worker Pool with sliding-window concurrency capped at MAX_CONCURRENT_UPLOADS (4)
-   */
   private async processUploadQueue() {
     if (this.isCancelled) return
 
@@ -186,7 +216,6 @@ export class BatchUploadManager {
   private async uploadSingleFile(item: BatchFileItem): Promise<void> {
     const { file, id } = item
 
-    // Step 1: Client Validation
     this.updateItem(id, { status: 'validating', uploadProgress: 5 })
 
     if (file.type !== ALLOWED_MIME_TYPE && !file.name.toLowerCase().endsWith('.pdf')) {
@@ -230,7 +259,6 @@ export class BatchUploadManager {
       return
     }
 
-    // Step 2: Prepare upload
     this.updateItem(id, { status: 'preparing', uploadProgress: 15 })
     let documentId: string
     let storagePath: string
@@ -263,7 +291,6 @@ export class BatchUploadManager {
       return
     }
 
-    // Step 3: Direct Upload to Supabase Storage with Progress Tracking
     this.updateItem(id, { status: 'uploading', uploadProgress: 20 })
 
     try {
@@ -289,7 +316,6 @@ export class BatchUploadManager {
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
             const rawProgress = (event.loaded / event.total) * 100
-            // Map 0-100% upload progress to 20%-85% overall status
             const mappedProgress = Math.min(85, Math.max(20, Math.round(20 + rawProgress * 0.65)))
             this.updateItem(id, { uploadProgress: mappedProgress })
           }
@@ -330,7 +356,6 @@ export class BatchUploadManager {
       return
     }
 
-    // Step 4: Confirm Upload
     this.updateItem(id, { status: 'confirming', uploadProgress: 90 })
 
     try {
@@ -341,7 +366,7 @@ export class BatchUploadManager {
           documentId,
           storagePath,
           fileSize: file.size,
-          skipImmediateProcessing: true, // Controlled queue will process at concurrency = 2
+          skipImmediateProcessing: true,
         }),
       })
 
@@ -362,9 +387,6 @@ export class BatchUploadManager {
     }
   }
 
-  /**
-   * Controlled AI Processing Queue Worker (Concurrency = 2)
-   */
   private async processProcessingQueue() {
     if (this.isCancelled) return
 

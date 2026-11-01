@@ -13,17 +13,12 @@ export interface OptimizationResult {
   reason?: string
 }
 
-const PDF_MAGIC_BYTES = [0x25, 0x50, 0x44, 0x46] // %PDF
-const MIN_SAVINGS_PERCENT_THRESHOLD = 1.0 // >= 1% adoption threshold
+const PDF_MAGIC_BYTES = [0x25, 0x50, 0x44, 0x46]
+const MIN_SAVINGS_PERCENT_THRESHOLD = 1.0
 
-/**
- * Checks for conservative digital signature structures.
- * Looks for ByteRange arrays, standard signature subfilters, and signature dictionaries.
- */
 function hasDigitalSignatureIndicators(buffer: Buffer): boolean {
   const str = buffer.toString('latin1')
-  
-  // ByteRange is mandatory in standard PDF digital signatures
+
   if (/\/ByteRange\s*\[/i.test(str)) {
     return true
   }
@@ -40,17 +35,11 @@ function hasDigitalSignatureIndicators(buffer: Buffer): boolean {
   return false
 }
 
-/**
- * Checks for XFA (XML Forms Architecture) structures.
- */
 function hasXfaIndicators(buffer: Buffer): boolean {
   const str = buffer.toString('latin1')
   return /\/XFA\s*\[/i.test(str) || /\/XFA\s+\d+\s+\d+\s+R/i.test(str)
 }
 
-/**
- * Checks for interactive JavaScript actions or launch actions that could be corrupted by reserialization.
- */
 function hasInteractiveActions(buffer: Buffer): boolean {
   const str = buffer.toString('latin1')
   if (/\/JavaScript\s+/i.test(str) || /\/JS\s*\(/i.test(str) || /\/JS\s*</i.test(str)) {
@@ -62,9 +51,6 @@ function hasInteractiveActions(buffer: Buffer): boolean {
   return false
 }
 
-/**
- * Checks for embedded files and attachments.
- */
 function hasEmbeddedFiles(buffer: Buffer): boolean {
   const str = buffer.toString('latin1')
   if (/\/EmbeddedFiles\s+/i.test(str) || /\/EF\s+<<[^\>]*\/F\s+/i.test(str)) {
@@ -73,17 +59,11 @@ function hasEmbeddedFiles(buffer: Buffer): boolean {
   return false
 }
 
-/**
- * Checks if raw buffer contains encryption dictionary indicator.
- */
 function hasEncryptionDictionary(buffer: Buffer): boolean {
   const str = buffer.toString('latin1')
   return /\/Encrypt\s+\d+\s+\d+\s+R/i.test(str) || /\/Encrypt\s+<</i.test(str)
 }
 
-/**
- * Validates that a buffer has a valid %PDF header.
- */
 function isValidPdfHeader(buffer: Buffer): boolean {
   if (buffer.length < 4) return false
   return (
@@ -94,12 +74,6 @@ function isValidPdfHeader(buffer: Buffer): boolean {
   )
 }
 
-/**
- * Structural PDF Optimizer.
- * Safely reserializes PDF documents using pdf-lib object stream compression.
- * Strictly lossless-intent: zero image downsampling, zero rasterization.
- * Enforces conservative pre-checks and post-serialization integrity validation.
- */
 export async function optimizePdfBuffer(originalBuffer: Buffer): Promise<OptimizationResult> {
   const originalSize = originalBuffer.length
 
@@ -114,37 +88,30 @@ export async function optimizePdfBuffer(originalBuffer: Buffer): Promise<Optimiz
     reason,
   })
 
-  // 1. Pre-check: Minimum size & magic bytes
   if (!isValidPdfHeader(originalBuffer)) {
     return unoptimizedResult('skipped', 'Input is not a valid PDF (invalid magic header)')
   }
 
-  // 2. Pre-check: Encryption
   if (hasEncryptionDictionary(originalBuffer)) {
     return unoptimizedResult('skipped', 'PDF is encrypted')
   }
 
-  // 3. Pre-check: Digital Signatures
   if (hasDigitalSignatureIndicators(originalBuffer)) {
     return unoptimizedResult('skipped', 'PDF appears digitally signed or contains signature structures')
   }
 
-  // 4. Pre-check: XFA Forms
   if (hasXfaIndicators(originalBuffer)) {
     return unoptimizedResult('skipped', 'PDF contains XML Forms Architecture (XFA)')
   }
 
-  // 5. Pre-check: Interactive JavaScript / Actions
   if (hasInteractiveActions(originalBuffer)) {
     return unoptimizedResult('skipped', 'PDF contains interactive scripts or launch actions')
   }
 
-  // 6. Pre-check: Embedded Files / Attachments
   if (hasEmbeddedFiles(originalBuffer)) {
     return unoptimizedResult('skipped', 'PDF contains embedded file attachments')
   }
 
-  // 7. Load document into pdf-lib (without ignoreEncryption)
   let pdfDoc: PDFDocument
   let originalPageCount: number
   try {
@@ -164,7 +131,6 @@ export async function optimizePdfBuffer(originalBuffer: Buffer): Promise<Optimiz
     return unoptimizedResult('skipped', `pdf-lib cannot safely parse the document: ${msg}`)
   }
 
-  // 8. Reserialize using supported pdf-lib options (useObjectStreams: true)
   let optimizedBytes: Uint8Array
   try {
     optimizedBytes = await pdfDoc.save({
@@ -178,13 +144,10 @@ export async function optimizePdfBuffer(originalBuffer: Buffer): Promise<Optimiz
   const optimizedBuffer = Buffer.from(optimizedBytes)
   const optimizedSize = optimizedBuffer.length
 
-  // 9. Integrity Validation on optimized output
-  // Check A: Header check
   if (!isValidPdfHeader(optimizedBuffer)) {
     return unoptimizedResult('failed', 'Optimized output has invalid PDF magic bytes')
   }
 
-  // Check B: Re-load check by pdf-lib
   let verifyDoc: PDFDocument
   try {
     verifyDoc = await PDFDocument.load(optimizedBuffer, {
@@ -196,7 +159,6 @@ export async function optimizePdfBuffer(originalBuffer: Buffer): Promise<Optimiz
     return unoptimizedResult('failed', `Optimized output failed reload verification: ${msg}`)
   }
 
-  // Check C: Page count check
   if (verifyDoc.getPageCount() !== originalPageCount) {
     return unoptimizedResult(
       'failed',
@@ -204,7 +166,6 @@ export async function optimizePdfBuffer(originalBuffer: Buffer): Promise<Optimiz
     )
   }
 
-  // Check D: Page accessibility check
   try {
     for (let i = 0; i < originalPageCount; i++) {
       const page = verifyDoc.getPage(i)
@@ -217,7 +178,6 @@ export async function optimizePdfBuffer(originalBuffer: Buffer): Promise<Optimiz
     return unoptimizedResult('failed', `Page accessibility verification failed: ${msg}`)
   }
 
-  // 10. Check size & adoption threshold
   if (optimizedSize >= originalSize) {
     return unoptimizedResult('unchanged', 'Optimized size is not smaller than original')
   }
@@ -232,7 +192,6 @@ export async function optimizePdfBuffer(originalBuffer: Buffer): Promise<Optimiz
     )
   }
 
-  // Optimization succeeded and passed all verification checks!
   return {
     buffer: optimizedBuffer,
     originalSize,

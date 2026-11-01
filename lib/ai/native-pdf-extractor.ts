@@ -18,10 +18,13 @@ export async function extractNativePdfText(
   pdfBuffer: Buffer
 ): Promise<NativeExtractionResult> {
   try {
-    const uint8 = new Uint8Array(
-      pdfBuffer.buffer,
-      pdfBuffer.byteOffset,
-      pdfBuffer.byteLength
+    const uint8 = new Uint8Array(pdfBuffer.byteLength)
+    uint8.set(
+      new Uint8Array(
+        pdfBuffer.buffer,
+        pdfBuffer.byteOffset,
+        pdfBuffer.byteLength
+      )
     )
 
     const rawResult = await extractText(uint8, { mergePages: false })

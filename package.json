@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node tests/test_bulk_upload_suite.mjs && node tests/test_optimization_suite.js && node tests/test_hybrid_search_relevance.mjs && node tests/test_ask_ai_suite.mjs && node tests/test_pdf_limits_suite.mjs && node tests/test_pdf_splitting_suite.mjs && node tests/test_hybrid_pdf_pipeline.mjs && node tests/test_ask_ai_bugfixes_suite.mjs && node tests/test_conversation_persistence_suite.mjs",
+    "test": "node tests/test_bulk_upload_suite.mjs && node tests/test_optimization_suite.js && node tests/test_hybrid_search_relevance.mjs && node tests/test_ask_ai_suite.mjs && node tests/test_pdf_limits_suite.mjs && node tests/test_pdf_splitting_suite.mjs && node tests/test_hybrid_pdf_pipeline.mjs && node tests/test_ask_ai_bugfixes_suite.mjs && node tests/test_conversation_persistence_suite.mjs && node tests/test_deepgram_speech_suite.mjs && node tests/test_provider_evaluation_suite.mjs && node tests/test_vault_mfa_suite.mjs && node tests/test_biometric_vault_suite.mjs && node tests/test_redirect_verification.mjs",
     "test:bulk": "node tests/test_bulk_upload_suite.mjs",
     "test:opt": "node tests/test_optimization_suite.js",
     "test:relevance": "node tests/test_hybrid_search_relevance.mjs",
@@ -15,10 +15,18 @@
     "test:limits": "node tests/test_pdf_limits_suite.mjs",
     "test:split": "node tests/test_pdf_splitting_suite.mjs",
     "test:hybrid": "node tests/test_hybrid_pdf_pipeline.mjs",
-    "test:conversations": "node tests/test_conversation_persistence_suite.mjs"
+    "test:conversations": "node tests/test_conversation_persistence_suite.mjs",
+    "test:speech": "node tests/test_deepgram_speech_suite.mjs",
+    "test:nvidia": "node tests/test_provider_evaluation_suite.mjs",
+    "test:mfa": "node tests/test_vault_mfa_suite.mjs",
+    "test:biometric": "node tests/test_biometric_vault_suite.mjs",
+    "test:redirect": "node tests/test_redirect_verification.mjs"
   },
   "dependencies": {
+    "@deepgram/sdk": "^5.17.0",
     "@google/genai": "^2.22.0",
+    "@simplewebauthn/browser": "^14.0.0",
+    "@simplewebauthn/server": "^14.0.3",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
     "lucide-react": "^1.45.0",

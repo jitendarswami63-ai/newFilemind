@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { processDocument } from '@/lib/ai/processor'
 
 export const maxDuration = 60
+export const dynamic = 'force-dynamic'
 
 export async function POST(
   request: Request,
@@ -12,7 +13,6 @@ export async function POST(
   const { id } = await params
   const supabase = await createClient()
 
-  // 1. Authenticate using getUser()
   const {
     data: { user },
     error: authError,
@@ -22,7 +22,6 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // 3. Explicit ownership check in database. Never trust body or query params.
   const { data: doc, error } = await supabase
     .from('documents')
     .select('id, user_id, status, processing_locked_at')
@@ -30,15 +29,10 @@ export async function POST(
     .eq('user_id', user.id)
     .single()
 
-  // 4. Return 404 if not found or unauthorized
   if (error || !doc) {
     return NextResponse.json({ error: 'Document not found' }, { status: 404 })
   }
 
-  // 6. Check retryable states:
-  // - pending
-  // - failed
-  // - processing with stale lease (>10 minutes)
   const isPending = doc.status === 'pending'
   const isFailed = doc.status === 'failed'
 
@@ -62,7 +56,6 @@ export async function POST(
     )
   }
 
-  // 7. Active processing younger than 10 minutes -> 409 Conflict
   if (doc.status === 'processing' && !isStaleProcessing) {
     return NextResponse.json(
       { error: 'Document is currently being processed. Please wait.' },
@@ -77,12 +70,10 @@ export async function POST(
     )
   }
 
-  // 8. Trigger background processing via Next.js 16 after()
   after(async () => {
     await processDocument(id)
   })
 
-  // 9. Return success without exposing service-role secrets or processing_token
   return NextResponse.json({
     success: true,
     message: 'Document processing scheduled.',

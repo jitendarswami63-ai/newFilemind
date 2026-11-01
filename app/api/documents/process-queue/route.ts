@@ -3,11 +3,11 @@ import { createClient } from '@/lib/supabase/server'
 import { processDocument } from '@/lib/ai/processor'
 
 export const maxDuration = 60
+export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
 
-  // 1. Authenticate user
   const {
     data: { user },
     error: authError,
@@ -20,11 +20,8 @@ export async function POST(request: Request) {
   let body: { documentId?: string } = {}
   try {
     body = await request.json()
-  } catch {
-    // Body is optional
-  }
+  } catch {}
 
-  // Path A: Process specific document requested by client
   if (body.documentId) {
     const { data: doc, error } = await supabase
       .from('documents')
@@ -59,14 +56,12 @@ export async function POST(request: Request) {
     }
   }
 
-  // Path B: Claim next pending document atomically using claim_next_pending_document RPC
   const { data: claimedDocs, error: claimError } = await supabase.rpc('claim_next_pending_document', {
     p_user_id: user.id,
   })
 
   if (claimError) {
-    // Graceful fallback if migration RPC is not yet executed in Supabase:
-    // Query oldest pending document directly
+
     const { data: fallbackDoc } = await supabase
       .from('documents')
       .select('id')

@@ -4,8 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 import { MAX_FILE_SIZE_BYTES, PDF_MAGIC_BYTES } from '@/lib/constants'
 import { processDocument } from '@/lib/ai/processor'
 import { isSameOrigin } from '@/lib/validation/origin'
+import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
 
 export const maxDuration = 60
+export const dynamic = 'force-dynamic'
 
 interface ConfirmUploadBody {
   documentId?: string
@@ -19,10 +21,15 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const auth = await verifyVaultAccess(supabase)
+  if (!auth.authorized) {
+    return NextResponse.json(
+      { error: auth.error, code: auth.code, mfaRequired: auth.code === 'MFA_REQUIRED' },
+      { status: auth.status }
+    )
   }
+  const user = auth.user!
 
   let body: ConfirmUploadBody
   try {
@@ -41,7 +48,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 400 })
   }
 
-  // 4. Verify Storage object exists
+  const { data: existingDoc } = await supabase
+    .from('documents')
+    .select('id, status')
+    .eq('id', documentId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (existingDoc) {
+    return NextResponse.json({ success: true, documentId: existingDoc.id, alreadyConfirmed: true })
+  }
+
   const folderPath = `${user.id}/${documentId}`
   const { data: listData, error: listError } = await supabase.storage
     .from('documents')
@@ -54,14 +71,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Upload not found in storage. Please try again.' }, { status: 400 })
   }
 
-  // 5. Verify actual file size from Storage metadata
   const actualSize = matchedFile.metadata?.size || 0
   if (actualSize > MAX_FILE_SIZE_BYTES) {
     await supabase.storage.from('documents').remove([storagePath])
     return NextResponse.json({ error: 'File must be under 49 MB.' }, { status: 400 })
   }
 
-  // 6. Magic bytes check via HTTP Range request
   const { data: sessionData } = await supabase.auth.getSession()
   const userJwt = sessionData.session?.access_token
 
@@ -94,7 +109,6 @@ export async function POST(request: Request) {
     }
   }
 
-  // 7. Create document record via create_document_with_quota
   const { data: rpcData, error: rpcError } = await supabase.rpc('create_document_with_quota', {
     p_id: documentId,
     p_user_id: user.id,
@@ -104,6 +118,17 @@ export async function POST(request: Request) {
   })
 
   if (rpcError) {
+    const { data: alreadyCreated } = await supabase
+      .from('documents')
+      .select('id')
+      .eq('id', documentId)
+      .eq('user_id', user.id)
+      .maybeSingle()
+
+    if (alreadyCreated) {
+      return NextResponse.json({ success: true, documentId: alreadyCreated.id, alreadyConfirmed: true })
+    }
+
     await supabase.storage.from('documents').remove([storagePath])
     return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 500 })
   }
@@ -120,8 +145,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Storage quota exceeded (2 GB limit). Please delete old documents.' }, { status: 403 })
   }
 
-  // Best-effort background processing trigger via Next.js 16 after()
-  // In bulk mode, skipImmediateProcessing allows client/worker queue to throttle processing to 2 concurrent jobs
   const skipImmediate = (body as unknown as { skipImmediateProcessing?: boolean }).skipImmediateProcessing
   if (!skipImmediate) {
     after(async () => {

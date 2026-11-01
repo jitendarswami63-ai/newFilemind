@@ -8,7 +8,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className = '', variant = 'primary', size = 'md', ...props }, ref) => {
     const baseStyles =
-      'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#315C4C]/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F7F6F3] disabled:pointer-events-none disabled:opacity-50 cursor-pointer select-none active:scale-[0.98]'
+      'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C5A878]/40 focus-visible:ring-offset-2 focus-visible:ring-offset-[#F3EFE5] disabled:pointer-events-none disabled:opacity-50 cursor-pointer select-none active:scale-[0.98]'
 
     const sizeStyles = {
       sm: 'h-8 px-3 text-xs gap-1.5',
@@ -18,15 +18,15 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
     const variantStyles = {
       primary:
-        'bg-[#315C4C] hover:bg-[#26493C] text-white shadow-sm border border-[#26493C]',
+        'bg-[#9C7D47] hover:bg-[#856837] text-[#FFFCF5] shadow-xs border border-[#856837]',
       secondary:
-        'bg-white hover:bg-[#F2F1ED] text-[#242424] border border-[#E7E5E0] shadow-sm hover:border-[#D4D1C9]',
+        'bg-[#FFFCF5] hover:bg-[#F3EFE5] text-[#292720] border border-[#E5DED1] shadow-2xs hover:border-[#DDD5C7]',
       outline:
-        'bg-transparent hover:bg-[#F2F1ED] text-[#242424] border border-[#E7E5E0] hover:border-[#D4D1C9]',
+        'bg-transparent hover:bg-[#FAF5EC] text-[#292720] hover:text-[#9C7D47] border border-[#E5DED1] hover:border-[#C5A878]/60',
       ghost:
-        'bg-transparent hover:bg-[#EAE8E3]/60 text-[#77756F] hover:text-[#242424]',
+        'bg-transparent hover:bg-[#EAE4D6]/70 text-[#777064] hover:text-[#292720]',
       danger:
-        'bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 hover:border-red-300',
+        'bg-[#FDF2F2] hover:bg-[#FCE8E8] text-[#B91C1C] border border-[#F8D7DA] hover:border-[#F5C2C7]',
     }
 
     return (

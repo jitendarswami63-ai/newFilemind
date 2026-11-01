@@ -2,7 +2,6 @@ const { createClient } = require('@supabase/supabase-js')
 const fs = require('fs')
 const { z } = require('zod')
 
-// Read environment from .env.local
 const env = Object.fromEntries(
   fs.readFileSync('.env.local', 'utf8')
     .split('\n')
@@ -28,12 +27,8 @@ async function runPhase1aSuite() {
   console.log('       FILEMIND PHASE 1A AUTOMATED VERIFICATION SUITE          ')
   console.log('===============================================================\n')
 
-  // --------------------------------------------------------------------------
-  // TEST GROUP 1: Zod Normalization & Page Integrity
-  // --------------------------------------------------------------------------
   console.log('--- TEST GROUP 1: Zod Schema & Page Integrity Validation ---')
 
-  // Require our schema module (compile or test schema rules directly)
   const RawMetadataItemSchema = z
     .object({
       key: z.string().trim().min(1).max(100),
@@ -97,7 +92,6 @@ async function runPhase1aSuite() {
       }
     })
 
-  // 1.1 Reject page_count mismatch
   const mismatchRes = DocumentAiOutputSchema.safeParse({
     doc_category: 'Invoice',
     tags: ['billing'],
@@ -112,7 +106,6 @@ async function runPhase1aSuite() {
     record('Zod: Reject page_count mismatch', 'FAIL', 'Unexpectedly parsed mismatched count')
   }
 
-  // 1.2 Reject non-contiguous pages [1, 3] when count is 2
   const nonContigRes = DocumentAiOutputSchema.safeParse({
     doc_category: 'Invoice',
     tags: ['billing'],
@@ -130,7 +123,6 @@ async function runPhase1aSuite() {
     record('Zod: Reject non-contiguous pages [1, 3]', 'FAIL', 'Unexpectedly accepted [1, 3]')
   }
 
-  // 1.3 Reject duplicate pages [1, 1]
   const dupPagesRes = DocumentAiOutputSchema.safeParse({
     doc_category: 'Invoice',
     tags: ['billing'],
@@ -148,7 +140,6 @@ async function runPhase1aSuite() {
     record('Zod: Reject duplicate pages [1, 1]', 'FAIL', 'Unexpectedly accepted duplicate pages')
   }
 
-  // 1.4 Reject page text > 100,000 characters
   const hugeText = 'A'.repeat(100_001)
   const hugePageRes = DocumentAiOutputSchema.safeParse({
     doc_category: 'Invoice',
@@ -164,7 +155,6 @@ async function runPhase1aSuite() {
     record('Zod: Reject page text > 100,000 characters', 'FAIL', 'Unexpectedly accepted >100k page text')
   }
 
-  // 1.5 Reject number metadata without value_number
   const numWithoutValRes = DocumentAiOutputSchema.safeParse({
     doc_category: 'Invoice',
     tags: ['tax'],
@@ -179,7 +169,6 @@ async function runPhase1aSuite() {
     record('Zod: Reject number metadata without value_number', 'FAIL', 'Unexpectedly accepted invalid number item')
   }
 
-  // 1.6 Reject invalid date metadata
   const badDateRes = DocumentAiOutputSchema.safeParse({
     doc_category: 'Invoice',
     tags: ['tax'],
@@ -194,10 +183,9 @@ async function runPhase1aSuite() {
     record('Zod: Reject date with invalid format', 'FAIL', 'Unexpectedly accepted invalid date format')
   }
 
-  // 1.7 Accept and normalize valid payload
   const validPayload = {
     doc_category: 'Invoice',
-    tags: ['Finance', 'Receipt', 'Tax', 'Receipt'], // Duplicate test
+    tags: ['Finance', 'Receipt', 'Tax', 'Receipt'],
     metadata: [
       { key: 'invoice_num', type: 'string', value_string: 'INV-2026-001', value_number: 999 },
       { key: 'total_amount', type: 'number', value_number: 150.5, currency: 'USD', value_string: 'skip' },
@@ -221,9 +209,6 @@ async function runPhase1aSuite() {
     record('Zod: Normalize metadata and strip irrelevant fields', 'FAIL', 'Failed normalization check')
   }
 
-  // --------------------------------------------------------------------------
-  // Create Test Users for Integration & Security Tests
-  // --------------------------------------------------------------------------
   console.log('\n--- TEST GROUP 2: API Protection & Retry Authorization ---')
 
   const timestamp = Date.now()
@@ -253,11 +238,10 @@ async function runPhase1aSuite() {
   const cookieA = `${cookieName}=${encodeURIComponent(JSON.stringify(signUpA.data.session))}`
   const cookieB = `${cookieName}=${encodeURIComponent(JSON.stringify(signUpB.data.session))}`
 
-  // Create document for User A via prepare & confirm flow
   const testDocId = crypto.randomUUID()
   const testFileName = 'phase1a_test.pdf'
   const testStoragePath = `${userA.id}/${testDocId}/${testFileName}`
-  const pdfHeader = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34]) // %PDF-1.4
+  const pdfHeader = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x34])
 
   await clientA.storage.from('documents').upload(testStoragePath, pdfHeader, {
     contentType: 'application/pdf',
@@ -272,7 +256,6 @@ async function runPhase1aSuite() {
     p_file_size: pdfHeader.length,
   })
 
-  // 2.1 API Protection: GET /api/documents does not leak processing_token
   try {
     const res = await fetch(`${BASE_URL}/api/documents`, {
       headers: { Cookie: cookieA },
@@ -292,7 +275,6 @@ async function runPhase1aSuite() {
     record('API Protection: GET /api/documents does NOT leak processing_token', 'FAIL', err.message)
   }
 
-  // 2.2 API Protection: GET /api/documents/[id] does not leak processing_token
   try {
     const res = await fetch(`${BASE_URL}/api/documents/${testDocId}`, {
       headers: { Cookie: cookieA },
@@ -311,7 +293,6 @@ async function runPhase1aSuite() {
     record('API Protection: GET /api/documents/[id] does NOT leak processing_token', 'FAIL', err.message)
   }
 
-  // 2.3 Retry Authorization: Unauthenticated call -> 401
   try {
     const res = await fetch(`${BASE_URL}/api/documents/${testDocId}/retry`, {
       method: 'POST',
@@ -325,7 +306,6 @@ async function runPhase1aSuite() {
     record('Retry Authorization: Unauthenticated call', 'FAIL', err.message)
   }
 
-  // 2.4 Retry Authorization: Cross-user call (User B retrying User A's doc) -> 404
   try {
     const res = await fetch(`${BASE_URL}/api/documents/${testDocId}/retry`, {
       method: 'POST',
@@ -340,7 +320,6 @@ async function runPhase1aSuite() {
     record('Retry Authorization: Cross-user retry attempt', 'FAIL', err.message)
   }
 
-  // 2.5 Retry State: Stuck pending document -> accepted (HTTP 200)
   try {
     const res = await fetch(`${BASE_URL}/api/documents/${testDocId}/retry`, {
       method: 'POST',
@@ -356,12 +335,8 @@ async function runPhase1aSuite() {
     record('Retry State: Pending document retry', 'FAIL', err.message)
   }
 
-  // --------------------------------------------------------------------------
-  // TEST GROUP 3: Database RPC & Security Restrictions
-  // --------------------------------------------------------------------------
   console.log('\n--- TEST GROUP 3: Database RPC Security & RLS Isolation ---')
 
-  // Check if remote migration has been applied
   const checkRpc = await clientA.rpc('acquire_document_processing', {
     p_document_id: testDocId,
     p_user_id: userA.id,
@@ -381,14 +356,12 @@ async function runPhase1aSuite() {
     record('Concurrency: Atomic Fencing Lock Race', 'BLOCKED', 'Remote migration supabase_phase1a_setup.sql needs to be executed in Supabase SQL Editor')
     record('Fencing: Stale Worker Rejection', 'BLOCKED', 'Remote migration supabase_phase1a_setup.sql needs to be executed in Supabase SQL Editor')
   } else {
-    // 3.1 Authenticated client calls acquire_document_processing directly -> permission denied
     if (checkRpc.error && checkRpc.error.message.includes('permission denied')) {
       record('RPC Security: Authenticated acquire_document_processing', 'PASS', `Explicitly denied: "${checkRpc.error.message}"`)
     } else {
       record('RPC Security: Authenticated acquire_document_processing', 'FAIL', `Expected permission denied, got: ${JSON.stringify(checkRpc.error)}`)
     }
 
-    // 3.2 Authenticated client calls finalize_document_processing directly -> permission denied
     const finalizeRpc = await clientA.rpc('finalize_document_processing', {
       p_document_id: testDocId,
       p_user_id: userA.id,
@@ -406,7 +379,6 @@ async function runPhase1aSuite() {
       record('RPC Security: Authenticated finalize_document_processing', 'FAIL', `Expected permission denied, got: ${JSON.stringify(finalizeRpc.error)}`)
     }
 
-    // 3.3 Authenticated client calls mark_document_processing_failed directly -> permission denied
     const failRpc = await clientA.rpc('mark_document_processing_failed', {
       p_document_id: testDocId,
       p_user_id: userA.id,
@@ -419,7 +391,6 @@ async function runPhase1aSuite() {
       record('RPC Security: Authenticated mark_document_processing_failed', 'FAIL', `Expected permission denied, got: ${JSON.stringify(failRpc.error)}`)
     }
 
-    // 3.4 Authenticated client direct UPDATE on public.documents -> revoked
     const updateDoc = await clientA
       .from('documents')
       .update({ status: 'completed' })
@@ -427,7 +398,6 @@ async function runPhase1aSuite() {
     if (updateDoc.error && (updateDoc.error.message.includes('permission denied') || updateDoc.error.message.includes('row-level security'))) {
       record('Table Security: Authenticated direct UPDATE on documents', 'PASS', `Denied: "${updateDoc.error.message}"`)
     } else {
-      // Check if rows actually updated
       const checkDoc = await clientA.from('documents').select('status').eq('id', testDocId).single()
       if (checkDoc.data?.status !== 'completed') {
         record('Table Security: Authenticated direct UPDATE on documents', 'PASS', 'Status was not modified; UPDATE revoked')
@@ -436,7 +406,6 @@ async function runPhase1aSuite() {
       }
     }
 
-    // 3.5 Authenticated client direct INSERT into document_pages -> denied
     const insertPages = await clientA.from('document_pages').insert({
       id: crypto.randomUUID(),
       document_id: testDocId,
@@ -449,11 +418,9 @@ async function runPhase1aSuite() {
       record('Table Security: Authenticated direct INSERT into document_pages', 'FAIL', 'Direct insert succeeded!')
     }
 
-    // 3.6 Service-role worker tests (if SERVICE_ROLE_KEY present)
     if (SERVICE_ROLE_KEY) {
       const serviceClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } })
 
-      // Create a fresh pending document specifically for atomic concurrency tests
       const concurrencyDocId = crypto.randomUUID()
       const concurrencyFileName = 'concurrency_test.pdf'
       const concurrencyStoragePath = `${userA.id}/${concurrencyDocId}/${concurrencyFileName}`
@@ -471,7 +438,6 @@ async function runPhase1aSuite() {
         p_file_size: pdfHeader.length,
       })
 
-      // Concurrency test: Atomic Acquisition
       const token1 = await serviceClient.rpc('acquire_document_processing', {
         p_document_id: concurrencyDocId,
         p_user_id: userA.id,
@@ -487,7 +453,6 @@ async function runPhase1aSuite() {
         record('Concurrency: Atomic acquisition race', 'FAIL', `Worker 1: ${token1.data}, Worker 2: ${token2.data}`)
       }
 
-      // Fencing test: Stale token cannot finalize
       const staleToken = crypto.randomUUID()
       const staleFinalize = await serviceClient.rpc('finalize_document_processing', {
         p_document_id: concurrencyDocId,
@@ -507,7 +472,6 @@ async function runPhase1aSuite() {
         record('Fencing: Stale worker finalize rejected', 'FAIL', `Expected false, got: ${staleFinalize.data}`)
       }
 
-      // Fencing test: Stale token cannot fail document
       const staleFail = await serviceClient.rpc('mark_document_processing_failed', {
         p_document_id: concurrencyDocId,
         p_user_id: userA.id,
@@ -521,7 +485,6 @@ async function runPhase1aSuite() {
         record('Fencing: Stale worker markFailed rejected', 'FAIL', `Expected false, got: ${staleFail.data}`)
       }
 
-      // Current worker: Finalize with valid token
       const validFinalize = await serviceClient.rpc('finalize_document_processing', {
         p_document_id: concurrencyDocId,
         p_user_id: userA.id,
@@ -540,7 +503,6 @@ async function runPhase1aSuite() {
         record('Current Worker: Finalize with active token', 'FAIL', `Failed to finalize: ${validFinalize.error?.message}`)
       }
 
-      // RLS: User A can SELECT own document_pages
       const selectPagesA = await clientA.from('document_pages').select('*').eq('document_id', concurrencyDocId)
       if (selectPagesA.data && selectPagesA.data.length === 1) {
         record('RLS Isolation: Owner SELECT on document_pages', 'PASS', `Owner successfully read ${selectPagesA.data.length} page row`)
@@ -548,7 +510,6 @@ async function runPhase1aSuite() {
         record('RLS Isolation: Owner SELECT on document_pages', 'FAIL', `Owner saw ${selectPagesA.data?.length} rows`)
       }
 
-      // RLS: User B cannot SELECT User A's document_pages
       const selectPagesB = await clientB.from('document_pages').select('*').eq('document_id', concurrencyDocId)
       if (selectPagesB.data && selectPagesB.data.length === 0) {
         record('RLS Isolation: Cross-user SELECT on document_pages', 'PASS', 'User B query for User A pages returned 0 rows')
@@ -560,11 +521,10 @@ async function runPhase1aSuite() {
     }
   }
 
-  // Output test report JSON
   fs.writeFileSync('phase1a_test_report.json', JSON.stringify(results, null, 2))
   console.log('\n===============================================================')
   console.log('             ALL PHASE 1A VERIFICATION FINISHED                ')
   console.log('===============================================================')
 }
 
-runPhase1aSuite().catch(console.error)
+runPhase1aSuite().catch(console.error) {} 

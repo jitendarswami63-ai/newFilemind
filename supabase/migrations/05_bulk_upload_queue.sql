@@ -1,10 +1,3 @@
--- ==============================================================================
--- FileMind: Bulk PDF Upload (100–150 Files) & Queue Processing Migration
--- Migration: supabase_bulk_upload_setup.sql
--- ==============================================================================
-
--- 1. Upgrade create_document_with_quota to support bulk batches (250 docs/hr)
---    and enforce cumulative storage capacity quota (2 GB ceiling)
 CREATE OR REPLACE FUNCTION public.create_document_with_quota(
   p_id uuid,
   p_user_id uuid,
@@ -18,25 +11,23 @@ SET search_path = ''
 AS $BODY$
 DECLARE
   v_count int;
-  v_rate_limit int := 250; -- Raised from 20 to 250 to support bulk uploads up to 150 files
+  v_rate_limit int := 250;
   v_actual_size bigint;
   v_owner text;
   v_total_storage bigint;
-  v_max_storage_bytes bigint := 2147483648; -- 2 GB cumulative storage limit per user
+  v_max_storage_bytes bigint := 2147483648;
 BEGIN
-  -- Security Invariant 1: Auth JWT verification
-  IF pg_catalog.current_setting('request.jwt.claims', true)::jsonb->>'sub' IS NULL OR 
+
+  IF pg_catalog.current_setting('request.jwt.claims', true)::jsonb->>'sub' IS NULL OR
      (pg_catalog.current_setting('request.jwt.claims', true)::jsonb->>'sub')::uuid != p_user_id THEN
     RAISE EXCEPTION 'Unauthorized: user_id mismatch or not authenticated';
   END IF;
 
-  -- Security Invariant 2: User namespace path isolation
   IF pg_catalog.split_part(p_storage_path, '/', 1) != p_user_id::text THEN
     RAISE EXCEPTION 'Unauthorized: storage_path does not belong to user';
   END IF;
 
-  -- Security Invariant 3: Authoritative storage object verification
-  SELECT (metadata->>'size')::bigint, owner_id 
+  SELECT (metadata->>'size')::bigint, owner_id
   INTO v_actual_size, v_owner
   FROM storage.objects
   WHERE bucket_id = 'documents' AND name = p_storage_path;
@@ -51,10 +42,8 @@ BEGIN
     RAISE EXCEPTION 'Storage object not owned by user';
   END IF;
 
-  -- Security Invariant 4: Transactional advisory lock preventing race conditions
   PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(p_user_id::text));
 
-  -- Quota Check A: Rate limit (250 docs/hour)
   SELECT count(*) INTO v_count
     FROM public.documents
     WHERE user_id = p_user_id
@@ -65,7 +54,6 @@ BEGIN
     RETURN;
   END IF;
 
-  -- Quota Check B: Cumulative storage ceiling (2 GB)
   SELECT COALESCE(sum(file_size), 0) INTO v_total_storage
     FROM public.documents
     WHERE user_id = p_user_id;
@@ -75,7 +63,6 @@ BEGIN
     RETURN;
   END IF;
 
-  -- Insert document record with pending status
   INSERT INTO public.documents (
     id, user_id, filename, storage_path, file_size, mime_type, status
   ) VALUES (
@@ -90,7 +77,6 @@ REVOKE EXECUTE ON FUNCTION public.create_document_with_quota(uuid, uuid, text, t
 REVOKE EXECUTE ON FUNCTION public.create_document_with_quota(uuid, uuid, text, text, bigint) FROM anon;
 GRANT EXECUTE ON FUNCTION public.create_document_with_quota(uuid, uuid, text, text, bigint) TO authenticated;
 
--- 2. Durable User Queue Worker Claim RPC (Atomic lease acquisition with SKIP LOCKED)
 CREATE OR REPLACE FUNCTION public.claim_next_pending_document(
   p_user_id uuid
 ) RETURNS TABLE(
@@ -111,7 +97,7 @@ DECLARE
   v_role text;
   v_sub text;
 BEGIN
-  -- Authenticated user validation (handles authenticated JWT, service_role, and internal contexts)
+
   BEGIN
     v_claims := pg_catalog.current_setting('request.jwt.claims', true)::jsonb;
   EXCEPTION WHEN OTHERS THEN
@@ -122,7 +108,6 @@ BEGIN
     v_role := v_claims->>'role';
     v_sub := v_claims->>'sub';
 
-    -- If caller is authenticated user, strictly enforce sub = p_user_id
     IF v_role = 'authenticated' THEN
       IF v_sub IS NULL OR v_sub::uuid != p_user_id THEN
         RAISE EXCEPTION 'Unauthorized: user_id mismatch';
@@ -132,7 +117,6 @@ BEGIN
     END IF;
   END IF;
 
-  -- Step A: Transition stale jobs for this user that exhausted attempts (>= 3) to terminal 'failed' state
   UPDATE public.documents
      SET status = 'failed',
          processing_stage = 'failed',
@@ -145,7 +129,6 @@ BEGIN
      AND processing_locked_at < pg_catalog.now() - INTERVAL '10 minutes'
      AND processing_attempts >= 3;
 
-  -- Step B: Atomically select and lock the oldest pending document or retryable stale processing document (< 3 attempts)
   SELECT d.id INTO v_doc_id
     FROM public.documents d
    WHERE d.user_id = p_user_id
@@ -164,7 +147,6 @@ BEGIN
 
   v_new_token := pg_catalog.gen_random_uuid();
 
-  -- Claim the lease
   UPDATE public.documents
      SET status = 'processing',
          processing_stage = 'starting',
@@ -186,7 +168,6 @@ REVOKE EXECUTE ON FUNCTION public.claim_next_pending_document(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.claim_next_pending_document(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.claim_next_pending_document(uuid) TO service_role;
 
--- 3. System Queue Claim RPC for Background Crons (Service-Role Only)
 CREATE OR REPLACE FUNCTION public.claim_next_system_pending_document()
 RETURNS TABLE(
   document_id uuid,
@@ -206,7 +187,7 @@ DECLARE
   v_claims jsonb;
   v_role text;
 BEGIN
-  -- Security Invariant: Only service_role or internal DB contexts may invoke system-wide claim
+
   BEGIN
     v_claims := pg_catalog.current_setting('request.jwt.claims', true)::jsonb;
   EXCEPTION WHEN OTHERS THEN
@@ -220,7 +201,6 @@ BEGIN
     END IF;
   END IF;
 
-  -- Step A: Transition stale jobs across all users that exhausted attempts (>= 3) to terminal 'failed' state
   UPDATE public.documents
      SET status = 'failed',
          processing_stage = 'failed',
@@ -232,7 +212,6 @@ BEGIN
      AND processing_locked_at < pg_catalog.now() - INTERVAL '10 minutes'
      AND processing_attempts >= 3;
 
-  -- Step B: Atomically select and lock the oldest pending document or retryable stale processing document (< 3 attempts)
   SELECT d.id INTO v_doc_id
     FROM public.documents d
    WHERE (
@@ -250,7 +229,6 @@ BEGIN
 
   v_new_token := pg_catalog.gen_random_uuid();
 
-  -- Claim the lease
   UPDATE public.documents
      SET status = 'processing',
          processing_stage = 'starting',
@@ -272,7 +250,6 @@ REVOKE EXECUTE ON FUNCTION public.claim_next_system_pending_document() FROM anon
 REVOKE EXECUTE ON FUNCTION public.claim_next_system_pending_document() FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.claim_next_system_pending_document() TO service_role;
 
--- 4. Upgrade acquire_document_processing to allow manual retry of failed documents
 CREATE OR REPLACE FUNCTION public.acquire_document_processing(
   p_document_id uuid,
   p_user_id uuid
@@ -284,20 +261,20 @@ AS $$
 DECLARE
   v_new_token uuid;
 BEGIN
-  -- If document was in terminal 'failed' state or stale processing with exhausted attempts, reset attempts for user-initiated retry
+
   UPDATE public.documents
-  SET status = 'processing', 
-      processing_stage = 'starting', 
-      processing_locked_at = pg_catalog.now(), 
-      processing_attempts = CASE 
-        WHEN status = 'failed' OR (status = 'processing' AND processing_locked_at < pg_catalog.now() - interval '10 minutes' AND processing_attempts >= 3) THEN 1 
-        ELSE processing_attempts + 1 
+  SET status = 'processing',
+      processing_stage = 'starting',
+      processing_locked_at = pg_catalog.now(),
+      processing_attempts = CASE
+        WHEN status = 'failed' OR (status = 'processing' AND processing_locked_at < pg_catalog.now() - interval '10 minutes' AND processing_attempts >= 3) THEN 1
+        ELSE processing_attempts + 1
       END,
       processing_token = pg_catalog.gen_random_uuid(),
       error_message = NULL,
       updated_at = pg_catalog.now()
-  WHERE id = p_document_id 
-    AND user_id = p_user_id 
+  WHERE id = p_document_id
+    AND user_id = p_user_id
     AND (
       status = 'failed'
       OR (status = 'pending' AND processing_attempts < 3)

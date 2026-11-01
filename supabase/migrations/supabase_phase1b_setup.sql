@@ -1,12 +1,6 @@
--- ==============================================================================
--- FileMind Phase 1B Database Migration: Chunking, pgvector, HNSW & Hybrid Search
--- ==============================================================================
-
--- Step 1: Enable pgvector extension
 CREATE EXTENSION IF NOT EXISTS vector;
 
--- Step 2: Add Phase 1B embedding lifecycle columns to public.documents
-ALTER TABLE public.documents 
+ALTER TABLE public.documents
   ADD COLUMN IF NOT EXISTS embedding_status text NOT NULL DEFAULT 'pending'
     CHECK (embedding_status IN ('pending', 'processing', 'completed', 'failed')),
   ADD COLUMN IF NOT EXISTS embedding_attempts integer NOT NULL DEFAULT 0,
@@ -16,10 +10,9 @@ ALTER TABLE public.documents
   ADD COLUMN IF NOT EXISTS embedding_locked_at timestamptz,
   ADD COLUMN IF NOT EXISTS embedding_token uuid;
 
-CREATE INDEX IF NOT EXISTS documents_user_embedding_status_idx 
+CREATE INDEX IF NOT EXISTS documents_user_embedding_status_idx
   ON public.documents(user_id, embedding_status);
 
--- Step 3: Create public.document_chunks table
 CREATE TABLE IF NOT EXISTS public.document_chunks (
   id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   document_id     uuid        NOT NULL REFERENCES public.documents(id) ON DELETE CASCADE,
@@ -35,38 +28,32 @@ CREATE TABLE IF NOT EXISTS public.document_chunks (
   UNIQUE(document_id, chunk_index)
 );
 
--- Step 4: Create performance and retrieval indexes
-CREATE INDEX IF NOT EXISTS document_chunks_document_id_idx 
+CREATE INDEX IF NOT EXISTS document_chunks_document_id_idx
   ON public.document_chunks(document_id);
 
-CREATE INDEX IF NOT EXISTS document_chunks_document_chunk_idx 
+CREATE INDEX IF NOT EXISTS document_chunks_document_chunk_idx
   ON public.document_chunks(document_id, chunk_index);
 
--- HNSW Cosine vector index on 768-dimensional embeddings
-CREATE INDEX IF NOT EXISTS document_chunks_embedding_hnsw_idx 
-  ON public.document_chunks 
+CREATE INDEX IF NOT EXISTS document_chunks_embedding_hnsw_idx
+  ON public.document_chunks
   USING hnsw (embedding public.vector_cosine_ops);
 
--- GIN index for PostgreSQL full-text search
-CREATE INDEX IF NOT EXISTS document_chunks_fts_idx 
-  ON public.document_chunks 
+CREATE INDEX IF NOT EXISTS document_chunks_fts_idx
+  ON public.document_chunks
   USING gin (fts_tokens);
 
--- Step 5: Enable RLS and isolate permissions on document_chunks
 ALTER TABLE public.document_chunks ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "document_chunks_select_own" ON public.document_chunks;
 
 CREATE POLICY "document_chunks_select_own" ON public.document_chunks FOR SELECT
   USING (EXISTS (
-    SELECT 1 FROM public.documents d 
+    SELECT 1 FROM public.documents d
     WHERE d.id = document_chunks.document_id AND d.user_id = auth.uid()
   ));
 
--- Disallow client-side mutations completely
 REVOKE INSERT, UPDATE, DELETE ON public.document_chunks FROM anon, authenticated;
 
--- Step 6: Atomic Acquisition RPC (Lease / Fencing Token for Indexing)
 CREATE OR REPLACE FUNCTION public.acquire_document_indexing(
   p_document_id uuid,
   p_user_id uuid
@@ -103,7 +90,6 @@ REVOKE EXECUTE ON FUNCTION public.acquire_document_indexing(uuid, uuid) FROM ano
 REVOKE EXECUTE ON FUNCTION public.acquire_document_indexing(uuid, uuid) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.acquire_document_indexing(uuid, uuid) TO service_role;
 
--- Step 7: Atomic Finalization RPC (Commits all chunks + embeddings transactionally)
 CREATE OR REPLACE FUNCTION public.finalize_document_indexing(
   p_document_id uuid,
   p_user_id uuid,
@@ -115,18 +101,16 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 BEGIN
-  -- 1. Fencing Check: Verify document ownership and current lease token
+
   IF NOT EXISTS (
     SELECT 1 FROM public.documents
     WHERE id = p_document_id AND user_id = p_user_id AND embedding_token = p_embedding_token
   ) THEN
-    RETURN false; -- Token is stale / fenced out
+    RETURN false;
   END IF;
 
-  -- 2. Clean previous chunks for idempotency / safe re-indexing
   DELETE FROM public.document_chunks WHERE document_id = p_document_id;
 
-  -- 3. Insert new validated chunks
   INSERT INTO public.document_chunks (
     document_id,
     page_start,
@@ -146,7 +130,6 @@ BEGIN
     (item->>'embedding')::public.vector(768)
   FROM pg_catalog.jsonb_array_elements(p_chunks) AS item;
 
-  -- 4. Mark embedding_status = completed and clear token
   UPDATE public.documents
   SET embedding_status = 'completed',
       embedding_completed_at = pg_catalog.now(),
@@ -164,7 +147,6 @@ REVOKE EXECUTE ON FUNCTION public.finalize_document_indexing(uuid, uuid, uuid, j
 REVOKE EXECUTE ON FUNCTION public.finalize_document_indexing(uuid, uuid, uuid, jsonb) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.finalize_document_indexing(uuid, uuid, uuid, jsonb) TO service_role;
 
--- Step 8: Fenced Failure RPC for Indexing
 CREATE OR REPLACE FUNCTION public.mark_document_indexing_failed(
   p_document_id uuid,
   p_user_id uuid,
@@ -194,7 +176,6 @@ REVOKE EXECUTE ON FUNCTION public.mark_document_indexing_failed(uuid, uuid, uuid
 REVOKE EXECUTE ON FUNCTION public.mark_document_indexing_failed(uuid, uuid, uuid, text) FROM authenticated;
 GRANT EXECUTE ON FUNCTION public.mark_document_indexing_failed(uuid, uuid, uuid, text) TO service_role;
 
--- Step 9: Vector Search RPC (Scoped to Authenticated User)
 CREATE OR REPLACE FUNCTION public.match_document_chunks(
   p_query_embedding public.vector(768),
   p_match_count integer,
@@ -244,7 +225,6 @@ REVOKE EXECUTE ON FUNCTION public.match_document_chunks(public.vector, integer, 
 GRANT EXECUTE ON FUNCTION public.match_document_chunks(public.vector, integer, real, uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.match_document_chunks(public.vector, integer, real, uuid) TO service_role;
 
--- Step 10: Lexical Search RPC (PostgreSQL Full-Text + Exact Substring Match)
 CREATE OR REPLACE FUNCTION public.search_document_chunks_lexical(
   p_query_text text,
   p_match_count integer,

@@ -1,4 +1,3 @@
--- Step 1 - Shared trigger function
 CREATE OR REPLACE FUNCTION public.set_updated_at()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -10,7 +9,6 @@ BEGIN
 END;
 $BODY$;
 
--- Step 2 - Profiles table
 CREATE TABLE public.profiles (
   id          uuid        PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email       text,
@@ -30,7 +28,6 @@ CREATE POLICY "profiles_update_own"
   USING (auth.uid() = id)
   WITH CHECK (auth.uid() = id);
 
--- Step 3 - Profile creation trigger
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -53,7 +50,6 @@ CREATE TRIGGER on_auth_user_created
 REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.handle_new_user() FROM anon, authenticated;
 
--- Step 4 - Documents table
 CREATE TABLE public.documents (
   id                    uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id               uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -79,20 +75,17 @@ CREATE TRIGGER documents_updated_at
   BEFORE UPDATE ON public.documents
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
--- Step 5 - Documents indexes
 CREATE INDEX documents_user_id_idx ON public.documents(user_id);
 CREATE INDEX documents_status_idx ON public.documents(status);
 CREATE INDEX documents_user_status_idx ON public.documents(user_id, status);
 CREATE INDEX documents_user_created_idx ON public.documents(user_id, created_at desc);
 
--- Step 6 - Documents RLS
 ALTER TABLE public.documents ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "documents_select_own" ON public.documents FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "documents_insert_own" ON public.documents FOR INSERT WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "documents_update_own" ON public.documents FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 CREATE POLICY "documents_delete_own" ON public.documents FOR DELETE USING (auth.uid() = user_id);
 
--- Step 7 - create_document_with_quota function
 CREATE OR REPLACE FUNCTION public.create_document_with_quota(
   p_id uuid,
   p_user_id uuid,
@@ -110,7 +103,7 @@ DECLARE
   v_actual_size bigint;
   v_owner text;
 BEGIN
-  IF pg_catalog.current_setting('request.jwt.claims', true)::jsonb->>'sub' IS NULL OR 
+  IF pg_catalog.current_setting('request.jwt.claims', true)::jsonb->>'sub' IS NULL OR
      (pg_catalog.current_setting('request.jwt.claims', true)::jsonb->>'sub')::uuid != p_user_id THEN
     RAISE EXCEPTION 'Unauthorized: user_id mismatch or not authenticated';
   END IF;
@@ -119,7 +112,7 @@ BEGIN
     RAISE EXCEPTION 'Unauthorized: storage_path does not belong to user';
   END IF;
 
-  SELECT (metadata->>'size')::bigint, owner_id 
+  SELECT (metadata->>'size')::bigint, owner_id
   INTO v_actual_size, v_owner
   FROM storage.objects
   WHERE bucket_id = 'documents' AND name = p_storage_path;
@@ -159,8 +152,6 @@ REVOKE EXECUTE ON FUNCTION public.create_document_with_quota(uuid, uuid, text, t
 REVOKE EXECUTE ON FUNCTION public.create_document_with_quota(uuid, uuid, text, text, bigint) FROM anon;
 GRANT EXECUTE ON FUNCTION public.create_document_with_quota(uuid, uuid, text, text, bigint) TO authenticated;
 
--- Storage RLS (Make sure bucket is created first manually)
--- INSERT
 create policy "storage_insert_own"
   on storage.objects for insert
   with check (
@@ -169,7 +160,6 @@ create policy "storage_insert_own"
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
--- SELECT
 create policy "storage_select_own"
   on storage.objects for select
   using (
@@ -178,7 +168,6 @@ create policy "storage_select_own"
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
--- DELETE
 create policy "storage_delete_own"
   on storage.objects for delete
   using (

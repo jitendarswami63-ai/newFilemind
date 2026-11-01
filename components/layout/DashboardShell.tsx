@@ -1,0 +1,46 @@
+'use client'
+
+import React from 'react'
+import { SidebarProvider, useSidebar } from './SidebarContext'
+import { Sidebar } from './Sidebar'
+import { MobileNav } from './MobileNav'
+
+function DashboardInnerShell({
+  user,
+  children,
+}: {
+  user: any
+  children: React.ReactNode
+}) {
+  const { isCollapsed } = useSidebar()
+
+  return (
+    <div className="flex min-h-screen w-full bg-[#F3EFE5] text-[#292720]">
+      <Sidebar user={user} />
+      <div
+        className={`flex-1 flex flex-col min-w-0 w-full transition-[padding] duration-300 ease-in-out ${
+          isCollapsed ? 'md:pl-20' : 'md:pl-64'
+        }`}
+      >
+        <MobileNav user={user} />
+        <main className="flex-1 p-4 sm:p-6 md:p-8 w-full max-w-7xl mx-auto box-border">
+          {children}
+        </main>
+      </div>
+    </div>
+  )
+}
+
+export function DashboardShell({
+  user,
+  children,
+}: {
+  user: any
+  children: React.ReactNode
+}) {
+  return (
+    <SidebarProvider>
+      <DashboardInnerShell user={user}>{children}</DashboardInnerShell>
+    </SidebarProvider>
+  )
+}

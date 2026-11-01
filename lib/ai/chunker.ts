@@ -14,17 +14,12 @@ export interface DocumentChunk {
   content_hash: string
 }
 
-// Target ~700-900 tokens (approx 3000-3600 characters)
 const TARGET_CHUNK_CHARS = 3200
-// Bounded overlap ~100-150 tokens (approx 450-600 characters)
+
 const OVERLAP_CHARS = 500
-// Minimum meaningful chunk size (avoids tiny tail fragments)
+
 const MIN_CHUNK_CHARS = 100
 
-/**
- * Deterministically chunks an ordered array of page texts from public.document_pages.
- * Preserves page_start, page_end, chunk_index, and sentence/paragraph boundaries.
- */
 export function chunkDocumentPages(
   documentId: string,
   pages: PageText[]
@@ -33,10 +28,8 @@ export function chunkDocumentPages(
     return []
   }
 
-  // Ensure pages are deterministically sorted by page_number
   const sortedPages = [...pages].sort((a, b) => a.page_number - b.page_number)
 
-  // Build a segmented representation where each segment tracks its source page
   interface TextSegment {
     text: string
     page: number
@@ -46,7 +39,7 @@ export function chunkDocumentPages(
 
   for (const page of sortedPages) {
     const rawText = page.text || ''
-    // Split by paragraphs first
+
     const paragraphs = rawText.split(/\n\s*\n/)
 
     for (const para of paragraphs) {
@@ -57,7 +50,6 @@ export function chunkDocumentPages(
     }
   }
 
-  // If document was completely empty or had only whitespace
   if (segments.length === 0) {
     return []
   }
@@ -75,7 +67,6 @@ export function chunkDocumentPages(
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i]
 
-    // If adding this segment exceeds target and we already have sufficient content
     if (currentLength + seg.text.length > TARGET_CHUNK_CHARS && currentLength >= MIN_CHUNK_CHARS) {
       const chunkText = currentBuffer.join('\n\n').trim()
       if (chunkText.length > 0) {
@@ -86,7 +77,6 @@ export function chunkDocumentPages(
         })
       }
 
-      // Compute overlap from the end of currentBuffer
       const overlapBuffer: string[] = []
       const overlapPages: number[] = []
       let overlapLen = 0
@@ -112,11 +102,10 @@ export function chunkDocumentPages(
     }
   }
 
-  // Flush remaining buffer
   if (currentBuffer.length > 0) {
     const chunkText = currentBuffer.join('\n\n').trim()
     if (chunkText.length > 0) {
-      // If the last chunk is too tiny and we have a previous chunk, merge it if bounded
+
       if (rawChunks.length > 0 && chunkText.length < MIN_CHUNK_CHARS) {
         const lastChunk = rawChunks[rawChunks.length - 1]
         if (lastChunk.content.length + chunkText.length < TARGET_CHUNK_CHARS * 1.5) {
@@ -139,7 +128,6 @@ export function chunkDocumentPages(
     }
   }
 
-  // If no paragraphs could be formed (e.g. single long block), slice by boundary-aware sliding window
   if (rawChunks.length === 0 && segments.length > 0) {
     const combined = segments.map((s) => s.text).join('\n\n')
     const pageNum = segments[0].page
@@ -150,7 +138,6 @@ export function chunkDocumentPages(
     })
   }
 
-  // Convert rawChunks into deterministic DocumentChunk objects with content_hash and 0-indexed chunk_index
   return rawChunks.map((chunk, index) => {
     const hash = createHash('sha256')
       .update(`${documentId}:${index}:${chunk.page_start}:${chunk.page_end}:${chunk.content}`)
@@ -167,9 +154,6 @@ export function chunkDocumentPages(
   })
 }
 
-/**
- * Validates chunk sequence integrity (ordering, non-emptiness, contiguous 0-indexing).
- */
 export function validateChunksIntegrity(chunks: DocumentChunk[]): void {
   if (!Array.isArray(chunks)) {
     throw new Error('Chunks must be an array')

@@ -17,7 +17,6 @@ export async function POST(
   const { id } = await params
   const supabase = await createClient()
 
-  // 1. Authenticate user
   const {
     data: { user },
     error: authError,
@@ -27,7 +26,6 @@ export async function POST(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // 2. Authoritative database ownership check
   const { data: doc, error: docError } = await supabase
     .from('documents')
     .select('id, status')
@@ -46,7 +44,6 @@ export async function POST(
     )
   }
 
-  // 3. Trigger Phase 1B background indexing
   after(async () => {
     try {
       await indexDocument(id)

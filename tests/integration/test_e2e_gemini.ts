@@ -2,7 +2,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { createClient } from '@supabase/supabase-js';
 
-// Parse .env.local before importing any internal modules
 const envLines = fs.readFileSync(path.join(process.cwd(), '.env.local'), 'utf8').split('\n');
 envLines.forEach(line => {
   const parts = line.trim().split('=');
@@ -19,9 +18,6 @@ envLines.forEach(line => {
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
-
-
-
 const serviceClient = createClient(SUPABASE_URL, SERVICE_KEY, {
   auth: { persistSession: false },
 });
@@ -31,7 +27,6 @@ async function runE2E() {
   console.log('   FILEMIND PHASE 1A LIVE GEMINI E2E VERIFICATION    ');
   console.log('====================================================');
 
-  // Minimal valid 1-page PDF
   const minimalPdf = Buffer.from(
     '%PDF-1.4\n' +
     '1 0 obj <</Type /Catalog /Pages 2 0 R>> endobj\n' +
@@ -69,7 +64,6 @@ async function runE2E() {
     '%%EOF'
   );
 
-  // 1. Create and authenticate test user
   const timestamp = Date.now();
   const testEmail = `gemini_e2e_${timestamp}@test.com`;
   const testPassword = 'Password123!GeminiTest';
@@ -88,7 +82,6 @@ async function runE2E() {
   const testUser = authData.user;
   console.log(`[E2E] Created test user: ${testUser.id} (${testEmail})`);
 
-  // 2. Upload PDF into user storage using authenticated user client
   const fileId = crypto.randomUUID();
   const storagePath = `${testUser.id}/${fileId}/invoice_sample.pdf`;
   console.log(`[E2E] Uploading sample invoice to storage: ${storagePath}`);
@@ -100,7 +93,6 @@ async function runE2E() {
     });
   if (storageErr) throw new Error('Storage upload failed: ' + storageErr.message);
 
-  // 3. Register document via RPC using authenticated user client
   console.log('[E2E] Registering document via create_document_with_quota RPC...');
   const { data: rpcData, error: rpcErr } = await anonClient.rpc('create_document_with_quota', {
     p_id: fileId,
@@ -113,12 +105,10 @@ async function runE2E() {
   const docId = fileId;
   console.log(`[E2E] Document registered with ID: ${docId}, status: pending`);
 
-  // 4. Run processor directly (this executes the exact background job)
   console.log('[E2E] Executing processDocument() with gemini-3.8-flash...');
   const { processDocument } = await import('@/lib/ai/processor');
   await processDocument(docId);
 
-  // 5. Inspect final state in DB
   const { data: docRecord, error: fetchErr } = await serviceClient
     .from('documents')
     .select('id, status, error_message, doc_category, tags, extracted_data, page_count, is_scanned, processing_locked_at')
@@ -146,7 +136,6 @@ async function runE2E() {
     console.log(`  Page ${p.page_number} (${p.extracted_text.length} chars): ${p.extracted_text.slice(0, 80)}...`);
   });
 
-  // Verification assertions
   if (docRecord.status !== 'completed') {
     throw new Error(`Expected status 'completed', but got '${docRecord.status}'`);
   }

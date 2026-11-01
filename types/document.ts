@@ -1,6 +1,6 @@
 export type DocumentStatus = 'pending' | 'processing' | 'completed' | 'failed'
 
-export type FilterStatus = 'all' | 'ready' | 'processing' | 'failed'
+export type FilterStatus = 'all' | 'ready' | 'processing' | 'failed' | 'locked'
 
 export interface DocumentRecord {
   id: string
@@ -15,6 +15,8 @@ export interface DocumentRecord {
   tags?: string[] | null
   page_count?: number | null
   is_scanned?: boolean | null
+  is_locked?: boolean | null
+  locked_at?: string | null
   error_message?: string | null
   processing_locked_at?: string | null
   processing_token?: string | null
@@ -33,6 +35,8 @@ export interface DocumentItem {
   storage_path?: string | null
   doc_category?: string | null
   tags?: string[] | null
+  is_locked?: boolean | null
+  locked_at?: string | null
 }
 
 export interface PaginationMeta {
@@ -89,6 +93,9 @@ export interface AskAIMessage {
   hasSufficientEvidence?: boolean
   verifiedCitations?: VerifiedCitation[]
   timestamp: string
+  provider?: 'gemini' | 'nvidia'
+  model?: string
+  latencyMs?: number
 }
 
 export interface AskAIQuestionOptions {
@@ -99,6 +106,8 @@ export interface AskAIQuestionOptions {
     role: 'user' | 'assistant'
     content: string
   }>
+  provider?: 'gemini' | 'nvidia'
+  model?: string
 }
 
 export interface AskAIResult {
@@ -106,6 +115,9 @@ export interface AskAIResult {
   sources: AskAISource[]
   hasSufficientEvidence: boolean
   verifiedCitations?: VerifiedCitation[]
+  provider?: 'gemini' | 'nvidia'
+  model?: string
+  latencyMs?: number
 }
 
 export interface AskAIRequest {
@@ -115,6 +127,8 @@ export interface AskAIRequest {
     role: 'user' | 'assistant'
     content: string
   }>
+  provider?: 'gemini' | 'nvidia'
+  model?: string
 }
 
 export interface AskAIResponse {
@@ -125,6 +139,9 @@ export interface AskAIResponse {
   hasSufficientEvidence: boolean
   question: string
   verifiedCitations?: VerifiedCitation[]
+  provider?: 'gemini' | 'nvidia'
+  model?: string
+  latencyMs?: number
 }
 
 export interface Conversation {
@@ -160,4 +177,21 @@ export interface ConversationWithMessages extends Conversation {
 export interface CreateConversationRequest {
   title?: string
   documentId?: string
+}
+
+export interface BiometricCredential {
+  id: string
+  credential_id: string
+  device_name: string
+  authenticator_type: string
+  aaguid?: string | null
+  created_at: string
+  last_used_at?: string | null
+}
+
+export interface BiometricStatusResponse {
+  isSupported: boolean
+  hasEnrolledAuthenticator: boolean
+  credentials: BiometricCredential[]
+  activeLeasesCount: number
 }

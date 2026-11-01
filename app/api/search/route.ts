@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { executeHybridSearch } from '@/lib/search/hybrid-search'
+import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,17 +12,14 @@ export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient()
 
-    // 1. Authenticate user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const auth = await verifyVaultAccess(supabase)
+    if (!auth.authorized) {
+      return NextResponse.json(
+        { error: auth.error, code: auth.code, mfaRequired: auth.code === 'MFA_REQUIRED' },
+        { status: auth.status }
+      )
     }
 
-    // 2. Validate query parameter
     const searchParams = request.nextUrl.searchParams
     const rawQuery = searchParams.get('q')
 
@@ -47,7 +45,6 @@ export async function GET(request: NextRequest) {
 
     const docIdParam = searchParams.get('documentId') || undefined
 
-    // 3. Execute hybrid search
     const results = await executeHybridSearch(supabase, trimmedQuery, {
       limit,
       documentId: docIdParam,

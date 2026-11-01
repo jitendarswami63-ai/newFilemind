@@ -3,6 +3,9 @@ import { createClient } from '@/lib/supabase/server'
 import { sanitizeFilename } from '@/lib/validation/filename'
 import { MAX_FILE_SIZE_BYTES, ALLOWED_MIME_TYPE } from '@/lib/constants'
 import { isSameOrigin } from '@/lib/validation/origin'
+import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
+
+export const dynamic = 'force-dynamic'
 
 interface PrepareUploadBody {
   filename?: string
@@ -16,10 +19,15 @@ export async function POST(request: Request) {
   }
 
   const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const auth = await verifyVaultAccess(supabase)
+  if (!auth.authorized) {
+    return NextResponse.json(
+      { error: auth.error, code: auth.code, mfaRequired: auth.code === 'MFA_REQUIRED' },
+      { status: auth.status }
+    )
   }
+  const user = auth.user!
 
   let body: PrepareUploadBody
   try {

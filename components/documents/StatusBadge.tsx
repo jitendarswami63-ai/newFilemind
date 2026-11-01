@@ -6,44 +6,71 @@ export type { DocumentStatus }
 
 interface StatusBadgeProps {
   status: DocumentStatus
+  embeddingStatus?: 'pending' | 'processing' | 'completed' | 'failed' | null
 }
 
-export function StatusBadge({ status }: StatusBadgeProps) {
+export function StatusBadge({ status, embeddingStatus }: StatusBadgeProps) {
+  const isIndexingFailed = status === 'completed' && embeddingStatus === 'failed'
+  const isIndexingProcessing = status === 'completed' && (embeddingStatus === 'processing' || embeddingStatus === 'pending')
+
   const configs = {
     pending: {
       label: 'Pending',
-      className: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
-      dotColor: 'bg-amber-400 animate-pulse',
+      className: 'bg-[#FEF8EC] text-[#B45309] border-[#FDE68A]',
+      dotColor: 'bg-[#D97706] animate-pulse',
+      isSpinning: false,
     },
     processing: {
       label: 'Analyzing document...',
-      className: 'bg-[#007ba7]/15 text-[#00d2ff] border-[#007ba7]/30',
+      className: 'bg-[#FAF5EC] text-[#9C7D47] border-[#E5DED1]',
       dotColor: '',
+      isSpinning: true,
     },
     completed: {
       label: 'Ready',
-      className: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20',
-      dotColor: 'bg-emerald-400',
+      className: 'bg-[#EBF7EE] text-[#1E7E34] border-[#C3E6CB]',
+      dotColor: 'bg-[#1E7E34]',
+      isSpinning: false,
+    },
+    indexing_processing: {
+      label: 'Indexing search...',
+      className: 'bg-[#FAF5EC] text-[#856837] border-[#E5DED1]',
+      dotColor: '',
+      isSpinning: true,
+    },
+    indexing_failed: {
+      label: 'Indexing Failed',
+      className: 'bg-[#FEF8EC] text-[#B45309] border-[#FDE68A]',
+      dotColor: 'bg-[#D97706]',
+      isSpinning: false,
     },
     failed: {
       label: 'Failed',
-      className: 'bg-[#ff2d95]/15 text-[#ff5ca8] border-[#ff2d95]/30',
-      dotColor: 'bg-[#ff2d95]',
+      className: 'bg-[#FDF2F2] text-[#B91C1C] border-[#F8D7DA]',
+      dotColor: 'bg-[#DC2626]',
+      isSpinning: false,
     },
   }
 
-  const config = configs[status] || configs.pending
+  let configKey: keyof typeof configs = status
+  if (isIndexingFailed) {
+    configKey = 'indexing_failed'
+  } else if (isIndexingProcessing) {
+    configKey = 'indexing_processing'
+  }
+
+  const current = configs[configKey] || configs.pending
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border select-none ${config.className}`}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium border select-none transition-colors ${current.className}`}
     >
-      {status === 'processing' ? (
-        <Loader2 className="w-3 h-3 animate-spin text-[#00d2ff]" />
+      {current.isSpinning ? (
+        <Loader2 className="h-3 w-3 animate-spin text-current" />
       ) : (
-        <span className={`w-1.5 h-1.5 rounded-full ${config.dotColor}`} />
+        <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${current.dotColor}`} />
       )}
-      {config.label}
+      <span>{current.label}</span>
     </span>
   )
 }

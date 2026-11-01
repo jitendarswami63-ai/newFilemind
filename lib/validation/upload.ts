@@ -12,7 +12,7 @@ export function validateUpload(file: { type: string; size: number }): { valid: b
   if (!validateMimeType(file.type)) {
     return { valid: false, error: 'Invalid file type. Only ' + ALLOWED_MIME_TYPE + ' is allowed.' };
   }
-  
+
   if (!validateFileSize(file.size)) {
     return { valid: false, error: 'File size exceeds the maximum limit.' };
   }

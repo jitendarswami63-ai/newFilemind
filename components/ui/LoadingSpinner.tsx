@@ -10,9 +10,9 @@ export function LoadingSpinner({
   return (
     <div className="flex flex-col items-center justify-center gap-2.5 p-4 select-none" role="status">
       <div
-        className={`rounded-full border-2 border-slate-200 border-t-[#315C4C] animate-spin ${className}`}
+        className={`rounded-full border-2 border-[#E5DED1] border-t-[#9C7D47] animate-spin ${className}`}
       />
-      {label && <span className="text-xs text-[#77756F] font-medium tracking-wide">{label}</span>}
+      {label && <span className="text-xs text-[#777064] font-medium tracking-wide">{label}</span>}
       <span className="sr-only">{label}</span>
     </div>
   )

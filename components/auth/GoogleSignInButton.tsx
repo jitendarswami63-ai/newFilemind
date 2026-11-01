@@ -6,11 +6,13 @@ import { Loader2 } from 'lucide-react'
 
 interface GoogleSignInButtonProps {
   text?: string
+  next?: string
   onError?: (msg: string) => void
 }
 
 export function GoogleSignInButton({
   text = 'Continue with Google',
+  next,
   onError,
 }: GoogleSignInButtonProps) {
   const [loading, setLoading] = useState(false)
@@ -19,10 +21,15 @@ export function GoogleSignInButton({
   const handleGoogleSignIn = async () => {
     setLoading(true)
     try {
+      const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
+      if (next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\')) {
+        callbackUrl.searchParams.set('next', next)
+      }
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: callbackUrl.toString(),
         },
       })
       if (error) {
@@ -40,10 +47,10 @@ export function GoogleSignInButton({
       type="button"
       onClick={handleGoogleSignIn}
       disabled={loading}
-      className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-[#12141f] hover:bg-[#171a29] text-white font-semibold text-sm rounded-xl border border-white/15 hover:border-[#00d2ff]/60 shadow-md hover:shadow-[0_0_20px_rgba(0,210,255,0.2)] transition-all duration-200 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99]"
+      className="w-full flex items-center justify-center gap-3 py-2.5 px-4 bg-[#FFFCF5] hover:bg-[#F3EFE5] text-[#292720] font-semibold text-sm rounded-xl border border-[#E5DED1] hover:border-[#C5A878] shadow-2xs transition-all duration-150 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer active:scale-[0.99]"
     >
       {loading ? (
-        <Loader2 className="h-5 w-5 animate-spin text-slate-600" />
+        <Loader2 className="h-5 w-5 animate-spin text-[#777064]" />
       ) : (
         <svg className="h-5 w-5 flex-shrink-0" viewBox="0 0 24 24">
           <path

@@ -7,8 +7,8 @@ export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 export function Card({ className = '', hover = false, ...props }: CardProps) {
   return (
     <div
-      className={`bg-white rounded-xl overflow-hidden border border-[#E7E5E0] shadow-sm ${
-        hover ? 'transition-all duration-150 hover:border-[#D4D1C9] hover:shadow-md' : ''
+      className={`bg-[#FFFCF5] rounded-2xl overflow-hidden border border-[#E5DED1] shadow-2xs ${
+        hover ? 'transition-all duration-200 hover:border-[#DDD5C7] hover:shadow-sm' : ''
       } ${className}`}
       {...props}
     />
@@ -20,11 +20,11 @@ export function CardHeader({ className = '', ...props }: React.HTMLAttributes<HT
 }
 
 export function CardTitle({ className = '', ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 className={`font-semibold text-[#242424] leading-tight tracking-tight ${className}`} {...props} />
+  return <h3 className={`font-semibold text-[#292720] leading-tight tracking-tight ${className}`} {...props} />
 }
 
 export function CardDescription({ className = '', ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
-  return <p className={`text-xs md:text-sm text-[#77756F] leading-relaxed ${className}`} {...props} />
+  return <p className={`text-xs md:text-sm text-[#777064] leading-relaxed ${className}`} {...props} />
 }
 
 export function CardContent({ className = '', ...props }: React.HTMLAttributes<HTMLDivElement>) {
@@ -32,5 +32,5 @@ export function CardContent({ className = '', ...props }: React.HTMLAttributes<H
 }
 
 export function CardFooter({ className = '', ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={`flex items-center p-5 md:p-6 pt-0 border-t border-[#E7E5E0] ${className}`} {...props} />
+  return <div className={`flex items-center p-5 md:p-6 pt-0 border-t border-[#E5DED1] ${className}`} {...props} />
 }

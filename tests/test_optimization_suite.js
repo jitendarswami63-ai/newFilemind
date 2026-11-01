@@ -3,7 +3,6 @@ const crypto = require('crypto')
 const assert = require('assert')
 const { PDFDocument, rgb, StandardFonts } = require('pdf-lib')
 
-// Read environment from .env.local
 let env = {}
 try {
   env = Object.fromEntries(
@@ -14,9 +13,7 @@ try {
       .filter((parts) => parts.length >= 2)
       .map(([k, ...v]) => [k.trim(), v.join('=').trim()])
   )
-} catch {
-  // Fallback if .env.local is not present
-}
+} catch {}
 
 const SUPABASE_URL = env.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:54321'
 const ANON_KEY = env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy_anon_key'
@@ -34,12 +31,8 @@ async function runOptimizationSuite() {
   console.log('    FILEMIND SYSTEM OPTIMIZATION AUTOMATED VERIFICATION SUITE   ')
   console.log('===============================================================\n')
 
-  // --------------------------------------------------------------------------
-  // TEST GROUP 1: Safe PDF Storage Optimization (pdf-lib)
-  // --------------------------------------------------------------------------
   console.log('--- TEST GROUP 1: Safe PDF Storage Optimization & Integrity ---')
 
-  // Create a synthetic PDF document with multiple pages
   const doc = await PDFDocument.create()
   const font = await doc.embedFont(StandardFonts.Helvetica)
   for (let i = 0; i < 4; i++) {
@@ -55,7 +48,6 @@ async function runOptimizationSuite() {
   }
   const samplePdfBuffer = Buffer.from(await doc.save())
 
-  // Helper matching lib/storage/optimizer.ts logic
   function hasDigitalSignatureIndicators(buffer) {
     const str = buffer.toString('latin1')
     return (
@@ -105,7 +97,6 @@ async function runOptimizationSuite() {
     const optimizedBytes = await pdfDoc.save({ useObjectStreams: true })
     const optimizedBuffer = Buffer.from(optimizedBytes)
 
-    // Verification
     const verifyDoc = await PDFDocument.load(optimizedBuffer)
     if (verifyDoc.getPageCount() !== pageCount) {
       return { status: 'failed', reason: 'Page count mismatch', buffer }
@@ -121,7 +112,6 @@ async function runOptimizationSuite() {
     return { status: 'optimized', savingsPercent, savedBytes, buffer: optimizedBuffer }
   }
 
-  // 1.1 Structural optimization
   const optRes = await testOptimizePdf(samplePdfBuffer)
   if (optRes.status === 'optimized' || optRes.status === 'unchanged') {
     record('PDF Optimizer: Execution & Integrity', 'PASS', `Result status="${optRes.status}", 4 pages preserved`)
@@ -129,7 +119,6 @@ async function runOptimizationSuite() {
     record('PDF Optimizer: Execution & Integrity', 'FAIL', `Unexpected status: ${optRes.status}`)
   }
 
-  // 1.2 Digital signature skip
   const signedBuffer = Buffer.concat([samplePdfBuffer, Buffer.from('\n/ByteRange [0 10 20 30]\n/Type /Sig\n')])
   const signedRes = await testOptimizePdf(signedBuffer)
   if (signedRes.status === 'skipped' && signedRes.reason.includes('signed')) {
@@ -138,7 +127,6 @@ async function runOptimizationSuite() {
     record('PDF Optimizer: Digital Signature Skip', 'FAIL', `Failed to skip signed PDF: status=${signedRes.status}`)
   }
 
-  // 1.3 Encryption skip
   const encBuffer = Buffer.concat([samplePdfBuffer, Buffer.from('\n/Encrypt 5 0 R\n')])
   const encRes = await testOptimizePdf(encBuffer)
   if (encRes.status === 'skipped' && encRes.reason.includes('Encrypted')) {
@@ -147,7 +135,6 @@ async function runOptimizationSuite() {
     record('PDF Optimizer: Encryption Skip', 'FAIL', `Failed to skip encrypted PDF: status=${encRes.status}`)
   }
 
-  // 1.4 Interactive actions skip
   const jsBuffer = Buffer.concat([samplePdfBuffer, Buffer.from('\n/JavaScript << /Type /Action >>\n')])
   const jsRes = await testOptimizePdf(jsBuffer)
   if (jsRes.status === 'skipped' && jsRes.reason.includes('scripts')) {
@@ -156,7 +143,6 @@ async function runOptimizationSuite() {
     record('PDF Optimizer: Interactive JS Skip', 'FAIL', `Failed to skip JS PDF: status=${jsRes.status}`)
   }
 
-  // 1.5 Embedded files skip
   const efBuffer = Buffer.concat([samplePdfBuffer, Buffer.from('\n/EmbeddedFiles << >>\n')])
   const efRes = await testOptimizePdf(efBuffer)
   if (efRes.status === 'skipped' && efRes.reason.includes('Embedded files')) {
@@ -165,7 +151,6 @@ async function runOptimizationSuite() {
     record('PDF Optimizer: Embedded Files Skip', 'FAIL', `Failed to skip embedded files: status=${efRes.status}`)
   }
 
-  // 1.6 Malformed / Non-PDF skip
   const malformedRes = await testOptimizePdf(Buffer.from('NOT_PDF_HEADER'))
   if (malformedRes.status === 'skipped' && malformedRes.reason.includes('Invalid header')) {
     record('PDF Optimizer: Invalid Header Skip', 'PASS', 'Correctly rejected invalid magic bytes')
@@ -173,9 +158,6 @@ async function runOptimizationSuite() {
     record('PDF Optimizer: Invalid Header Skip', 'FAIL', `Failed to reject invalid header: status=${malformedRes.status}`)
   }
 
-  // --------------------------------------------------------------------------
-  // TEST GROUP 2: Search Query Embedding LRU Cache
-  // --------------------------------------------------------------------------
   console.log('\n--- TEST GROUP 2: Search Query Embedding LRU Cache ---')
 
   const CACHE_CAPACITY = 500
@@ -224,7 +206,6 @@ async function runOptimizationSuite() {
 
   const testCache = new TestLRUCache()
 
-  // 2.1 Query normalization
   const k1 = testCache.generateKey('Artificial Intelligence')
   const k2 = testCache.generateKey('  artificial    intelligence \n')
   const k3 = testCache.generateKey('Machine Learning')
@@ -235,7 +216,6 @@ async function runOptimizationSuite() {
     record('Embedding Cache: Query Normalization & SHA-256 Key', 'FAIL', 'Key normalization failed')
   }
 
-  // 2.2 Hit and miss semantics
   const dummyVec = new Array(768).fill(0.123)
   testCache.set(k1, dummyVec)
   const hit = testCache.get(k1)
@@ -247,19 +227,16 @@ async function runOptimizationSuite() {
     record('Embedding Cache: Hit & Miss Semantics', 'FAIL', 'Hit/miss behavior incorrect')
   }
 
-  // 2.3 LRU Eviction at capacity 500
   const lruCache = new TestLRUCache(500)
   for (let i = 0; i < 500; i++) {
     const k = lruCache.generateKey(`term_${i}`)
     lruCache.set(k, dummyVec)
   }
 
-  // Access term_0 to refresh it
   const term0Key = lruCache.generateKey('term_0')
   const term1Key = lruCache.generateKey('term_1')
   lruCache.get(term0Key)
 
-  // Insert 501st element
   const overflowKey = lruCache.generateKey('overflow_term')
   lruCache.set(overflowKey, dummyVec)
 
@@ -273,14 +250,13 @@ async function runOptimizationSuite() {
     record('Embedding Cache: 500-Capacity LRU Eviction', 'FAIL', `LRU eviction failed: size=${lruCache.size()}`)
   }
 
-  // 2.4 Vector integrity validation
   const invalidKey = lruCache.generateKey('invalid_term')
-  lruCache.set(invalidKey, [1, 2, 3]) // wrong length
+  lruCache.set(invalidKey, [1, 2, 3])
   const wrongLenRejected = lruCache.get(invalidKey) === null
 
   const nanVec = new Array(768).fill(0.1)
   nanVec[5] = NaN
-  lruCache.set(invalidKey, nanVec) // NaN value
+  lruCache.set(invalidKey, nanVec)
   const nanRejected = lruCache.get(invalidKey) === null
 
   if (wrongLenRejected && nanRejected) {
@@ -289,9 +265,6 @@ async function runOptimizationSuite() {
     record('Embedding Cache: Vector Integrity Validation', 'FAIL', 'Accepted invalid vector')
   }
 
-  // --------------------------------------------------------------------------
-  // TEST GROUP 3: Search Result Deduplication & Snippet Coalescing
-  // --------------------------------------------------------------------------
   console.log('\n--- TEST GROUP 3: Search Result Deduplication & Snippet Coalescing ---')
 
   const candidateChunks = [
@@ -314,7 +287,7 @@ async function runOptimizationSuite() {
       page_start: 5,
       page_end: 6,
       content: 'Operating efficiency improved by 14% following algorithmic pipeline upgrades.',
-      score: 0.048888, // Higher score for doc-100
+      score: 0.048888,
       rrfScore: 0.048888,
     },
     {
@@ -377,21 +350,18 @@ async function runOptimizationSuite() {
 
   const dedupResults = deduplicateAndCoalesceTest(candidateChunks, 'revenue security', 20)
 
-  // 3.1 Document grouping
   if (dedupResults.length === 2 && dedupResults[0].document_id === 'doc-100' && dedupResults[1].document_id === 'doc-200') {
     record('Search Deduplication: Document Grouping', 'PASS', '3 chunks grouped into 2 distinct document results')
   } else {
     record('Search Deduplication: Document Grouping', 'FAIL', `Grouping incorrect: count=${dedupResults.length}`)
   }
 
-  // 3.2 Highest score preservation
   if (dedupResults[0].score === 0.048888 && dedupResults[0].chunk_id === 'chk-2') {
     record('Search Deduplication: Highest Score Preservation', 'PASS', 'Doc-100 preserved highest chunk score (0.048888 from chk-2)')
   } else {
     record('Search Deduplication: Highest Score Preservation', 'FAIL', `Score preservation failed: ${dedupResults[0].score}`)
   }
 
-  // 3.3 Page range expansion & sorting
   const doc100Pages = dedupResults[0].matching_pages
   if (JSON.stringify(doc100Pages) === JSON.stringify([1, 2, 5, 6])) {
     record('Search Deduplication: Page Range Expansion', 'PASS', 'Expanded and sorted matching_pages to [1, 2, 5, 6]')
@@ -399,7 +369,6 @@ async function runOptimizationSuite() {
     record('Search Deduplication: Page Range Expansion', 'FAIL', `Page expansion failed: ${JSON.stringify(doc100Pages)}`)
   }
 
-  // 3.4 Snippet coalescing <= 1000 chars
   const doc100Snippet = dedupResults[0].snippet
   if (
     doc100Snippet.includes('Operating efficiency') &&
@@ -411,9 +380,6 @@ async function runOptimizationSuite() {
     record('Search Deduplication: Snippet Coalescing', 'FAIL', 'Snippet coalescing failed')
   }
 
-  // --------------------------------------------------------------------------
-  // TEST GROUP 4: PDF Viewer Fast-Path Signed URL Cache
-  // --------------------------------------------------------------------------
   console.log('\n--- TEST GROUP 4: PDF Viewer Fast-Path Signed URL Cache ---')
 
   class TestSignedUrlCache {
@@ -467,11 +433,10 @@ async function runOptimizationSuite() {
     fetchCount++
     return {
       signedUrl: `https://supabase.co/storage/v1/object/sign/docs/${id}.pdf?token=valid`,
-      expiresAt: Date.now() + 300 * 1000, // 5 minutes
+      expiresAt: Date.now() + 300 * 1000,
     }
   }
 
-  // 4.1 In-flight request collapsing
   const [url1, url2, url3] = await Promise.all([
     viewerCache.fetchSignedUrl('doc-abc', 'path/v1.pdf', mockFetcher),
     viewerCache.fetchSignedUrl('doc-abc', 'path/v1.pdf', mockFetcher),
@@ -484,7 +449,6 @@ async function runOptimizationSuite() {
     record('Viewer Cache: In-Flight Collapsing', 'FAIL', `In-flight collapsing failed: fetchCount=${fetchCount}`)
   }
 
-  // 4.2 Cache hit
   const urlCached = await viewerCache.fetchSignedUrl('doc-abc', 'path/v1.pdf', mockFetcher)
   if (fetchCount === 1 && urlCached === url1) {
     record('Viewer Cache: In-Memory Hit', 'PASS', 'Immediate hit returned without invoking fetcher')
@@ -492,7 +456,6 @@ async function runOptimizationSuite() {
     record('Viewer Cache: In-Memory Hit', 'FAIL', 'Cache hit failed')
   }
 
-  // 4.3 Invalidation on path update
   const urlNewPath = await viewerCache.fetchSignedUrl('doc-abc', 'path/v2-optimized.pdf', mockFetcher)
   if (fetchCount === 2 && urlNewPath !== undefined) {
     record('Viewer Cache: Storage Path Invalidation', 'PASS', 'Storage path change triggered fresh fetch')
@@ -500,12 +463,8 @@ async function runOptimizationSuite() {
     record('Viewer Cache: Storage Path Invalidation', 'FAIL', 'Path invalidation failed')
   }
 
-  // --------------------------------------------------------------------------
-  // TEST GROUP 5: Storage Versioning, Security & Quota Invariants
-  // --------------------------------------------------------------------------
   console.log('\n--- TEST GROUP 5: Storage Versioning, Security & Quota Invariants ---')
 
-  // 5.1 Storage path format validation
   function buildOptimizedStoragePath(userId, documentId, filename, buffer) {
     const hash = crypto.createHash('sha256').update(buffer).digest('hex').slice(0, 8)
     const baseName = filename.replace(/\.pdf$/i, '').replace(/[^a-zA-Z0-9._-]/g, '_')
@@ -526,7 +485,6 @@ async function runOptimizationSuite() {
     record('Storage Versioning: Path Namespace & Hash', 'FAIL', `Path formatting failed: ${vPath}`)
   }
 
-  // 5.2 Atomic Switch & Quota Invariant
   const originalSize = 100000
   const optimizedSize = 85000
   const savedBytes = originalSize - optimizedSize
@@ -538,8 +496,6 @@ async function runOptimizationSuite() {
     record('Quota Invariant: Storage Calculation', 'FAIL', 'Quota calculation mismatch')
   }
 
-  // 5.3 Non-blocking Failure Invariant
-  // Verify that an optimization failure falls back to the original buffer
   function processWithFallback(originalBuffer, shouldFailOptimization) {
     let finalBuffer = originalBuffer
     let optStatus = 'unchanged'
@@ -564,9 +520,6 @@ async function runOptimizationSuite() {
     record('Resilience Invariant: Non-Blocking Fallback', 'FAIL', 'Fallback failed to preserve original buffer')
   }
 
-  // --------------------------------------------------------------------------
-  // SUMMARY
-  // --------------------------------------------------------------------------
   console.log('\n===============================================================')
   const total = results.length
   const passed = results.filter((r) => r.status === 'PASS').length

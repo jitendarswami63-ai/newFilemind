@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/Card'
@@ -18,7 +18,6 @@ export function SignupForm() {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  // Verification state
   const [pendingVerification, setPendingVerification] = useState(false)
   const [otpCode, setOtpCode] = useState('')
   const [verifyingOtp, setVerifyingOtp] = useState(false)
@@ -26,7 +25,13 @@ export function SignupForm() {
   const [resendSuccess, setResendSuccess] = useState<string | null>(null)
 
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
+
+  const nextParam = searchParams.get('next')
+  const destination = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') && !nextParam.startsWith('/\\')
+    ? nextParam
+    : '/'
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,6 +50,11 @@ export function SignupForm() {
       return
     }
 
+    const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
+    if (destination !== '/') {
+      callbackUrl.searchParams.set('next', destination)
+    }
+
     const { data, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -52,7 +62,7 @@ export function SignupForm() {
         data: {
           full_name: fullName,
         },
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        emailRedirectTo: callbackUrl.toString(),
       },
     })
 
@@ -66,22 +76,19 @@ export function SignupForm() {
       return
     }
 
-    // Crucial check: Supabase returns identities: [] when the email is ALREADY REGISTERED!
     if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
       setError('An account with this email already exists. Please go to the login page to sign in.')
       setLoading(false)
       return
     }
 
-    // Check if email confirmation is required (session is null)
     if (!data.session) {
       setPendingVerification(true)
       setLoading(false)
       return
     }
 
-    // If session was granted immediately (auto-confirm)
-    router.push('/dashboard')
+    router.push(destination)
     router.refresh()
   }
 
@@ -107,10 +114,10 @@ export function SignupForm() {
       }
 
       if (data.session) {
-        router.push('/dashboard')
+        router.push(destination)
         router.refresh()
       } else {
-        router.push('/login?message=verified')
+        router.push(nextParam ? `/login?message=verified&next=${encodeURIComponent(nextParam)}` : '/login?message=verified')
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Invalid or expired verification code. Please try again.')
@@ -124,11 +131,16 @@ export function SignupForm() {
     setResendSuccess(null)
 
     try {
+      const callbackUrl = new URL(`${window.location.origin}/auth/callback`)
+      if (destination !== '/') {
+        callbackUrl.searchParams.set('next', destination)
+      }
+
       const { error: resendError } = await supabase.auth.resend({
         type: 'signup',
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: callbackUrl.toString(),
         },
       })
 
@@ -144,34 +156,30 @@ export function SignupForm() {
     }
   }
 
-  // --- Render Verification Screen if Email Confirmation Pending ---
   if (pendingVerification) {
     return (
-      <Card className="relative overflow-hidden w-full border-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.8)] bg-gradient-to-b from-[#0f111a]/95 via-[#0b0c13]/95 to-[#08090e]/95 backdrop-blur-2xl rounded-2xl">
-        {/* Top accent glow line */}
-        <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-[#00d2ff]/80 to-transparent" />
-
+      <Card className="relative overflow-hidden w-full border-[#E5DED1] shadow-sm bg-[#FFFCF5] rounded-2xl">
         <CardHeader className="text-center pb-4 pt-6">
-          <div className="mx-auto h-14 w-14 rounded-2xl overflow-hidden shadow-[0_0_25px_rgba(0,210,255,0.25)] border border-[#00d2ff]/40 flex items-center justify-center mb-3.5 bg-gradient-to-br from-[#007ba7]/30 to-[#ff2d95]/20">
-            <Mail className="h-7 w-7 text-[#00d2ff]" />
+          <div className="mx-auto h-12 w-12 rounded-2xl overflow-hidden border border-[#E5DED1] flex items-center justify-center mb-3.5 bg-[#FAF5EC] text-[#9C7D47] shadow-2xs">
+            <Mail className="h-6 w-6 text-[#9C7D47]" />
           </div>
-          <CardTitle className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+          <CardTitle className="text-2xl sm:text-3xl font-bold tracking-tight text-[#292720]">
             Verify Your Email
           </CardTitle>
-          <CardDescription className="text-slate-300 text-xs sm:text-sm font-medium max-w-sm mx-auto mt-1">
+          <CardDescription className="text-[#777064] text-xs sm:text-sm font-normal max-w-sm mx-auto mt-1">
             We sent a 6-digit verification code and confirmation link to{' '}
-            <span className="text-[#ff2d95] font-bold">{email}</span>.
+            <span className="text-[#9C7D47] font-semibold">{email}</span>.
           </CardDescription>
         </CardHeader>
 
         <form onSubmit={handleVerifyOtp}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <label htmlFor="otpCode" className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+              <label htmlFor="otpCode" className="text-xs font-semibold uppercase tracking-wider text-[#777064]">
                 6-Digit Verification Code
               </label>
               <div className="relative">
-                <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-[#777064]" />
                 <input
                   id="otpCode"
                   type="text"
@@ -179,26 +187,26 @@ export function SignupForm() {
                   placeholder="123456"
                   required
                   autoFocus
-                  className="flex h-14 w-full rounded-xl border border-white/20 bg-black/70 pl-11 pr-4 py-2 text-center text-2xl font-mono font-bold tracking-[0.4em] text-white placeholder:text-slate-600 focus:outline-none focus:border-[#00d2ff] focus:ring-2 focus:ring-[#007ba7]/40 transition-all shadow-inner"
+                  className="flex h-14 w-full rounded-xl border border-[#E5DED1] bg-[#FFFCF5] pl-11 pr-4 py-2 text-center text-2xl font-mono font-bold tracking-[0.4em] text-[#292720] placeholder:text-[#DDD5C7] focus:outline-none focus:border-[#9C7D47] focus:ring-2 focus:ring-[#C5A878]/25 transition-all shadow-2xs"
                   value={otpCode}
                   onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
                 />
               </div>
-              <p className="text-xs text-slate-400 text-center font-medium">
+              <p className="text-xs text-[#777064] text-center font-medium">
                 You can also simply click the verification link sent to your email.
               </p>
             </div>
 
             {error && (
-              <div className="flex items-center gap-2 p-3.5 rounded-xl bg-[#ff2d95]/10 border border-[#ff2d95]/30 text-[#ff5ca8] text-xs shadow-[0_0_15px_rgba(255,45,149,0.15)]">
+              <div className="flex items-center gap-2 p-3.5 rounded-xl bg-[#FDF2F2] border border-[#F8D7DA] text-[#B91C1C] text-xs">
                 <AlertCircle className="h-4 w-4 flex-shrink-0" />
                 <span>{error}</span>
               </div>
             )}
 
             {resendSuccess && (
-              <div className="flex items-center gap-2 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs shadow-[0_0_15px_rgba(16,185,129,0.15)]">
-                <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+              <div className="flex items-center gap-2 p-3.5 rounded-xl bg-[#EBF7EE] border border-[#C3E6CB] text-[#1E7E34] text-xs shadow-2xs">
+                <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-[#1E7E34]" />
                 <span>{resendSuccess}</span>
               </div>
             )}
@@ -206,7 +214,7 @@ export function SignupForm() {
 
           <CardFooter className="flex flex-col gap-3 pt-2 pb-6">
             <Button
-              className="w-full h-11 text-sm font-bold shadow-lg"
+              className="w-full h-11 text-sm font-semibold shadow-xs bg-[#9C7D47] hover:bg-[#856837] text-[#FFFCF5]"
               type="submit"
               disabled={verifyingOtp || otpCode.length < 6}
             >
@@ -220,14 +228,14 @@ export function SignupForm() {
               )}
             </Button>
 
-            <div className="flex items-center justify-between w-full text-xs text-slate-300 font-medium pt-2 border-t border-white/10">
+            <div className="flex items-center justify-between w-full text-xs text-[#777064] font-normal pt-2 border-t border-[#E5DED1]">
               <button
                 type="button"
                 onClick={() => {
                   setPendingVerification(false)
                   setError(null)
                 }}
-                className="flex items-center gap-1.5 hover:text-white transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 hover:text-[#292720] transition-colors cursor-pointer"
               >
                 <ArrowLeft className="h-3.5 w-3.5" />
                 <span>Change email</span>
@@ -237,7 +245,7 @@ export function SignupForm() {
                 type="button"
                 onClick={handleResendOtp}
                 disabled={resending}
-                className="text-[#00d2ff] hover:text-[#38bdf8] font-bold underline underline-offset-2 transition-colors cursor-pointer"
+                className="text-[#9C7D47] hover:underline font-semibold transition-colors cursor-pointer"
               >
                 {resending ? 'Sending...' : 'Resend code'}
               </button>
@@ -248,45 +256,40 @@ export function SignupForm() {
     )
   }
 
-  // --- Default Sign-Up Screen ---
   return (
-    <Card className="relative overflow-hidden w-full border-white/10 shadow-[0_12px_40px_rgba(0,0,0,0.8)] bg-gradient-to-b from-[#0f111a]/95 via-[#0b0c13]/95 to-[#08090e]/95 backdrop-blur-2xl rounded-2xl">
-      {/* Top accent glow line */}
-      <div className="absolute top-0 inset-x-0 h-[2px] bg-gradient-to-r from-transparent via-[#00d2ff]/80 to-transparent" />
-
+    <Card className="relative overflow-hidden w-full border-[#E5DED1] shadow-sm bg-[#FFFCF5] rounded-2xl">
       <CardHeader className="text-center pb-4 pt-6">
-        <div className="mx-auto h-14 w-14 rounded-2xl overflow-hidden shadow-[0_0_25px_rgba(0,210,255,0.25)] border border-[#00d2ff]/40 flex items-center justify-center mb-3.5 bg-gradient-to-br from-[#007ba7]/30 to-[#ff2d95]/20">
+        <div className="mx-auto h-12 w-12 rounded-xl overflow-hidden border border-[#E5DED1] flex items-center justify-center mb-3.5 bg-[#FFFCF5] shadow-2xs p-1">
           <Image
             src="/logo.png"
             alt="FileMind Logo"
-            width={56}
-            height={56}
-            className="h-full w-full object-cover"
+            width={48}
+            height={48}
+            className="h-full w-full object-contain"
             priority
           />
         </div>
-        <CardTitle className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+        <CardTitle className="text-2xl sm:text-3xl font-bold tracking-tight text-[#292720]">
           Create Account
         </CardTitle>
-        <CardDescription className="text-xs sm:text-sm text-slate-300 font-medium mt-1">
+        <CardDescription className="text-xs sm:text-sm text-[#777064] font-normal mt-1">
           Get started with your private FileMind intelligence vault.
         </CardDescription>
       </CardHeader>
 
       <div className="px-6 pt-1">
-        {/* Google OAuth Button */}
         <GoogleSignInButton
           text="Continue with Google"
+          next={nextParam || undefined}
           onError={(msg) => setError(msg)}
         />
 
-        {/* Divider */}
         <div className="relative my-5">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-white/10" />
+            <div className="w-full border-t border-[#E5DED1]" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-[#0c0e18] px-3.5 py-0.5 rounded-full border border-white/10 text-slate-400 font-semibold tracking-wider text-[10px]">
+            <span className="bg-[#FFFCF5] px-3.5 py-0.5 rounded-full border border-[#E5DED1] text-[#777064] font-medium tracking-wider text-[10px]">
               Or continue with email
             </span>
           </div>
@@ -296,21 +299,21 @@ export function SignupForm() {
       <form onSubmit={handleSignup}>
         <CardContent className="space-y-3.5 pt-0">
           <div className="space-y-1.5">
-            <label htmlFor="fullName" className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+            <label htmlFor="fullName" className="text-xs font-semibold uppercase tracking-wider text-[#777064]">
               Full Name (Optional)
             </label>
             <input
               id="fullName"
               type="text"
               placeholder="Jitendar Swami"
-              className="flex h-11 w-full rounded-xl border border-white/15 bg-black/60 px-4 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-[#00d2ff] focus:ring-2 focus:ring-[#007ba7]/40 transition-all duration-200 shadow-inner"
+              className="flex h-11 w-full rounded-xl border border-[#E5DED1] bg-[#FFFCF5] px-4 py-2 text-sm text-[#292720] placeholder:text-[#DDD5C7] focus:outline-none focus:border-[#9C7D47] focus:ring-2 focus:ring-[#C5A878]/25 transition-all shadow-2xs"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
             />
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+            <label htmlFor="email" className="text-xs font-semibold uppercase tracking-wider text-[#777064]">
               Email Address
             </label>
             <input
@@ -319,14 +322,14 @@ export function SignupForm() {
               placeholder="name@example.com"
               required
               autoComplete="email"
-              className="flex h-11 w-full rounded-xl border border-white/15 bg-black/60 px-4 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-[#00d2ff] focus:ring-2 focus:ring-[#007ba7]/40 transition-all duration-200 shadow-inner"
+              className="flex h-11 w-full rounded-xl border border-[#E5DED1] bg-[#FFFCF5] px-4 py-2 text-sm text-[#292720] placeholder:text-[#DDD5C7] focus:outline-none focus:border-[#9C7D47] focus:ring-2 focus:ring-[#C5A878]/25 transition-all shadow-2xs"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+            <label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-[#777064]">
               Password (min. 8 characters)
             </label>
             <input
@@ -335,14 +338,14 @@ export function SignupForm() {
               required
               minLength={8}
               autoComplete="new-password"
-              className="flex h-11 w-full rounded-xl border border-white/15 bg-black/60 px-4 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-[#00d2ff] focus:ring-2 focus:ring-[#007ba7]/40 transition-all duration-200 shadow-inner"
+              className="flex h-11 w-full rounded-xl border border-[#E5DED1] bg-[#FFFCF5] px-4 py-2 text-sm text-[#292720] placeholder:text-[#DDD5C7] focus:outline-none focus:border-[#9C7D47] focus:ring-2 focus:ring-[#C5A878]/25 transition-all shadow-2xs"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor="confirmPassword" className="text-xs font-semibold uppercase tracking-wider text-slate-300">
+            <label htmlFor="confirmPassword" className="text-xs font-semibold uppercase tracking-wider text-[#777064]">
               Confirm Password
             </label>
             <input
@@ -351,14 +354,14 @@ export function SignupForm() {
               required
               minLength={8}
               autoComplete="new-password"
-              className="flex h-11 w-full rounded-xl border border-white/15 bg-black/60 px-4 py-2 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-[#00d2ff] focus:ring-2 focus:ring-[#007ba7]/40 transition-all duration-200 shadow-inner"
+              className="flex h-11 w-full rounded-xl border border-[#E5DED1] bg-[#FFFCF5] px-4 py-2 text-sm text-[#292720] placeholder:text-[#DDD5C7] focus:outline-none focus:border-[#9C7D47] focus:ring-2 focus:ring-[#C5A878]/25 transition-all shadow-2xs"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
             />
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 p-3.5 rounded-xl bg-[#ff2d95]/10 border border-[#ff2d95]/30 text-[#ff5ca8] text-xs shadow-[0_0_15px_rgba(255,45,149,0.15)] animate-shake">
+            <div className="flex items-center gap-2 p-3.5 rounded-xl bg-[#FDF2F2] border border-[#F8D7DA] text-[#B91C1C] text-xs">
               <AlertCircle className="h-4 w-4 flex-shrink-0" />
               <span>{error}</span>
             </div>
@@ -367,7 +370,7 @@ export function SignupForm() {
 
         <CardFooter className="flex flex-col gap-4 pt-3 pb-6">
           <Button
-            className="w-full h-11 text-sm font-bold shadow-lg"
+            className="w-full h-11 text-sm font-semibold shadow-xs bg-[#9C7D47] hover:bg-[#856837] text-[#FFFCF5]"
             type="submit"
             disabled={loading}
           >
@@ -381,11 +384,11 @@ export function SignupForm() {
             )}
           </Button>
 
-          <div className="text-center text-xs text-slate-300 font-medium">
+          <div className="text-center text-xs text-[#777064] font-normal">
             Already have an account?{' '}
             <Link
-              href="/login"
-              className="font-bold text-[#ff2d95] hover:text-[#ff5ca8] underline underline-offset-4"
+              href={nextParam ? `/login?next=${encodeURIComponent(nextParam)}` : '/login'}
+              className="font-medium text-[#9C7D47] hover:underline underline-offset-4"
             >
               Sign in
             </Link>

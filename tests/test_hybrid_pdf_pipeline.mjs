@@ -161,6 +161,38 @@ await testAsync('Scenario 6: Mixed document with intentional blank divider pages
   assert.equal(result.pages[2].text, '', 'Blank page preserved with empty string')
 })
 
+await testAsync('Scenario 7: extractNativePdfText preserves caller ArrayBuffer attachment for pdf-lib copyPages', async () => {
+  const doc = await PDFDocument.create()
+  const font = await doc.embedFont(StandardFonts.Helvetica)
+
+  for (let i = 1; i <= 5; i++) {
+    const page = doc.addPage([400, 600])
+    page.drawText(`Sample content page ${i}`, { x: 50, y: 500, size: 12, font })
+  }
+
+  const bytes = await doc.save()
+  const buffer = Buffer.from(bytes)
+
+  // Pre-load the document with pdf-lib before native extraction, mirroring DocumentAI pipeline
+  const preLoadedDoc = await PDFDocument.load(buffer, { ignoreEncryption: true, throwOnInvalidObject: false })
+
+  // Run extractNativePdfText
+  await extractNativePdfText(buffer)
+
+  // Verify buffer's underlying ArrayBuffer was NOT detached
+  assert.equal(buffer.buffer.detached, false, 'Buffer ArrayBuffer must not be detached by unpdf')
+
+  // Verify pdf-lib can still copy pages from the preLoadedDoc without "detached ArrayBuffer" error
+  const subDoc = await PDFDocument.create()
+  const copiedPages = await subDoc.copyPages(preLoadedDoc, [0, 1, 2])
+  assert.equal(copiedPages.length, 3)
+  for (const page of copiedPages) {
+    subDoc.addPage(page)
+  }
+  const subBytes = await subDoc.save()
+  assert.ok(subBytes.length > 0, 'Must produce valid sub-PDF bytes')
+})
+
 console.log('\n====================================================')
 console.log(`Test Summary: ${passedTests} / ${totalTests} passed`)
 console.log('====================================================')
