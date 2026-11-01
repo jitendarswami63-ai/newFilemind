@@ -140,7 +140,10 @@ export function PDFViewer({
 
   useEffect(() => {
     if (status === 'completed') {
-      reloadSignedUrl()
+      const timer = setTimeout(() => {
+        reloadSignedUrl()
+      }, 0)
+      return () => clearTimeout(timer)
     }
   }, [status, reloadSignedUrl])
 

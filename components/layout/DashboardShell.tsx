@@ -5,11 +5,13 @@ import { SidebarProvider, useSidebar } from './SidebarContext'
 import { Sidebar } from './Sidebar'
 import { MobileNav } from './MobileNav'
 
+type ShellUser = { email?: string; user_metadata?: { full_name?: string } } | null
+
 function DashboardInnerShell({
   user,
   children,
 }: {
-  user: any
+  user: ShellUser
   children: React.ReactNode
 }) {
   const { isCollapsed } = useSidebar()
@@ -35,7 +37,7 @@ export function DashboardShell({
   user,
   children,
 }: {
-  user: any
+  user: ShellUser
   children: React.ReactNode
 }) {
   return (

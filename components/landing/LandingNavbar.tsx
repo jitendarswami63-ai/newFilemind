@@ -26,7 +26,7 @@ export function LandingNavbar({ user }: LandingNavbarProps) {
           <div className="h-9 w-9 rounded-xl border border-[#D8D0C2] flex items-center justify-center flex-shrink-0 bg-[#FFFCF5] shadow-xs p-1.5">
             <Image
               src="/logo.png"
-              alt="FileMind Logo"
+              alt="FileMind AI-Powered PDF Search Logo"
               width={26}
               height={26}
               className="h-full w-full object-contain"

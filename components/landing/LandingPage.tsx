@@ -12,10 +12,8 @@ import {
   CheckCircle2,
   Zap,
   Volume2,
-  Mic,
   Database,
   Layers,
-  ChevronRight,
   Check,
   Fingerprint,
   FileCheck,
@@ -38,15 +36,15 @@ export function LandingPage({ user }: LandingPageProps) {
             <div className="max-w-3xl mx-auto text-center">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#D8D0C2] bg-[#FFFCF5] text-xs font-semibold text-[#9C7D47] shadow-xs mb-8">
                 <Sparkles className="h-3.5 w-3.5" />
-                <span>AI-Powered PDF Intelligence • Multi-Engine Grounding</span>
+                <span>AI Document Management • AI PDF Search Platform</span>
               </div>
 
               <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-[#292720] leading-[1.1] mb-6">
-                Your Documents. <span className="text-[#9C7D47]">Understood.</span>
+                Your Documents. <span className="text-[#9C7D47]">Understood with AI.</span>
               </h1>
 
               <p className="text-lg sm:text-xl text-[#777064] leading-relaxed mb-10 max-w-2xl mx-auto">
-                Transform dense, complex PDF libraries into conversational knowledge. FileMind delivers sub-second hybrid search, automated topic classification, exact page citations, and military-grade biometric vault encryption.
+                Transform dense, complex PDF libraries into conversational knowledge. FileMind is an AI document management platform and semantic document search engine that acts as your AI-powered PDF assistant with sub-second hybrid retrieval, exact page citations, and military-grade biometric vault encryption.
               </p>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-14">
@@ -117,7 +115,7 @@ export function LandingPage({ user }: LandingPageProps) {
                     <div className="h-3 w-3 rounded-full bg-[#E5DED1]/30" />
                   </div>
                   <div className="text-[11px] font-mono font-medium text-[#A8A49B]">
-                    filemind.app/workspace/intelligence
+                    filemindhub.xyz/workspace/intelligence
                   </div>
                   <div className="w-12" />
                 </div>
@@ -127,7 +125,7 @@ export function LandingPage({ user }: LandingPageProps) {
                     <div className="space-y-4">
                       <div className="flex items-center gap-2.5 px-2 py-1">
                         <div className="h-6 w-6 rounded-md bg-[#24262B] p-1 border border-[#3E4149]">
-                          <Image src="/logo.png" alt="Logo" width={16} height={16} className="h-full w-full object-contain" />
+                          <Image src="/logo.png" alt="FileMind AI Document Management Logo" width={16} height={16} className="h-full w-full object-contain" />
                         </div>
                         <span className="text-xs font-bold text-[#F5F1E9]">FileMind</span>
                       </div>
@@ -268,7 +266,7 @@ export function LandingPage({ user }: LandingPageProps) {
                 Engineered for rigorous document workflows
               </h2>
               <p className="text-base sm:text-lg text-[#777064]">
-                Built for researchers, analysts, and legal teams who require verifiable precision—not hallucinations.
+                Built for researchers, analysts, and legal teams who need an AI-powered PDF assistant with verifiable precision—not hallucinations.
               </p>
             </div>
 
@@ -621,7 +619,7 @@ export function LandingPage({ user }: LandingPageProps) {
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
               <div className="h-8 w-8 rounded-lg border border-[#D8D0C2] flex items-center justify-center bg-[#FFFCF5] p-1 shadow-2xs">
-                <Image src="/logo.png" alt="FileMind Logo" width={22} height={22} className="h-full w-full object-contain" />
+                <Image src="/logo.png" alt="FileMind Document Intelligence Platform Logo" width={22} height={22} className="h-full w-full object-contain" />
               </div>
               <div className="flex flex-col">
                 <span className="font-bold text-sm text-[#292720]">FileMind</span>
