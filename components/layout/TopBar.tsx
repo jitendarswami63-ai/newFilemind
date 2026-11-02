@@ -3,8 +3,9 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Download, Trash2, Loader2, Sparkles, Lock, Unlock } from 'lucide-react'
+import { ArrowLeft, Download, Trash2, Loader2, Sparkles, Lock, Unlock, Share2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { ShareModal } from '@/components/documents/ShareModal'
 
 interface TopBarProps {
   documentId: string
@@ -23,6 +24,7 @@ export function TopBar({
   const [downloading, setDownloading] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [locking, setLocking] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
 
   const handleDownload = async () => {
     setDownloading(true)
@@ -218,6 +220,17 @@ export function TopBar({
         <Button
           variant="secondary"
           size="sm"
+          onClick={() => setShowShareModal(true)}
+          className="text-xs font-semibold rounded-xl text-[#9C7D47] border-[#E5DED1] hover:bg-[#FAF5EC]"
+          title="Share document (Public Link or Restricted)"
+        >
+          <Share2 className="h-3.5 w-3.5 text-[#9C7D47]" />
+          <span className="hidden sm:inline">Share</span>
+        </Button>
+
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={handleDownload}
           disabled={downloading}
           className="text-xs font-semibold rounded-xl"
@@ -248,6 +261,13 @@ export function TopBar({
           <span className="hidden sm:inline">Delete</span>
         </Button>
       </div>
+
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        documentId={documentId}
+        filename={filename}
+      />
     </div>
   )
 }

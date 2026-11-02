@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { FileText, Database, ArrowRight, ShieldCheck } from 'lucide-react'
 import { UploadZone } from '@/components/documents/UploadZone'
@@ -8,6 +9,10 @@ import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+
+export const metadata: Metadata = {
+  title: 'Vault Dashboard',
+}
 
 export default async function DashboardPage() {
   const supabase = await createClient()

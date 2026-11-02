@@ -20,6 +20,7 @@
     "test:nvidia": "node tests/test_provider_evaluation_suite.mjs",
     "test:mfa": "node tests/test_vault_mfa_suite.mjs",
     "test:biometric": "node tests/test_biometric_vault_suite.mjs",
+    "test:share": "node tests/test_sharing_system_suite.mjs",
     "test:redirect": "node tests/test_redirect_verification.mjs",
     "test:seo": "node tests/test_seo_verification.mjs"
   },

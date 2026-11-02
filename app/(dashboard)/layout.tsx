@@ -7,6 +7,10 @@ import { DashboardShell } from '@/components/layout/DashboardShell'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
+  title: {
+    default: 'Workspace',
+    template: '%s | FileMind',
+  },
   robots: {
     index: false,
     follow: false,

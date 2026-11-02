@@ -25,7 +25,7 @@ function DashboardInnerShell({
         }`}
       >
         <MobileNav user={user} />
-        <main className="flex-1 p-4 sm:p-6 md:p-8 w-full max-w-7xl mx-auto box-border">
+        <main id="main-content" tabIndex={-1} className="flex-1 p-4 sm:p-6 md:p-8 w-full max-w-7xl mx-auto box-border focus:outline-none">
           {children}
         </main>
       </div>

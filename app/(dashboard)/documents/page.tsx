@@ -1,4 +1,5 @@
 import React from 'react'
+import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
 import { DocumentList } from '@/components/documents/DocumentList'
@@ -8,6 +9,10 @@ import { FileText, ShieldCheck } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+
+export const metadata: Metadata = {
+  title: 'Documents',
+}
 
 export default async function DocumentsPage() {
   const supabase = await createClient()

@@ -15,6 +15,8 @@ const cspHeader = `
 `.replace(/\s{2,}/g, ' ').trim()
 
 const nextConfig: NextConfig = {
+  compress: true,
+  poweredByHeader: false,
   turbopack: {
     root: path.resolve(__dirname),
   },
@@ -38,6 +40,23 @@ const nextConfig: NextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin',
+          },
+          {
+            key: 'Strict-Transport-Security',
+            value: 'max-age=63072000; includeSubDomains; preload',
+          },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(self), geolocation=(), interest-cohort=(), browsing-topics=()',
+          },
+        ],
+      },
+      {
+        source: '/(.*).(png|jpg|jpeg|gif|webp|svg|ico)',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
           },
         ],
       },

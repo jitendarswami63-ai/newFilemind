@@ -14,7 +14,7 @@ async function handleOptions(request: Request, documentId?: string) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { rpID } = getRpConfig(request.url)
+    const { rpID } = getRpConfig(request)
     const userCredentials = await listUserBiometricCredentials(user.id)
 
     if (userCredentials.length === 0) {
@@ -26,13 +26,12 @@ async function handleOptions(request: Request, documentId?: string) {
 
     const allowCredentials = userCredentials.map((c) => ({
       id: c.credential_id,
-      transports: ['internal' as const],
     }))
 
     const options = await generateAuthenticationOptions({
       rpID,
       allowCredentials,
-      userVerification: 'required',
+      userVerification: 'preferred',
     })
 
     const challengeToken = storeChallenge(user.id, options.challenge, documentId)

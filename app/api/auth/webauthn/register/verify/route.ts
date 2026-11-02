@@ -2,7 +2,13 @@ import { NextResponse } from 'next/server'
 import { verifyRegistrationResponse } from '@simplewebauthn/server'
 import type { RegistrationResponseJSON } from '@simplewebauthn/server'
 import { createClient } from '@/lib/supabase/server'
-import { getRpConfig, consumeChallenge, getServiceRoleClient } from '@/lib/auth/webauthn'
+import {
+  getRpConfig,
+  consumeChallenge,
+  getServiceRoleClient,
+  getAllowedOrigins,
+  getAllowedRPIDs,
+} from '@/lib/auth/webauthn'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,13 +35,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Challenge expired or invalid. Please retry.' }, { status: 400 })
     }
 
-    const { rpID, origin } = getRpConfig(request.url)
+    const { rpID, origin } = getRpConfig(request)
 
     const verification = await verifyRegistrationResponse({
       response,
       expectedChallenge: challengeData.challenge,
-      expectedOrigin: origin,
-      expectedRPID: rpID,
+      expectedOrigin: getAllowedOrigins(origin),
+      expectedRPID: getAllowedRPIDs(rpID),
       requireUserVerification: true,
     })
 

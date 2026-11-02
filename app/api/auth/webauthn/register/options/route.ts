@@ -14,12 +14,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { rpName, rpID } = getRpConfig(request.url)
+    const { rpName, rpID } = getRpConfig(request)
     const existingCreds = await listUserBiometricCredentials(user.id)
 
     const excludeCredentials = existingCreds.map((c) => ({
       id: c.credential_id,
-      transports: ['internal' as const],
     }))
 
     const options = await generateRegistrationOptions({

@@ -2,13 +2,26 @@ import crypto from 'node:crypto'
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export function getRpConfig(reqUrl?: string) {
+export function getRpConfig(reqOrUrl?: Request | string) {
   let hostname = 'localhost'
   let origin = 'http://localhost:3000'
 
-  if (reqUrl) {
+  if (typeof reqOrUrl === 'object' && reqOrUrl !== null && 'headers' in reqOrUrl) {
+    const hostHeader = reqOrUrl.headers.get('x-forwarded-host') || reqOrUrl.headers.get('host')
+    const protoHeader = reqOrUrl.headers.get('x-forwarded-proto') || (hostHeader?.includes('localhost') ? 'http' : 'https')
+    if (hostHeader) {
+      hostname = hostHeader.split(':')[0]
+      origin = `${protoHeader}://${hostHeader}`
+    } else {
+      try {
+        const u = new URL(reqOrUrl.url)
+        hostname = u.hostname
+        origin = u.origin
+      } catch {}
+    }
+  } else if (typeof reqOrUrl === 'string') {
     try {
-      const u = new URL(reqUrl)
+      const u = new URL(reqOrUrl)
       hostname = u.hostname
       origin = u.origin
     } catch {}
@@ -20,11 +33,45 @@ export function getRpConfig(reqUrl?: string) {
     } catch {}
   }
 
+  // W3C WebAuthn spec: RP ID must equal the origin's effective domain or a registrable suffix.
+  // For filemindhub.xyz and any subdomains (like www.filemindhub.xyz), set rpID to 'filemindhub.xyz'
+  // so credentials can be registered and asserted across both www and non-www origins.
+  let rpID = hostname
+  if (hostname.endsWith('.filemindhub.xyz') || hostname === 'filemindhub.xyz') {
+    rpID = 'filemindhub.xyz'
+  } else if (hostname.startsWith('www.')) {
+    rpID = hostname.slice(4)
+  }
+
   return {
     rpName: 'FileMind Biometric Vault',
-    rpID: hostname,
+    rpID,
     origin,
   }
+}
+
+export function getAllowedOrigins(origin: string): string[] {
+  const list = [
+    origin,
+    origin.replace('://www.', '://'),
+    origin.replace('://', '://www.'),
+    'https://www.filemindhub.xyz',
+    'https://filemindhub.xyz',
+    'http://localhost:3000',
+  ]
+  if (process.env.NEXT_PUBLIC_APP_URL) {
+    list.push(process.env.NEXT_PUBLIC_APP_URL)
+  }
+  return Array.from(new Set(list))
+}
+
+export function getAllowedRPIDs(rpID: string): string[] {
+  return Array.from(new Set([
+    rpID,
+    'filemindhub.xyz',
+    'www.filemindhub.xyz',
+    'localhost',
+  ]))
 }
 
 export function getServiceRoleClient(): SupabaseClient {
@@ -140,14 +187,26 @@ export async function listUserBiometricCredentials(userId: string) {
 
 export async function deleteBiometricCredential(userId: string, credentialId: string) {
   const supabaseAdmin = getServiceRoleClient()
-  const { error } = await supabaseAdmin
+  const { data, error: firstError } = await supabaseAdmin
     .from('biometric_credentials')
     .delete()
     .eq('user_id', userId)
     .eq('credential_id', credentialId)
+    .select('id')
 
-  if (error) {
-    throw new Error(error.message)
+  let finalError = firstError
+
+  if (!firstError && (!data || data.length === 0) && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(credentialId)) {
+    const res = await supabaseAdmin
+      .from('biometric_credentials')
+      .delete()
+      .eq('user_id', userId)
+      .eq('id', credentialId)
+    finalError = res.error
+  }
+
+  if (finalError) {
+    throw new Error(finalError.message)
   }
 
   await revokeBiometricLease(userId)

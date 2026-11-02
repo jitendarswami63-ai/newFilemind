@@ -22,6 +22,8 @@ export async function GET() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    let conversationsList: unknown[] = []
+
     const { data: conversations, error: dbError } = await supabase
       .from('conversations')
       .select(`
@@ -40,23 +42,80 @@ export async function GET() {
       .order('updated_at', { ascending: false })
       .limit(50)
 
-    if (dbError) {
-      if (
-        dbError.code === '42P01' ||
-        dbError.code === 'PGRST204' ||
-        dbError.code === 'PGRST200' ||
-        dbError.message?.toLowerCase().includes('schema cache') ||
-        dbError.message?.toLowerCase().includes('does not exist')
-      ) {
-        return NextResponse.json({ success: true, conversations: [] })
+    if (!dbError && Array.isArray(conversations)) {
+      conversationsList = conversations
+    } else {
+      console.warn('[Conversations API] Joined query warning, trying fallback:', dbError?.message)
+      // Fallback 1: Query without foreign key specification
+      let { data: rawConvs, error: rawError } = await supabase
+        .from('conversations')
+        .select('id, user_id, title, document_id, created_at, updated_at')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(50)
+
+      // Fallback 2: Admin client if user client had RLS/token issue
+      if (rawError && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        try {
+          const { createClient: createAdmin } = await import('@supabase/supabase-js')
+          const adminSupabase = createAdmin(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+          )
+          const adminRes = await adminSupabase
+            .from('conversations')
+            .select('id, user_id, title, document_id, created_at, updated_at')
+            .eq('user_id', user.id)
+            .order('updated_at', { ascending: false })
+            .limit(50)
+          if (!adminRes.error && Array.isArray(adminRes.data)) {
+            rawConvs = adminRes.data
+            rawError = null
+          }
+        } catch (e) {
+          console.error('[Conversations API] Admin fallback error:', e)
+        }
       }
-      console.error('[Conversations API] Failed to fetch conversations:', dbError.message)
-      return NextResponse.json({ error: 'Failed to fetch conversations' }, { status: 500 })
+
+      if (rawError) {
+        if (
+          rawError.code === '42P01' ||
+          rawError.message?.toLowerCase().includes('does not exist')
+        ) {
+          return NextResponse.json({ success: true, conversations: [] })
+        }
+        console.error('[Conversations API] Failed to fetch conversations:', rawError.message)
+        return NextResponse.json({ error: 'Failed to fetch conversations' }, { status: 500 })
+      }
+
+      // Enrich rawConvs with document filenames if document_id is present
+      if (Array.isArray(rawConvs)) {
+        const docIds = rawConvs.map((c) => c.document_id).filter(Boolean) as string[]
+        const docMap = new Map<string, string>()
+
+        if (docIds.length > 0) {
+          const { data: docs } = await supabase
+            .from('documents')
+            .select('id, filename')
+            .in('id', docIds)
+
+          if (Array.isArray(docs)) {
+            docs.forEach((d) => docMap.set(d.id, d.filename))
+          }
+        }
+
+        conversationsList = rawConvs.map((c) => ({
+          ...c,
+          document: c.document_id && docMap.has(c.document_id)
+            ? { id: c.document_id, filename: docMap.get(c.document_id)! }
+            : null,
+        }))
+      }
     }
 
     return NextResponse.json({
       success: true,
-      conversations: conversations || [],
+      conversations: conversationsList || [],
     })
   } catch (error: unknown) {
     console.error('[Conversations API] GET error:', error instanceof Error ? error.message : error)

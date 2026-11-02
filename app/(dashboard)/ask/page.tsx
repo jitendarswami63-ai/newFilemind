@@ -579,6 +579,22 @@ export default function AskAiPage() {
         return next
       })
 
+      // Sync with server in background to keep conversations updated
+      fetch('/api/conversations')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d && Array.isArray(d.conversations) && d.conversations.length > 0) {
+            setConversations((current) => {
+              const serverIds = new Set(d.conversations.map((c: Conversation) => c.id))
+              const localUnsynced = current.filter((c) => !serverIds.has(c.id))
+              const merged = [...d.conversations, ...localUnsynced]
+              saveLocalConversations(merged)
+              return merged
+            })
+          }
+        })
+        .catch(() => {})
+
       messageCounterRef.current += 1
       const assistantMsgId = `assistant-msg-${messageCounterRef.current}`
 
@@ -844,7 +860,7 @@ export default function AskAiPage() {
                 key={message.id}
                 className={`flex flex-col ${message.role === 'user' ? 'items-end' : 'items-start'} space-y-1.5`}
               >
-                <div className="flex items-center justify-between w-full text-[11px] text-[#777064] px-1">
+                <div className="flex flex-wrap items-center justify-between gap-1 w-full text-[11px] text-[#777064] px-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     {message.role === 'user' ? (
                       <span className="font-semibold text-[#292720]">You</span>

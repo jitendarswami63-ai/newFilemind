@@ -133,14 +133,36 @@ export async function POST(request: NextRequest) {
 
     let activeConvId: string | undefined = conversationId
 
-    if (activeConvId) {
+    // Helper to get admin client if service role key is available
+    const getAdminClient = async () => {
+      if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return null
+      const { createClient: createAdmin } = await import('@supabase/supabase-js')
+      return createAdmin(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+    }
 
-      const { data: existingConv, error: convErr } = await supabase
+    if (activeConvId) {
+      let { data: existingConv, error: convErr } = await supabase
         .from('conversations')
         .select('id, user_id, document_id')
         .eq('id', activeConvId)
         .eq('user_id', user.id)
         .single()
+
+      if ((convErr || !existingConv) && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        const admin = await getAdminClient()
+        if (admin) {
+          const adminCheck = await admin
+            .from('conversations')
+            .select('id, user_id, document_id')
+            .eq('id', activeConvId)
+            .eq('user_id', user.id)
+            .single()
+          if (!adminCheck.error && adminCheck.data) {
+            existingConv = adminCheck.data
+            convErr = null
+          }
+        }
+      }
 
       if (convErr || !existingConv) {
         return NextResponse.json(
@@ -149,9 +171,8 @@ export async function POST(request: NextRequest) {
         )
       }
     } else {
-
+      const title = generateSensibleTitle(question)
       try {
-        const title = generateSensibleTitle(question)
         const { data: newConv, error: newConvErr } = await supabase
           .from('conversations')
           .insert({
@@ -164,9 +185,28 @@ export async function POST(request: NextRequest) {
 
         if (!newConvErr && newConv) {
           activeConvId = newConv.id
+        } else {
+          console.warn('[AskAI] User-client conversation create warning:', newConvErr?.message)
+          const admin = await getAdminClient()
+          if (admin) {
+            const { data: adminNewConv, error: adminConvErr } = await admin
+              .from('conversations')
+              .insert({
+                user_id: user.id,
+                title,
+                document_id: documentId || null,
+              })
+              .select('id')
+              .single()
+            if (!adminConvErr && adminNewConv) {
+              activeConvId = adminNewConv.id
+            } else if (adminConvErr) {
+              console.error('[AskAI] Admin-client conversation create error:', adminConvErr.message)
+            }
+          }
         }
       } catch (convCreateErr: unknown) {
-        console.warn('[AskAI] Failed to auto-create conversation in DB (table may not be migrated):', convCreateErr)
+        console.warn('[AskAI] Failed to auto-create conversation in DB:', convCreateErr)
       }
 
       if (!activeConvId) {
@@ -176,8 +216,7 @@ export async function POST(request: NextRequest) {
 
     if (activeConvId) {
       try {
-
-        const { data: lastMsg } = await supabase
+        let { data: lastMsg } = await supabase
           .from('conversation_messages')
           .select('id, role, content')
           .eq('conversation_id', activeConvId)
@@ -186,13 +225,42 @@ export async function POST(request: NextRequest) {
           .limit(1)
           .single()
 
+        if (!lastMsg) {
+          const admin = await getAdminClient()
+          if (admin) {
+            const adminLast = await admin
+              .from('conversation_messages')
+              .select('id, role, content')
+              .eq('conversation_id', activeConvId)
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .single()
+            if (!adminLast.error && adminLast.data) {
+              lastMsg = adminLast.data
+            }
+          }
+        }
+
         if (!lastMsg || lastMsg.role !== 'user' || lastMsg.content !== question) {
-          await supabase.from('conversation_messages').insert({
+          const insertRes = await supabase.from('conversation_messages').insert({
             conversation_id: activeConvId,
             user_id: user.id,
             role: 'user',
             content: question,
           })
+
+          if (insertRes.error) {
+            const admin = await getAdminClient()
+            if (admin) {
+              await admin.from('conversation_messages').insert({
+                conversation_id: activeConvId,
+                user_id: user.id,
+                role: 'user',
+                content: question,
+              })
+            }
+          }
         }
       } catch (msgPersistErr: unknown) {
         console.warn('[AskAI] User message persistence warning:', msgPersistErr)
@@ -202,7 +270,7 @@ export async function POST(request: NextRequest) {
     let historyToUse = history
     if (!historyToUse && activeConvId) {
       try {
-        const { data: prevMsgs } = await supabase
+        let { data: prevMsgs } = await supabase
           .from('conversation_messages')
           .select('role, content')
           .eq('conversation_id', activeConvId)
@@ -210,15 +278,29 @@ export async function POST(request: NextRequest) {
           .order('created_at', { ascending: true })
           .limit(10)
 
+        if (!prevMsgs || prevMsgs.length === 0) {
+          const admin = await getAdminClient()
+          if (admin) {
+            const adminMsgs = await admin
+              .from('conversation_messages')
+              .select('role, content')
+              .eq('conversation_id', activeConvId)
+              .eq('user_id', user.id)
+              .order('created_at', { ascending: true })
+              .limit(10)
+            if (!adminMsgs.error && adminMsgs.data) {
+              prevMsgs = adminMsgs.data
+            }
+          }
+        }
+
         if (Array.isArray(prevMsgs) && prevMsgs.length > 0) {
           historyToUse = prevMsgs.map((m) => ({
             role: m.role as 'user' | 'assistant',
             content: m.content,
           }))
         }
-      } catch {
-
-      }
+      } catch {}
     }
 
     const result = await askAiQuestion(supabase, {
@@ -231,15 +313,23 @@ export async function POST(request: NextRequest) {
 
     if (activeConvId) {
       try {
-        await supabase.from('conversation_messages').insert({
+        const assistantPayload = {
           conversation_id: activeConvId,
           user_id: user.id,
-          role: 'assistant',
+          role: 'assistant' as const,
           content: result.answer,
           sources: result.sources || [],
           verified_citations: result.verifiedCitations || [],
           has_sufficient_evidence: result.hasSufficientEvidence,
-        })
+        }
+
+        const msgRes = await supabase.from('conversation_messages').insert(assistantPayload)
+        if (msgRes.error) {
+          const admin = await getAdminClient()
+          if (admin) {
+            await admin.from('conversation_messages').insert(assistantPayload)
+          }
+        }
 
         await supabase
           .from('conversations')

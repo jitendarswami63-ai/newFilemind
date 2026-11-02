@@ -60,6 +60,30 @@ export default async function DocumentViewerPage({
   }
 
   if (error || !doc) {
+    // Check if the current user has restricted sharing authorization
+    const { checkRestrictedDocumentAccess } = await import('@/lib/sharing/share-service')
+    const restrictedAccess = await checkRestrictedDocumentAccess(id, auth.user.id, auth.user.email)
+
+    if (restrictedAccess.authorized) {
+      const { createClient: createAdmin } = await import('@supabase/supabase-js')
+      const adminSupabase = createAdmin(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+      const { data: sharedDoc } = await adminSupabase
+        .from('documents')
+        .select('id, filename, status, error_message, doc_category, tags, processing_locked_at, storage_path, embedding_status, is_locked')
+        .eq('id', id)
+        .single()
+
+      if (sharedDoc) {
+        doc = sharedDoc
+        error = null
+      }
+    }
+  }
+
+  if (error || !doc) {
     notFound()
   }
 

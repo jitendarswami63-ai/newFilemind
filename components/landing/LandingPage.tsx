@@ -1,4 +1,6 @@
-import React from 'react'
+'use client'
+
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import {
@@ -17,19 +19,38 @@ import {
   Check,
   Fingerprint,
   FileCheck,
+  ChevronDown,
 } from 'lucide-react'
 import { LandingNavbar } from './LandingNavbar'
+import { createClient } from '@/lib/supabase/client'
 
 interface LandingPageProps {
   user?: { email?: string } | null
 }
 
-export function LandingPage({ user }: LandingPageProps) {
+export function LandingPage({ user: initialUser }: LandingPageProps) {
+  const [user, setUser] = useState(initialUser)
+  const [openFaq, setOpenFaq] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (initialUser) return
+    let isMounted = true
+    try {
+      const supabase = createClient()
+      supabase.auth.getUser().then(({ data }) => {
+        if (isMounted && data?.user) setUser(data.user)
+      }).catch(() => {})
+    } catch {}
+    return () => {
+      isMounted = false
+    }
+  }, [initialUser])
+
   return (
     <div className="min-h-screen bg-[#F3EFE5] text-[#292720] flex flex-col selection:bg-[#C5A878]/30 selection:text-[#292720]">
       <LandingNavbar user={user} />
 
-      <main className="flex-1">
+      <main id="main-content" tabIndex={-1} className="flex-1 focus:outline-none">
         <section className="relative pt-16 pb-20 md:pt-24 md:pb-28 overflow-hidden">
           <div className="ambient-glow" aria-hidden="true" />
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -44,7 +65,7 @@ export function LandingPage({ user }: LandingPageProps) {
               </h1>
 
               <p className="text-lg sm:text-xl text-[#777064] leading-relaxed mb-10 max-w-2xl mx-auto">
-                Transform dense, complex PDF libraries into conversational knowledge. FileMind is an AI document management platform and semantic document search engine that acts as your AI-powered PDF assistant with sub-second hybrid retrieval, exact page citations, and military-grade biometric vault encryption.
+                Organize your PDF documents, ask questions, and get instant answers. FileMind is an AI PDF manager that reads your files, finds key information in seconds, and shows you the exact page citations so you can verify every detail. Your private documents stay protected with hardware-grade biometric vault encryption.
               </p>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-14">
@@ -125,7 +146,7 @@ export function LandingPage({ user }: LandingPageProps) {
                     <div className="space-y-4">
                       <div className="flex items-center gap-2.5 px-2 py-1">
                         <div className="h-6 w-6 rounded-md bg-[#24262B] p-1 border border-[#3E4149]">
-                          <Image src="/logo.png" alt="FileMind AI Document Management Logo" width={16} height={16} className="h-full w-full object-contain" />
+                          <Image src="/filemind-ai-pdf-manager-logo.png" alt="FileMind Document Workspace Icon" width={16} height={16} className="h-full w-full object-contain" priority fetchPriority="high" />
                         </div>
                         <span className="text-xs font-bold text-[#F5F1E9]">FileMind</span>
                       </div>
@@ -263,10 +284,10 @@ export function LandingPage({ user }: LandingPageProps) {
                 Platform Capabilities
               </span>
               <h2 className="text-3xl sm:text-4xl font-extrabold text-[#292720] tracking-tight mt-2 mb-4">
-                Engineered for rigorous document workflows
+                Designed for simple, fast, and accurate document work
               </h2>
               <p className="text-base sm:text-lg text-[#777064]">
-                Built for researchers, analysts, and legal teams who need an AI-powered PDF assistant with verifiable precision—not hallucinations.
+                Built for students, analysts, researchers, and professionals who need verifiable answers without guessing.
               </p>
             </div>
 
@@ -276,10 +297,10 @@ export function LandingPage({ user }: LandingPageProps) {
                   <Search className="h-5 w-5" />
                 </div>
                 <h3 className="text-base font-bold text-[#292720] mb-2">
-                  Hybrid Vector & Keyword Search
+                  Smart Keyword & Topic Search
                 </h3>
                 <p className="text-sm text-[#777064] leading-relaxed">
-                  Fuses 768-dimensional dense semantic vectors with full-text keyword indexing to surface needle-in-a-haystack clauses in milliseconds across massive libraries.
+                  Find exact passages in seconds. FileMind combines AI understanding with exact keyword search to pinpoint any clause, figure, or topic across all your PDFs.
                 </p>
               </div>
 
@@ -288,10 +309,10 @@ export function LandingPage({ user }: LandingPageProps) {
                   <Sparkles className="h-5 w-5" />
                 </div>
                 <h3 className="text-base font-bold text-[#292720] mb-2">
-                  Dual-Engine Grounded Synthesis
+                  Verified Page References
                 </h3>
                 <p className="text-sm text-[#777064] leading-relaxed">
-                  Leverages an automated cascade between Google Gemini and NVIDIA NIM. Every answer is bound strictly to source context with clickable page citations.
+                  Get reliable answers backed by your files. The AI checks your documents first and shows you clickable page citations so you can confirm facts directly.
                 </p>
               </div>
 
@@ -300,10 +321,10 @@ export function LandingPage({ user }: LandingPageProps) {
                   <Fingerprint className="h-5 w-5" />
                 </div>
                 <h3 className="text-base font-bold text-[#292720] mb-2">
-                  FIDO2 Biometric Secure Vault
+                  Biometric Private Vault
                 </h3>
                 <p className="text-sm text-[#777064] leading-relaxed">
-                  Protect sensitive contracts behind hardware-level biometric passkeys and TOTP MFA. Cryptographic envelope encryption keeps locked documents impenetrable.
+                  Protect confidential documents behind your device fingerprint, Windows Hello, or PIN. Encrypted files remain completely secure and private to you.
                 </p>
               </div>
 
@@ -312,10 +333,10 @@ export function LandingPage({ user }: LandingPageProps) {
                   <Layers className="h-5 w-5" />
                 </div>
                 <h3 className="text-base font-bold text-[#292720] mb-2">
-                  Large PDF Pipeline (49 MB / 150 Files)
+                  Large PDF Support (49 MB / 150 Files)
                 </h3>
                 <p className="text-sm text-[#777064] leading-relaxed">
-                  Ingest large institutional PDFs with native segmentation and automatic metadata extraction. Process up to 150 documents in parallel queues safely.
+                  Upload documents up to 49 MB each. Add single files or batch upload up to 150 PDFs at once with automatic indexing and organization.
                 </p>
               </div>
 
@@ -324,10 +345,10 @@ export function LandingPage({ user }: LandingPageProps) {
                   <Volume2 className="h-5 w-5" />
                 </div>
                 <h3 className="text-base font-bold text-[#292720] mb-2">
-                  Neural Audio & Voice Input
+                  Voice Questions & Spoken Audio
                 </h3>
                 <p className="text-sm text-[#777064] leading-relaxed">
-                  Interrogate documents hands-free with real-time speech-to-text recording, and listen to synthesized AI summaries with Deepgram neural audio playback.
+                  Ask questions hands-free with microphone speech input, and listen to natural spoken summaries of your documents with high-clarity voice playback.
                 </p>
               </div>
 
@@ -336,10 +357,10 @@ export function LandingPage({ user }: LandingPageProps) {
                   <ShieldCheck className="h-5 w-5" />
                 </div>
                 <h3 className="text-base font-bold text-[#292720] mb-2">
-                  Zero Model Training & Total Isolation
+                  Complete Data Privacy
                 </h3>
                 <p className="text-sm text-[#777064] leading-relaxed">
-                  Your proprietary files are never used to train public foundation models. Strict Row-Level Security (RLS) guarantees complete tenant isolation.
+                  Your documents are strictly private. We never sell your data or use your files to train public AI models. Only you can view your workspace.
                 </p>
               </div>
             </div>
@@ -585,6 +606,87 @@ export function LandingPage({ user }: LandingPageProps) {
           </div>
         </section>
 
+        <section id="faq" className="py-20 border-t border-[#E5DED1] bg-[#FAF5EC]">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-14">
+              <span className="text-xs font-bold text-[#9C7D47] uppercase tracking-wider">
+                Frequently Asked Questions
+              </span>
+              <h2 className="text-3xl sm:text-4xl font-extrabold text-[#292720] tracking-tight mt-2 mb-3">
+                Everything you need to know about FileMind
+              </h2>
+              <p className="text-base text-[#777064]">
+                Answers to common questions about AI search, document security, file formats, and sharing.
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {[
+                {
+                  q: 'What is FileMind and how does it help manage PDFs?',
+                  a: 'FileMind is an AI PDF manager and document search platform that helps you organize, search, and understand complex documents. You can search across your entire PDF library at once, ask questions in plain English, and receive immediate answers backed by exact page citations.',
+                },
+                {
+                  q: 'How does AI semantic search find answers inside documents?',
+                  a: 'FileMind reads every page and indexes both the conceptual meaning and the exact keywords. When you search or ask a question, FileMind matches the most relevant passages in milliseconds, even if your question uses different phrasing than the document text.',
+                },
+                {
+                  q: 'Are my uploaded documents private and secure?',
+                  a: 'Yes. Your documents are stored in private cloud storage with strict user isolation. We never sell your data or use your files to train public AI models. You can also lock sensitive PDFs in your Biometric Secure Vault, which encrypts them with AES-256-GCM encryption that only your device fingerprint, Windows Hello, or PIN can decrypt.',
+                },
+                {
+                  q: 'How do exact page citations work?',
+                  a: 'Every AI response includes clickable citations that point to the exact page number where the information was found. Clicking a citation opens our built-in viewer directly to that page, allowing you to verify every fact in seconds.',
+                },
+                {
+                  q: 'Can I share PDFs with other people?',
+                  a: 'Yes. FileMind provides two sharing modes: Anyone with the link (a secure public link with optional expiration dates and download controls) and Restricted Sharing (sharing with specific registered users by email address).',
+                },
+                {
+                  q: 'What file sizes and formats does FileMind support?',
+                  a: 'FileMind is optimized for PDF documents up to 49 MB per file. You can upload single files or batch upload up to 150 documents at once with automatic text processing and vector indexing.',
+                },
+                {
+                  q: 'How does the AI assistant guarantee answer accuracy?',
+                  a: 'FileMind uses grounded document retrieval. The AI only uses information found directly inside your uploaded PDF files. If a fact is not mentioned in your documents, FileMind clearly tells you instead of guessing.',
+                },
+                {
+                  q: 'Can I export or download my documents at any time?',
+                  a: 'Yes. You can download original PDFs directly from your dashboard or viewer anytime. When sharing links, you choose whether visitors can download the raw file or view it securely in the browser.',
+                },
+              ].map((item, idx) => (
+                <div
+                  key={idx}
+                  className="rounded-xl border border-[#E5DED1] bg-[#FFFCF5] p-5 shadow-2xs transition-all"
+                >
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
+                    className="w-full flex items-center justify-between text-left gap-4 font-bold text-base text-[#292720] cursor-pointer"
+                  >
+                    <span>{item.q}</span>
+                    <ChevronDown
+                      className={`h-4 w-4 text-[#9C7D47] flex-shrink-0 transition-transform ${
+                        openFaq === idx ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
+                  {openFaq === idx && (
+                    <p className="mt-3 text-sm text-[#777064] leading-relaxed border-t border-[#E5DED1]/60 pt-3">
+                      {item.a}
+                    </p>
+                  )}
+                  {openFaq !== idx && (
+                    <p className="mt-2 text-sm text-[#777064] leading-relaxed line-clamp-2">
+                      {item.a}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
         <section className="py-20 border-t border-[#E5DED1] bg-[#FFFCF5]">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="rounded-2xl border border-[#D8D0C2] bg-[#FAF5EC] p-8 sm:p-12 text-center">
@@ -619,7 +721,13 @@ export function LandingPage({ user }: LandingPageProps) {
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
               <div className="h-8 w-8 rounded-lg border border-[#D8D0C2] flex items-center justify-center bg-[#FFFCF5] p-1 shadow-2xs">
-                <Image src="/logo.png" alt="FileMind Document Intelligence Platform Logo" width={22} height={22} className="h-full w-full object-contain" />
+                <Image
+                  src="/filemind-ai-pdf-manager-logo.png"
+                  alt="FileMind AI PDF Manager and Document Search Platform Logo"
+                  width={22}
+                  height={22}
+                  className="h-full w-full object-contain"
+                />
               </div>
               <div className="flex flex-col">
                 <span className="font-bold text-sm text-[#292720]">FileMind</span>
@@ -632,6 +740,7 @@ export function LandingPage({ user }: LandingPageProps) {
               <a href="#how-it-works" className="hover:text-[#292720] transition-colors">How It Works</a>
               <a href="#security" className="hover:text-[#292720] transition-colors">Security</a>
               <a href="#pricing" className="hover:text-[#292720] transition-colors">Pricing</a>
+              <a href="#faq" className="hover:text-[#292720] transition-colors">FAQ</a>
               <Link href="/login" className="hover:text-[#292720] transition-colors">Sign In</Link>
               <Link href="/signup" className="hover:text-[#292720] transition-colors">Sign Up</Link>
             </div>

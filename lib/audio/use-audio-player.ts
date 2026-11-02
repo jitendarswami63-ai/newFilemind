@@ -77,11 +77,35 @@ export function useAudioPlayer() {
           })
 
           if (!res.ok) {
-            let errorMsg = 'Failed to synthesize speech.'
+            let errorMsg = 'Deepgram voice service is temporarily unavailable.'
             try {
               const data = await res.json()
               if (data.error) errorMsg = data.error
             } catch {}
+
+            // Native Browser SpeechSynthesis fallback
+            if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+              try {
+                window.speechSynthesis.cancel()
+                const utterance = new SpeechSynthesisUtterance(text.slice(0, 1500))
+                utterance.rate = 1.0
+                utterance.pitch = 1.0
+                utterance.onend = () => {
+                  setStatus('idle')
+                  setActiveMessageId(null)
+                }
+                utterance.onerror = () => {
+                  setStatus('idle')
+                  setActiveMessageId(null)
+                }
+                window.speechSynthesis.speak(utterance)
+                setStatus('playing')
+                return
+              } catch (synthErr) {
+                console.warn('[useAudioPlayer] SpeechSynthesis fallback failed:', synthErr)
+              }
+            }
+
             throw new Error(errorMsg)
           }
 

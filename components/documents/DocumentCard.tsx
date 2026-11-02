@@ -5,8 +5,9 @@ import Link from 'next/link'
 import { StatusBadge } from './StatusBadge'
 import type { DocumentItem } from '@/types'
 import { formatDate, formatFileSize } from '@/lib/utils'
-import { FileText, ArrowUpRight, Trash2, Loader2, Zap, Lock } from 'lucide-react'
+import { FileText, ArrowUpRight, Trash2, Loader2, Zap, Lock, Share2 } from 'lucide-react'
 import { prefetchSignedUrl } from '@/lib/viewer/signed-url-cache'
+import { ShareModal } from '@/components/documents/ShareModal'
 
 interface DocumentCardProps {
   document: DocumentItem
@@ -15,6 +16,7 @@ interface DocumentCardProps {
 
 export function DocumentCard({ document, onDeleted }: DocumentCardProps) {
   const [deleting, setDeleting] = useState(false)
+  const [showShareModal, setShowShareModal] = useState(false)
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   const handleMouseEnter = useCallback(() => {
@@ -78,6 +80,19 @@ export function DocumentCard({ document, onDeleted }: DocumentCardProps) {
 
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <StatusBadge status={document.status} />
+
+            <button
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                setShowShareModal(true)
+              }}
+              className="opacity-0 group-hover:opacity-100 focus:opacity-100 p-1.5 rounded-lg text-[#777064] hover:text-[#9C7D47] hover:bg-[#FAF5EC] transition-colors cursor-pointer"
+              title="Share document"
+              aria-label="Share document"
+            >
+              <Share2 className="h-3.5 w-3.5" />
+            </button>
 
             <button
               onClick={handleDelete}
@@ -147,6 +162,13 @@ export function DocumentCard({ document, onDeleted }: DocumentCardProps) {
           <ArrowUpRight className="h-4 w-4" />
         </span>
       </div>
+
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        documentId={document.id}
+        filename={document.filename}
+      />
     </Link>
   )
 }

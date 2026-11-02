@@ -47,8 +47,16 @@ export async function fetchSignedUrlWithCache(
       if (!res.ok) {
         let errorMsg = 'Failed to generate viewer token'
         try {
-          const errData = await res.json()
-          if (errData.error) errorMsg = errData.error
+          const contentType = res.headers.get('content-type') || ''
+          if (contentType.includes('application/json')) {
+            const errData = await res.json()
+            if (errData.error) errorMsg = errData.error
+          } else {
+            const textData = await res.text()
+            if (textData) {
+              errorMsg = `Server error (${res.status}): ${textData.slice(0, 120)}`
+            }
+          }
         } catch {}
         throw new Error(errorMsg)
       }

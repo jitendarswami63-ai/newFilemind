@@ -33,7 +33,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const { data: conversation, error: convError } = await supabase
+    let conversation: unknown = null
+
+    const { data: convData, error: convError } = await supabase
       .from('conversations')
       .select(`
         id,
@@ -51,16 +53,84 @@ export async function GET(request: NextRequest, context: RouteContext) {
       .eq('user_id', user.id)
       .single()
 
-    if (convError || !conversation) {
-      return NextResponse.json({ error: 'Conversation not found or access denied' }, { status: 404 })
+    if (!convError && convData) {
+      conversation = convData
+    } else {
+      let { data: rawConv, error: rawConvErr } = await supabase
+        .from('conversations')
+        .select('id, user_id, title, document_id, created_at, updated_at')
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .single()
+
+      if (rawConvErr && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+        try {
+          const { createClient: createAdmin } = await import('@supabase/supabase-js')
+          const adminSupabase = createAdmin(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.SUPABASE_SERVICE_ROLE_KEY!
+          )
+          const adminConv = await adminSupabase
+            .from('conversations')
+            .select('id, user_id, title, document_id, created_at, updated_at')
+            .eq('id', id)
+            .eq('user_id', user.id)
+            .single()
+          if (!adminConv.error && adminConv.data) {
+            rawConv = adminConv.data
+            rawConvErr = null
+          }
+        } catch {}
+      }
+
+      if (rawConvErr || !rawConv) {
+        return NextResponse.json({ error: 'Conversation not found or access denied' }, { status: 404 })
+      }
+
+      let docInfo = null
+      if (rawConv.document_id) {
+        const { data: docData } = await supabase
+          .from('documents')
+          .select('id, filename')
+          .eq('id', rawConv.document_id)
+          .single()
+        if (docData) {
+          docInfo = docData
+        }
+      }
+
+      conversation = {
+        ...rawConv,
+        document: docInfo,
+      }
     }
 
-    const { data: dbMessages, error: msgError } = await supabase
+    let { data: dbMessages, error: msgError } = await supabase
       .from('conversation_messages')
       .select('*')
       .eq('conversation_id', id)
       .eq('user_id', user.id)
       .order('created_at', { ascending: true })
+
+    if (msgError && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const { createClient: createAdmin } = await import('@supabase/supabase-js')
+        const adminSupabase = createAdmin(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        )
+        const adminMsgs = await adminSupabase
+          .from('conversation_messages')
+          .select('*')
+          .eq('conversation_id', id)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: true })
+        if (!adminMsgs.error && Array.isArray(adminMsgs.data)) {
+          dbMessages = adminMsgs.data
+          msgError = null
+        }
+      } catch {}
+    }
 
     if (msgError) {
       console.error('[Conversation Detail API] Failed to fetch messages:', msgError.message)

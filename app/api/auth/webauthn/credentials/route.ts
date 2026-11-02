@@ -33,7 +33,14 @@ export async function DELETE(request: Request) {
     }
 
     const { searchParams } = new URL(request.url)
-    const credentialId = searchParams.get('credentialId')
+    let credentialId = searchParams.get('credentialId') || searchParams.get('id')
+
+    if (!credentialId) {
+      try {
+        const body = await request.json()
+        credentialId = body?.credentialId || body?.id
+      } catch {}
+    }
 
     if (!credentialId) {
       return NextResponse.json({ error: 'credentialId is required' }, { status: 400 })

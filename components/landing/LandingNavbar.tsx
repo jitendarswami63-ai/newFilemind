@@ -1,22 +1,39 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Menu, X, ArrowRight } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 interface LandingNavbarProps {
   user?: { email?: string } | null
 }
 
-export function LandingNavbar({ user }: LandingNavbarProps) {
+export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [user, setUser] = useState(initialUser)
+
+  useEffect(() => {
+    if (initialUser) return
+    let isMounted = true
+    try {
+      const supabase = createClient()
+      supabase.auth.getUser().then(({ data }) => {
+        if (isMounted && data?.user) setUser(data.user)
+      }).catch(() => {})
+    } catch {}
+    return () => {
+      isMounted = false
+    }
+  }, [initialUser])
 
   const navLinks = [
     { name: 'Features', href: '#features' },
     { name: 'How It Works', href: '#how-it-works' },
     { name: 'Security', href: '#security' },
     { name: 'Pricing', href: '#pricing' },
+    { name: 'FAQ', href: '#faq' },
   ]
 
   return (
@@ -25,12 +42,13 @@ export function LandingNavbar({ user }: LandingNavbarProps) {
         <Link href="/" className="flex items-center gap-3 select-none">
           <div className="h-9 w-9 rounded-xl border border-[#D8D0C2] flex items-center justify-center flex-shrink-0 bg-[#FFFCF5] shadow-xs p-1.5">
             <Image
-              src="/logo.png"
-              alt="FileMind AI-Powered PDF Search Logo"
+              src="/filemind-ai-pdf-manager-logo.png"
+              alt="FileMind AI PDF Manager and Document Search Platform Logo"
               width={26}
               height={26}
               className="h-full w-full object-contain"
               priority
+              fetchPriority="high"
             />
           </div>
           <div className="flex flex-col">

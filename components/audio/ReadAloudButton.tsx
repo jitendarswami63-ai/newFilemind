@@ -37,9 +37,9 @@ export function ReadAloudButton({
 
   if (isThisMessageError) {
     return (
-      <div className="flex items-center gap-1.5 text-[11px] text-[#B91C1C] bg-[#FDF2F2] border border-[#F8D7DA] rounded-full px-2.5 py-0.5 max-w-fit">
+      <div className="inline-flex items-center gap-1 text-[10px] text-[#B91C1C] bg-[#FDF2F2] border border-[#F8D7DA] rounded-full px-2 py-0.5 max-w-full">
         <AlertCircle className="h-3 w-3 flex-shrink-0" />
-        <span className="truncate max-w-[200px]" title={playerError.error}>
+        <span className="truncate max-w-[130px] sm:max-w-[200px]" title={playerError.error}>
           {playerError.error}
         </span>
         <button
@@ -47,7 +47,7 @@ export function ReadAloudButton({
             onClearError()
             onPlay(messageId, content)
           }}
-          className="underline font-semibold hover:text-[#991B1B] ml-1 cursor-pointer"
+          className="underline font-semibold hover:text-[#991B1B] ml-1 cursor-pointer flex-shrink-0"
         >
           Retry
         </button>

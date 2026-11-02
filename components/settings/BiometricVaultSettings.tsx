@@ -95,7 +95,7 @@ export function BiometricVaultSettings() {
     setDeletingId(credentialId)
     setError(null)
     try {
-      const res = await fetch(`/api/auth/webauthn/credentials?id=${encodeURIComponent(credentialId)}`, {
+      const res = await fetch(`/api/auth/webauthn/credentials?credentialId=${encodeURIComponent(credentialId)}&id=${encodeURIComponent(credentialId)}`, {
         method: 'DELETE',
       })
       if (!res.ok) {

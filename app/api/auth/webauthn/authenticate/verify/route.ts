@@ -7,6 +7,8 @@ import {
   consumeChallenge,
   getServiceRoleClient,
   createBiometricLease,
+  getAllowedOrigins,
+  getAllowedRPIDs,
 } from '@/lib/auth/webauthn'
 
 export const dynamic = 'force-dynamic'
@@ -48,20 +50,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Biometric credential not recognized.' }, { status: 400 })
     }
 
-    const { rpID, origin } = getRpConfig(request.url)
+    const { rpID, origin } = getRpConfig(request)
     const publicKeyBuffer = Buffer.from(credentialRecord.public_key, 'base64url')
 
     const verification = await verifyAuthenticationResponse({
       response,
       expectedChallenge: challengeData.challenge,
-      expectedOrigin: origin,
-      expectedRPID: rpID,
+      expectedOrigin: getAllowedOrigins(origin),
+      expectedRPID: getAllowedRPIDs(rpID),
       credential: {
         id: credentialRecord.credential_id,
         publicKey: publicKeyBuffer,
         counter: Number(credentialRecord.counter || 0),
       },
-      requireUserVerification: true,
+      requireUserVerification: false,
     })
 
     if (!verification.verified || !verification.authenticationInfo) {

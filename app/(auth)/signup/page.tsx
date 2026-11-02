@@ -9,7 +9,7 @@ export const metadata: Metadata = {
     canonical: 'https://www.filemindhub.xyz/signup',
   },
   robots: {
-    index: true,
+    index: false,
     follow: true,
   },
 }

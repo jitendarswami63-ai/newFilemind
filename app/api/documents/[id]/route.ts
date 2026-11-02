@@ -44,8 +44,44 @@ export async function GET(
     error = fallback.error
   }
 
+  let isSharedRecipient = false
+  let allowDownload = true
+
   if (error || !doc) {
-    return NextResponse.json({ error: 'Document not found' }, { status: 404 })
+    const { checkRestrictedDocumentAccess } = await import('@/lib/sharing/share-service')
+    const restrictedCheck = await checkRestrictedDocumentAccess(id, user.id, user.email)
+
+    if (restrictedCheck.authorized) {
+      isSharedRecipient = true
+      allowDownload = restrictedCheck.allowDownload
+
+      const { createClient: createAdmin } = await import('@supabase/supabase-js')
+      const adminSupabase = createAdmin(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+      const { data: sharedDoc } = await adminSupabase
+        .from('documents')
+        .select(
+          'id, filename, mime_type, file_size, storage_path, status, doc_category, tags, page_count, error_message, processing_locked_at, embedding_status, embedding_error, created_at, updated_at'
+        )
+        .eq('id', id)
+        .single()
+
+      if (sharedDoc) {
+        doc = {
+          ...sharedDoc,
+          original_file_size: null,
+          is_locked: false,
+          locked_at: null,
+        }
+        error = null
+      }
+    }
+  }
+
+  if (error || !doc) {
+    return NextResponse.json({ error: 'Document not found or access denied' }, { status: 404 })
   }
 
   let isLeaseActive = true
@@ -56,6 +92,8 @@ export async function GET(
   return NextResponse.json({
     ...doc,
     is_lease_active: isLeaseActive,
+    is_shared_recipient: isSharedRecipient,
+    allow_download: allowDownload,
   })
 }
 
