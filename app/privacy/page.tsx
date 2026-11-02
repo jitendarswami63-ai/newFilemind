@@ -101,16 +101,6 @@ export default function PrivacyPage() {
               Under applicable data protection regulations including GDPR and CCPA, you have the right to access, rectify, export, or delete your personal information and documents at any time. Deleting a document purges both the underlying PDF and all associated vector embeddings from our index.
             </p>
           </div>
-
-          <div className="space-y-3">
-            <h2 className="text-lg font-bold text-[#292720]">6. Contact Our Data Protection Team</h2>
-            <p>
-              If you have any questions or requests regarding this Privacy Policy, please contact our data privacy officer at{' '}
-              <a href="mailto:privacy@filemindhub.xyz" className="text-[#9C7D47] underline underline-offset-2">
-                privacy@filemindhub.xyz
-              </a>.
-            </p>
-          </div>
         </section>
       </main>
 

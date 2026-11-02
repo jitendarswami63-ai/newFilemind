@@ -75,16 +75,6 @@ export default function TermsPage() {
               FileMind is provided on an &quot;as is&quot; and &quot;as available&quot; basis. While we strive for 99.9% uptime and implement industry-standard redundancy, we do not warrant that our service will be uninterrupted or error-free.
             </p>
           </div>
-
-          <div className="space-y-3">
-            <h2 className="text-lg font-bold text-[#292720]">6. Contact Information</h2>
-            <p>
-              For legal notices or questions regarding these Terms of Service, please reach out to our legal department at{' '}
-              <a href="mailto:legal@filemindhub.xyz" className="text-[#9C7D47] underline underline-offset-2">
-                legal@filemindhub.xyz
-              </a>.
-            </p>
-          </div>
         </section>
       </main>
 
