@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
-import { FileCheck2, Scale, AlertCircle } from 'lucide-react'
+import { Scale } from 'lucide-react'
 import { LandingNavbar } from '@/components/landing/LandingNavbar'
 
 export const metadata: Metadata = {
@@ -38,16 +38,6 @@ export default function TermsPage() {
           <p className="text-xs text-[#777064]">
             Last updated: November 2, 2026 • Effective upon account creation
           </p>
-        </section>
-
-        <section className="p-6 rounded-2xl bg-[#FEF8EC] border border-[#FDE68A] text-xs text-[#B45309] flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 flex-shrink-0 text-[#B45309] mt-0.5" />
-          <div className="space-y-1">
-            <span className="font-bold block text-sm">Summary in Plain English</span>
-            <p className="leading-relaxed">
-              You own all rights to your documents. We provide AI indexing, search, sharing, and biometric security to make them easy to explore. You agree not to upload unlawful materials, and we agree never to sell your data or train external models on your private documents.
-            </p>
-          </div>
         </section>
 
         <section className="prose prose-sm max-w-none text-[#777064] space-y-8 leading-relaxed">
