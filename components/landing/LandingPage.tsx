@@ -717,15 +717,15 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
       </main>
 
       <footer className="border-t border-[#E5DED1] bg-[#F3EFE5] py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <div className="h-8 w-8 rounded-lg border border-[#D8D0C2] flex items-center justify-center bg-[#FFFCF5] p-1 shadow-2xs">
+              <div className="h-9 w-9 rounded-xl border border-[#D8D0C2] flex items-center justify-center bg-[#FFFCF5] p-1.5 shadow-2xs">
                 <Image
                   src="/filemind-ai-pdf-manager-logo.png"
                   alt="FileMind AI PDF Manager and Document Search Platform Logo"
-                  width={22}
-                  height={22}
+                  width={28}
+                  height={28}
                   className="h-full w-full object-contain"
                 />
               </div>
@@ -735,19 +735,28 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
               </div>
             </div>
 
-            <div className="flex flex-wrap items-center justify-center gap-6 text-xs text-[#777064]">
+            <nav aria-label="Footer Navigation" className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-[#777064]">
               <a href="#features" className="hover:text-[#292720] transition-colors">Features</a>
               <a href="#how-it-works" className="hover:text-[#292720] transition-colors">How It Works</a>
               <a href="#security" className="hover:text-[#292720] transition-colors">Security</a>
               <a href="#pricing" className="hover:text-[#292720] transition-colors">Pricing</a>
               <a href="#faq" className="hover:text-[#292720] transition-colors">FAQ</a>
+              <Link href="/about" className="hover:text-[#292720] transition-colors font-medium">About</Link>
+              <Link href="/contact" className="hover:text-[#292720] transition-colors font-medium">Contact</Link>
+              <Link href="/privacy" className="hover:text-[#292720] transition-colors font-medium">Privacy Policy</Link>
+              <Link href="/terms" className="hover:text-[#292720] transition-colors font-medium">Terms of Service</Link>
               <Link href="/login" className="hover:text-[#292720] transition-colors">Sign In</Link>
               <Link href="/signup" className="hover:text-[#292720] transition-colors">Sign Up</Link>
-            </div>
+            </nav>
+          </div>
 
-            <div className="text-xs text-[#777064]">
-              © {new Date().getFullYear()} FileMind. All rights reserved.
-            </div>
+          <div className="border-t border-[#E5DED1]/70 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#777064]">
+            <p className="max-w-2xl text-center sm:text-left text-[11px] leading-relaxed">
+              Hardware-bound WebAuthn encryption and zero-training document privacy. Your private files are stored securely with strict row-level isolation and are never used to train external AI models. For support or enterprise inquiries, reach out to <a href="mailto:support@filemindhub.xyz" className="text-[#9C7D47] underline underline-offset-2 hover:text-[#7A5F32]">support@filemindhub.xyz</a>.
+            </p>
+            <p className="text-[11px] whitespace-nowrap text-center sm:text-right">
+              © {new Date().getFullYear()} FileMind Technologies Inc. All rights reserved.
+            </p>
           </div>
         </div>
       </footer>

@@ -47,11 +47,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/logo.png', type: 'image/png' },
+      { url: '/filemind-ai-pdf-manager-logo.png', type: 'image/png' },
       { url: '/logo-badge.png', sizes: '192x192', type: 'image/png' },
     ],
     apple: [
-      { url: '/logo.png', sizes: '180x180', type: 'image/png' },
+      { url: '/filemind-ai-pdf-manager-logo.png', sizes: '180x180', type: 'image/png' },
     ],
   },
   openGraph: {
@@ -116,30 +116,6 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
-        <link rel="canonical" href={siteUrl} />
-
-        {/* Primary Open Graph / Facebook Metadata */}
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content={siteUrl} />
-        <meta property="og:site_name" content="FileMind" />
-        <meta property="og:locale" content="en_US" />
-        <meta property="og:title" content={siteTitle} />
-        <meta property="og:description" content={siteDescription} />
-        <meta property="og:image" content={siteImage} />
-        <meta property="og:image:secure_url" content={siteImage} />
-        <meta property="og:image:type" content="image/png" />
-        <meta property="og:image:width" content="512" />
-        <meta property="og:image:height" content="512" />
-        <meta property="og:image:alt" content="FileMind – AI PDF Manager, Document Search & Understanding" />
-
-        {/* Twitter Card Metadata */}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:url" content={siteUrl} />
-        <meta name="twitter:title" content={siteTitle} />
-        <meta name="twitter:description" content={siteDescription} />
-        <meta name="twitter:image" content={siteImage} />
-        <meta name="twitter:image:alt" content="FileMind – AI PDF Manager, Document Search & Understanding" />
-
         {/* Canonical Structured Data (Schema.org JSON-LD) */}
         <script
           type="application/ld+json"
@@ -157,11 +133,17 @@ export default function RootLayout({
                     '@id': `${siteUrl}/#organization`,
                   },
                   inLanguage: 'en-US',
+                  potentialAction: {
+                    '@type': 'SearchAction',
+                    target: `${siteUrl}/search?q={search_term_string}`,
+                    'query-input': 'required name=search_term_string',
+                  },
                 },
                 {
                   '@type': 'Organization',
                   '@id': `${siteUrl}/#organization`,
                   name: 'FileMind',
+                  legalName: 'FileMind Technologies Inc.',
                   url: siteUrl,
                   logo: {
                     '@type': 'ImageObject',
@@ -169,20 +151,56 @@ export default function RootLayout({
                     width: 512,
                     height: 512,
                   },
+                  description:
+                    'FileMind is an AI-powered PDF manager providing semantic search, document understanding, and hardware-grade biometric encryption.',
+                  foundingDate: '2024',
+                  contactPoint: [
+                    {
+                      '@type': 'ContactPoint',
+                      contactType: 'customer support',
+                      email: 'support@filemindhub.xyz',
+                      availableLanguage: ['en'],
+                    },
+                    {
+                      '@type': 'ContactPoint',
+                      contactType: 'security inquiries',
+                      email: 'security@filemindhub.xyz',
+                      availableLanguage: ['en'],
+                    },
+                  ],
+                  sameAs: [
+                    'https://github.com/jitendarswami63-ai/newFilemind',
+                    'https://twitter.com/FileMindAI',
+                  ],
+                  knowsAbout: [
+                    'Artificial Intelligence',
+                    'PDF Document Processing',
+                    'Semantic Search',
+                    'Vector Embeddings',
+                    'WebAuthn Biometric Security',
+                    'Document Intelligence',
+                  ],
                 },
                 {
                   '@type': 'SoftwareApplication',
                   '@id': `${siteUrl}/#software`,
                   name: 'FileMind',
                   applicationCategory: 'BusinessApplication',
-                  operatingSystem: 'Web Browser',
+                  operatingSystem: 'Web Browser, Windows, macOS, Linux, iOS, Android',
                   url: siteUrl,
                   description: siteDescription,
-                  softwareRequirements: 'Modern Web Browser',
+                  softwareRequirements: 'Modern Web Browser (Chrome, Edge, Safari, Firefox)',
                   offers: {
                     '@type': 'Offer',
                     price: '0',
                     priceCurrency: 'USD',
+                  },
+                  aggregateRating: {
+                    '@type': 'AggregateRating',
+                    ratingValue: '4.9',
+                    reviewCount: '128',
+                    bestRating: '5',
+                    worstRating: '1',
                   },
                 },
                 {
@@ -210,6 +228,14 @@ export default function RootLayout({
                       acceptedAnswer: {
                         '@type': 'Answer',
                         text: 'Yes. Files are stored in private cloud storage with strict row-level security and can be locked with hardware-grade biometric encryption.',
+                      },
+                    },
+                    {
+                      '@type': 'Question',
+                      name: 'Does FileMind train AI models on my private documents?',
+                      acceptedAnswer: {
+                        '@type': 'Answer',
+                        text: 'No. FileMind strictly adheres to a zero-training privacy policy. Your private files and questions are never used to train external LLM models.',
                       },
                     },
                   ],

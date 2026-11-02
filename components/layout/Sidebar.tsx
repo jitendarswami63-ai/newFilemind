@@ -34,8 +34,8 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: { fu
         <Link href="/dashboard" className="flex items-center gap-3 min-w-0">
           <div className="h-9 w-9 rounded-xl border border-[#3E4149] flex items-center justify-center flex-shrink-0 bg-[#24262B] shadow-sm p-1.5">
             <Image
-              src="/logo.png"
-              alt="FileMind Logo"
+              src="/filemind-ai-pdf-manager-logo.png"
+              alt="FileMind AI PDF Manager and Document Search Platform Logo"
               width={28}
               height={28}
               className="h-full w-full object-contain"

@@ -261,8 +261,8 @@ export function SignupForm() {
       <CardHeader className="text-center pb-4 pt-6">
         <div className="mx-auto h-12 w-12 rounded-xl overflow-hidden border border-[#E5DED1] flex items-center justify-center mb-3.5 bg-[#FFFCF5] shadow-2xs p-1">
           <Image
-            src="/logo.png"
-            alt="FileMind Logo"
+            src="/filemind-ai-pdf-manager-logo.png"
+            alt="FileMind AI PDF Manager and Document Search Platform Logo"
             width={48}
             height={48}
             className="h-full w-full object-contain"

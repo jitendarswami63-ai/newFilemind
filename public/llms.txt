@@ -1,0 +1,24 @@
+# FileMind
+
+> FileMind is an AI-powered PDF manager and semantic document search platform that enables instant understanding, verifiable page citations, and hardware-bound biometric document security.
+
+## Summary
+
+FileMind combines vector embeddings with full-text search to index and search across extensive PDF documents in milliseconds. Every answer provided includes exact page citations and source excerpts.
+
+## Core Capabilities
+
+- **AI PDF Management**: Upload, organize, and categorize complex multi-page PDF documents.
+- **Semantic Vector Search**: Ask questions in natural language and receive direct answers linked to page numbers.
+- **Hardware-bound Biometric Vault**: Envelope encryption using AES-256-GCM and FIDO2 WebAuthn (Windows Hello / Touch ID).
+- **Secure Document Sharing**: Share documents via unguessable public links with expiration controls or restricted to authenticated recipients.
+- **Privacy-first Architecture**: Zero training guarantee — private files are never used to train public AI models.
+
+## Key URLs
+
+- Homepage: https://www.filemindhub.xyz
+- About: https://www.filemindhub.xyz/about
+- Contact & Support: https://www.filemindhub.xyz/contact
+- Privacy Policy: https://www.filemindhub.xyz/privacy
+- Terms of Service: https://www.filemindhub.xyz/terms
+- Authentication: https://www.filemindhub.xyz/login
