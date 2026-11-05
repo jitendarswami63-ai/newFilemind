@@ -1233,7 +1233,7 @@ r_d3.text = "Presenter Contacts & Resources:\n"
 r_d3.font.bold = True
 r_d3.font.color.rgb = PINK
 r_d3_sub = p_d3.add_run()
-r_d3_sub.text = "GitHub: [github.com/your-username/filemind]\nEmail: [your-email@college.edu]  |  Demo URL: [http://localhost:3000]\n\nThank you! We welcome questions from our teacher and judges."
+r_d3_sub.text = "GitHub: [github.com/jitendarswami63-ai/newFilemind]\nEmail: contact@filemindhub.xyz  |  Live URL: https://www.filemindhub.xyz\n\nThank you! We welcome questions from our teacher and judges."
 r_d3_sub.font.size = Pt(9.5)
 r_d3_sub.font.color.rgb = TEXT_BODY
 

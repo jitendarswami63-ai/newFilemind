@@ -18,15 +18,13 @@ export default function robots(): MetadataRoute.Robots {
     '/share/',
     '/api/',
     '/auth/',
-    '/login',
-    '/signup',
   ]
 
   return {
     rules: [
       {
         userAgent: '*',
-        allow: '/',
+        allow: ['/', '/login', '/signup', '/about', '/contact', '/privacy', '/terms', '/llms.txt'],
         disallow: disallowedPrivateRoutes,
       },
       {

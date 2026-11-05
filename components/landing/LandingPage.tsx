@@ -752,7 +752,7 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
 
           <div className="border-t border-[#E5DED1]/70 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#777064]">
             <p className="max-w-2xl text-center sm:text-left text-[11px] leading-relaxed">
-              Hardware-bound WebAuthn encryption and zero-training document privacy. Your private files are stored securely with strict row-level isolation and are never used to train external AI models. For support or enterprise inquiries, reach out to <a href="mailto:support@filemindhub.xyz" className="text-[#9C7D47] underline underline-offset-2 hover:text-[#7A5F32]">support@filemindhub.xyz</a>.
+              Hardware-bound WebAuthn encryption and zero-training document privacy. Your private files are stored securely with strict row-level isolation and are never used to train external AI models. For support or enterprise inquiries, reach out to <a href="mailto:contact@filemindhub.xyz" className="text-[#9C7D47] underline underline-offset-2 hover:text-[#7A5F32]">contact@filemindhub.xyz</a>.
             </p>
             <p className="text-[11px] whitespace-nowrap text-center sm:text-right">
               © {new Date().getFullYear()} FileMind Technologies Inc. All rights reserved.

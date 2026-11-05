@@ -7,14 +7,14 @@ import { LandingNavbar } from '@/components/landing/LandingNavbar'
 export const metadata: Metadata = {
   title: 'Contact FileMind – Customer Support & Enterprise Inquiries',
   description:
-    'Get in touch with FileMind support, security teams, and business inquiries. Reach us at support@filemindhub.xyz for help with your account or biometric vault.',
+    'Get in touch with FileMind support, security teams, and business inquiries. Reach us at contact@filemindhub.xyz for help with your account or biometric vault.',
   alternates: {
     canonical: 'https://www.filemindhub.xyz/contact',
   },
   openGraph: {
     title: 'Contact FileMind – Customer Support & Enterprise Inquiries',
     description:
-      'Get in touch with FileMind support, security teams, and business inquiries. Reach us at support@filemindhub.xyz.',
+      'Get in touch with FileMind support, security teams, and business inquiries. Reach us at contact@filemindhub.xyz.',
     url: 'https://www.filemindhub.xyz/contact',
     siteName: 'FileMind',
     images: ['https://www.filemindhub.xyz/filemind-ai-pdf-manager-logo.png'],
@@ -52,10 +52,10 @@ export default function ContactPage() {
             </p>
             <div className="pt-2">
               <a
-                href="mailto:support@filemindhub.xyz"
+                href="mailto:contact@filemindhub.xyz"
                 className="inline-flex items-center gap-2 text-sm font-bold text-[#9C7D47] hover:underline"
               >
-                <span>support@filemindhub.xyz</span>
+                <span>contact@filemindhub.xyz</span>
               </a>
             </div>
           </div>
@@ -71,10 +71,10 @@ export default function ContactPage() {
             </p>
             <div className="pt-2">
               <a
-                href="mailto:security@filemindhub.xyz"
+                href="mailto:contact@filemindhub.xyz"
                 className="inline-flex items-center gap-2 text-sm font-bold text-[#9C7D47] hover:underline"
               >
-                <span>security@filemindhub.xyz</span>
+                <span>contact@filemindhub.xyz</span>
               </a>
             </div>
           </div>

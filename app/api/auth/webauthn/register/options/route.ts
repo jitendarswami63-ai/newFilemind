@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       rpName,
       rpID,
       userID: Buffer.from(user.id, 'utf8'),
-      userName: user.email || 'user@filemind.app',
+      userName: user.email || 'contact@filemindhub.xyz',
       userDisplayName: (user.user_metadata?.full_name as string) || user.email || 'FileMind User',
       attestationType: 'none',
       excludeCredentials,
