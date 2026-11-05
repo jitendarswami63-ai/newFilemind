@@ -20,6 +20,8 @@ import {
   Fingerprint,
   FileCheck,
   ChevronDown,
+  Share2,
+  ExternalLink,
 } from 'lucide-react'
 import { LandingNavbar } from './LandingNavbar'
 import { createClient } from '@/lib/supabase/client'
@@ -65,22 +67,24 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
               </h1>
 
               <p className="text-lg sm:text-xl text-[#777064] leading-relaxed mb-10 max-w-2xl mx-auto">
-                Organize your PDF documents, ask questions, and get instant answers. FileMind is an AI PDF manager that reads your files, finds key information in seconds, and shows you the exact page citations so you can verify every detail. Your private documents stay protected with hardware-grade biometric vault encryption.
+                Transform how your documents are understood with AI. FileMind is an AI PDF manager that organizes your files, answers complex questions with page-accurate citations, and ensures your private documents are understood, indexed, and protected with hardware-grade biometric vault encryption.
               </p>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-14">
                 <Link
-                  href={user ? '/dashboard' : '/signup?next=/dashboard'}
+                  href={user ? '/dashboard' : '/signup'}
+                  aria-label="Get started free with FileMind AI document manager"
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 text-base font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-xl shadow-sm border border-[#856837] transition-all cursor-pointer"
                 >
-                  <span>{user ? 'Get Started' : 'Get Started Free'}</span>
+                  <span>{user ? 'Go to Workspace' : 'Get Started Free'}</span>
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
                   href={user ? '/dashboard' : '/login'}
+                  aria-label="Sign in to your FileMind account"
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 text-base font-semibold text-[#292720] bg-[#FFFCF5] hover:bg-[#FAF5EC] rounded-xl border border-[#E5DED1] hover:border-[#DDD5C7] shadow-xs transition-all cursor-pointer"
                 >
-                  <span>{user ? 'View My Documents' : 'Sign In to Workspace'}</span>
+                  <span>{user ? 'Open Workspace' : 'Sign In to Workspace'}</span>
                 </Link>
               </div>
 
@@ -444,7 +448,16 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                   <Fingerprint className="h-5 w-5 text-[#C5A878] mb-2.5" />
                   <h3 className="text-sm font-bold text-[#F5F1E9] mb-1">WebAuthn Biometrics</h3>
                   <p className="text-xs text-[#A8A49B] leading-relaxed">
-                    Hardware-backed passkeys require TouchID, FaceID, or security keys to establish 15-minute decryption leases.
+                    Hardware-backed passkeys require TouchID, FaceID, or security keys under the{' '}
+                    <a
+                      href="https://fidoalliance.org/fido2/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[#C5A878] underline hover:text-[#E8DCC4] inline-flex items-center gap-0.5"
+                    >
+                      FIDO2 standard <ExternalLink className="h-2.5 w-2.5" />
+                    </a>{' '}
+                    to establish 15-minute decryption leases.
                   </p>
                 </div>
 
@@ -515,10 +528,11 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                   </ul>
                 </div>
                 <Link
-                  href={user ? '/dashboard' : '/signup?next=/dashboard'}
+                  href={user ? '/dashboard' : '/signup'}
+                  aria-label="Start with FileMind Free Tier"
                   className="w-full text-center py-2.5 text-xs font-semibold text-[#292720] bg-[#FAF5EC] hover:bg-[#F3EFE5] border border-[#E5DED1] rounded-lg transition-colors cursor-pointer"
                 >
-                  {user ? 'Get Started' : 'Get Started Free'}
+                  {user ? 'Open Free Tier' : 'Start with Free Tier'}
                 </Link>
               </div>
 
@@ -557,10 +571,11 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                   </ul>
                 </div>
                 <Link
-                  href={user ? '/dashboard' : '/signup?next=/dashboard'}
+                  href={user ? '/dashboard' : '/signup'}
+                  aria-label="Start free trial for FileMind Pro intelligence plan"
                   className="w-full text-center py-2.5 text-xs font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] border border-[#856837] rounded-lg shadow-xs transition-colors cursor-pointer"
                 >
-                  {user ? 'Get Started' : 'Start Free Pro Trial'}
+                  {user ? 'Open Pro Workspace' : 'Start Free Pro Trial'}
                 </Link>
               </div>
 
@@ -596,7 +611,8 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                   </ul>
                 </div>
                 <Link
-                  href={user ? '/dashboard' : '/signup?next=/dashboard'}
+                  href="/contact"
+                  aria-label="Contact our enterprise team for dedicated solutions"
                   className="w-full text-center py-2.5 text-xs font-semibold text-[#292720] bg-[#FAF5EC] hover:bg-[#F3EFE5] border border-[#E5DED1] rounded-lg transition-colors cursor-pointer"
                 >
                   Contact Enterprise Team
@@ -698,17 +714,19 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
               </p>
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <Link
-                  href={user ? '/dashboard' : '/signup?next=/dashboard'}
+                  href={user ? '/dashboard' : '/signup'}
+                  aria-label="Create a free FileMind account"
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-xl shadow-xs border border-[#856837] transition-all cursor-pointer"
                 >
-                  <span>{user ? 'Get Started' : 'Get Started Free'}</span>
+                  <span>{user ? 'Launch Dashboard' : 'Create Free Account'}</span>
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <Link
                   href={user ? '/dashboard' : '/login'}
+                  aria-label="Sign in to your member workspace"
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold text-[#292720] bg-[#FFFCF5] hover:bg-[#F3EFE5] rounded-xl border border-[#E5DED1] transition-all cursor-pointer"
                 >
-                  <span>{user ? 'My Workspace' : 'Sign In to Workspace'}</span>
+                  <span>{user ? 'Browse Private Vault' : 'Member Workspace'}</span>
                 </Link>
               </div>
             </div>
@@ -741,13 +759,63 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
               <a href="#security" className="hover:text-[#292720] transition-colors">Security</a>
               <a href="#pricing" className="hover:text-[#292720] transition-colors">Pricing</a>
               <a href="#faq" className="hover:text-[#292720] transition-colors">FAQ</a>
-              <Link href="/about" className="hover:text-[#292720] transition-colors font-medium">About</Link>
-              <Link href="/contact" className="hover:text-[#292720] transition-colors font-medium">Contact</Link>
+              <Link href="/about" className="hover:text-[#292720] transition-colors font-medium">About FileMind</Link>
+              <Link href="/contact" className="hover:text-[#292720] transition-colors font-medium">Contact Us</Link>
               <Link href="/privacy" className="hover:text-[#292720] transition-colors font-medium">Privacy Policy</Link>
               <Link href="/terms" className="hover:text-[#292720] transition-colors font-medium">Terms of Service</Link>
-              <Link href="/login" className="hover:text-[#292720] transition-colors">Sign In</Link>
-              <Link href="/signup" className="hover:text-[#292720] transition-colors">Sign Up</Link>
+              <Link href="/login" className="hover:text-[#292720] transition-colors">Account Login</Link>
+              <Link href="/signup" className="hover:text-[#292720] transition-colors">Register New Account</Link>
             </nav>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-y border-[#E5DED1]/70 text-xs">
+            <div className="flex flex-wrap items-center gap-2.5 text-[#777064]">
+              <span className="font-semibold text-[#292720] text-xs">Share:</span>
+              <a
+                href="https://twitter.com/intent/tweet?text=Explore%20FileMind%20%E2%80%94%20AI%20Document%20Intelligence%20and%20Biometric%20Vault&url=https%3A%2F%2Fwww.filemindhub.xyz"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Share FileMind on X"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md border border-[#D8D0C2] bg-[#FAF5EC] hover:bg-[#FFFCF5] text-xs font-medium text-[#292720] transition-colors"
+              >
+                <Share2 className="h-3 w-3 text-[#9C7D47]" />
+                <span>Share on X</span>
+              </a>
+              <a
+                href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fwww.filemindhub.xyz"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Share FileMind on LinkedIn"
+                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md border border-[#D8D0C2] bg-[#FAF5EC] hover:bg-[#FFFCF5] text-xs font-medium text-[#292720] transition-colors"
+              >
+                <Share2 className="h-3 w-3 text-[#0A66C2]" />
+                <span>Share on LinkedIn</span>
+              </a>
+            </div>
+
+            <div className="flex items-center gap-4 text-xs text-[#777064]">
+              <span className="font-semibold text-[#292720]">Resources:</span>
+              <a
+                href="https://github.com/jitendarswami63-ai/newFilemind"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="FileMind GitHub Repository"
+                className="hover:text-[#292720] inline-flex items-center gap-1 transition-colors"
+              >
+                <span>GitHub</span>
+                <ExternalLink className="h-3 w-3" />
+              </a>
+              <a
+                href="https://twitter.com/FileMindAI"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="FileMind on X"
+                className="hover:text-[#292720] inline-flex items-center gap-1 transition-colors"
+              >
+                <span>Twitter / X</span>
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
           </div>
 
           <div className="border-t border-[#E5DED1]/70 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#777064]">

@@ -99,7 +99,7 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
                 Sign In
               </Link>
               <Link
-                href="/signup?next=/dashboard"
+                href="/signup"
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-lg shadow-xs border border-[#856837] transition-colors"
               >
                 <span>Get Started</span>
@@ -161,7 +161,7 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
                   Sign In
                 </Link>
                 <Link
-                  href="/signup?next=/dashboard"
+                  href="/signup"
                   onClick={() => setMobileMenuOpen(false)}
                   className="w-full flex items-center justify-center gap-1.5 py-2.5 text-sm font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-lg shadow-xs border border-[#856837] transition-colors"
                 >
