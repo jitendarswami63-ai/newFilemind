@@ -15,7 +15,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const secret = process.env.RAZORPAY_KEY_SECRET
+    const secret = (process.env.RAZORPAY_KEY_SECRET || '').replace(/^["']|["']$/g, '').trim()
     if (!secret) {
       return NextResponse.json(
         { error: 'Server configuration error: missing secret' },
