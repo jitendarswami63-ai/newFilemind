@@ -4,7 +4,7 @@ import { getRazorpayClient } from '@/lib/payments/razorpay'
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}))
-    let amount = body.amount ?? 49900
+    let amount = body.amount ?? 5000
     const currency = body.currency || 'INR'
     const receipt = body.receipt || `rcpt_${Date.now()}`
 

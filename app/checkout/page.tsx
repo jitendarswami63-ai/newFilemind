@@ -48,7 +48,7 @@ export default function CheckoutPage() {
                 </p>
               </div>
               <div className="text-right">
-                <div className="text-3xl font-extrabold text-[#292720]">₹499</div>
+                <div className="text-3xl font-extrabold text-[#292720]">₹50</div>
                 <div className="text-[11px] text-[#777064]">/ month (incl. GST)</div>
               </div>
             </div>
@@ -78,10 +78,10 @@ export default function CheckoutPage() {
 
             <div className="pt-4 border-t border-[#E5DED1]">
               <RazorpayCheckoutButton
-                amount={499}
+                amount={50}
                 currency="INR"
                 planName="Pro Intelligence"
-                buttonText="Pay ₹499 with Razorpay"
+                buttonText="Pay ₹50 with Razorpay"
                 className="w-full text-center py-3 text-sm font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] border border-[#856837] rounded-xl shadow-xs transition-colors cursor-pointer"
               />
             </div>

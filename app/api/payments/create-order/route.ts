@@ -4,7 +4,7 @@ import { createRazorpayOrder } from '@/lib/payments/razorpay'
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}))
-    const { amount = 499, currency = 'INR', planName = 'Pro Intelligence', notes = {} } = body
+    const { amount = 50, currency = 'INR', planName = 'Pro Intelligence', notes = {} } = body
 
     if (typeof amount !== 'number' || amount <= 0) {
       return NextResponse.json(

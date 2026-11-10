@@ -21,10 +21,10 @@ interface RazorpayCheckoutButtonProps {
 }
 
 export function RazorpayCheckoutButton({
-  amount = 499,
+  amount = 50,
   currency = 'INR',
   planName = 'Pro Intelligence',
-  buttonText = 'Upgrade with Razorpay',
+  buttonText = 'Pay ₹50 with Razorpay',
   className = '',
   onSuccess,
   userEmail,
