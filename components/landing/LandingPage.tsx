@@ -571,11 +571,11 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                   </ul>
                 </div>
                 <Link
-                  href={user ? '/dashboard' : '/signup'}
-                  aria-label="Start free trial for FileMind Pro intelligence plan"
+                  href="/checkout"
+                  aria-label="Upgrade to FileMind Pro intelligence plan with Razorpay"
                   className="w-full text-center py-2.5 text-xs font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] border border-[#856837] rounded-lg shadow-xs transition-colors cursor-pointer"
                 >
-                  {user ? 'Open Pro Workspace' : 'Start Free Pro Trial'}
+                  Upgrade to Pro Plan
                 </Link>
               </div>
 

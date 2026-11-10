@@ -22,7 +22,8 @@
     "test:biometric": "node tests/test_biometric_vault_suite.mjs",
     "test:share": "node tests/test_sharing_system_suite.mjs",
     "test:redirect": "node tests/test_redirect_verification.mjs",
-    "test:seo": "node tests/test_seo_verification.mjs"
+    "test:seo": "node tests/test_seo_verification.mjs",
+    "test:razorpay": "node tests/test_razorpay_checkout_suite.mjs"
   },
   "dependencies": {
     "@deepgram/sdk": "^5.17.0",
@@ -34,6 +35,7 @@
     "lucide-react": "^1.45.0",
     "next": "16.3.5",
     "pdf-lib": "^1.17.1",
+    "razorpay": "^2.9.8",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "^0.0.1",
