@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
+import Script from 'next/script'
 import { Check, ShieldCheck, Zap } from 'lucide-react'
 import { LandingNavbar } from '@/components/landing/LandingNavbar'
 import { RazorpayCheckoutButton } from '@/components/checkout/RazorpayCheckoutButton'
@@ -14,6 +15,7 @@ export const metadata: Metadata = {
 export default function CheckoutPage() {
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-[#292720] flex flex-col selection:bg-[#9C7D47]/20 selection:text-[#292720]">
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
       <LandingNavbar />
 
       <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20 space-y-10">
