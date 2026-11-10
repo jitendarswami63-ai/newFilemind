@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { User, Shield, Sparkles, Database, Lock } from 'lucide-react'
 import { VaultMfaSettings } from '@/components/settings/VaultMfaSettings'
 import { BiometricVaultSettings } from '@/components/settings/BiometricVaultSettings'
+import { SubscriptionSettings } from '@/components/settings/SubscriptionSettings'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -83,6 +84,8 @@ export default async function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <SubscriptionSettings initialUser={user} />
 
       <VaultMfaSettings />
 

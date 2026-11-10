@@ -5,14 +5,17 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Menu, X, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { ProBadge } from '@/components/ui/ProBadge'
+import { useUserPlan } from '@/lib/subscription/plan'
 
 interface LandingNavbarProps {
-  user?: { email?: string } | null
+  user?: { email?: string; user_metadata?: Record<string, any> } | null
 }
 
 export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [user, setUser] = useState(initialUser)
+  const { isPro } = useUserPlan(user)
 
   useEffect(() => {
     if (initialUser) return
@@ -76,6 +79,11 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
         <div className="hidden md:flex items-center gap-3">
           {user ? (
             <div className="flex items-center gap-3">
+              {isPro && (
+                <Link href="/settings" title="Pro Intelligence Member">
+                  <ProBadge variant="gold-pill" size="xs" label="PRO" />
+                </Link>
+              )}
               <Link
                 href="/dashboard"
                 className="px-3.5 py-1.5 text-sm font-medium text-[#292720] hover:text-[#9C7D47] transition-colors"
@@ -86,7 +94,7 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
                 href="/dashboard"
                 className="inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-lg shadow-xs transition-colors"
               >
-                <span>Get Started</span>
+                <span>{isPro ? 'Pro Workspace' : 'Get Started'}</span>
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
@@ -138,16 +146,17 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
                 <Link
                   href="/dashboard"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="w-full text-center py-2 text-sm font-medium text-[#292720] hover:bg-[#F3EFE5] rounded-lg transition-colors border border-[#E5DED1]"
+                  className="w-full flex items-center justify-between px-3.5 py-2 text-sm font-medium text-[#292720] hover:bg-[#F3EFE5] rounded-lg transition-colors border border-[#E5DED1]"
                 >
-                  Dashboard
+                  <span>Dashboard</span>
+                  {isPro && <ProBadge variant="gold-pill" size="xs" label="PRO" />}
                 </Link>
                 <Link
                   href="/dashboard"
                   onClick={() => setMobileMenuOpen(false)}
                   className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-lg shadow-xs transition-colors"
                 >
-                  <span>Get Started</span>
+                  <span>{isPro ? 'Pro Workspace' : 'Get Started'}</span>
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </div>

@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
+import { createClient } from '@/lib/supabase/server'
+import { promoteUserToPro } from '@/lib/subscription/plan-server'
 
 export async function POST(req: Request) {
   try {
@@ -41,12 +43,43 @@ export async function POST(req: Request) {
       )
     }
 
-    return NextResponse.json({
+    // Try to associate with logged-in user if available
+    try {
+      const supabase = await createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      const targetUserId = body.userId || user?.id
+      if (targetUserId) {
+        await promoteUserToPro(targetUserId, {
+          razorpay_order_id: order_id,
+          razorpay_payment_id: payment_id,
+          plan_activated_at: new Date().toISOString(),
+        })
+      }
+    } catch (authErr) {
+      console.warn('[Razorpay Verify] Could not auto-promote user session:', authErr)
+    }
+
+    const response = NextResponse.json({
       success: true,
       message: 'Payment signature verified successfully',
+      is_pro: true,
+      plan: 'pro',
       order_id,
       payment_id,
     })
+
+    // Set cookie so immediate page transitions recognize Pro
+    response.cookies.set('filemind_plan', 'pro', {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: 'lax',
+      httpOnly: false,
+    })
+
+    return response
   } catch (error: any) {
     console.error('[Razorpay Verify Error]:', error)
     return NextResponse.json(

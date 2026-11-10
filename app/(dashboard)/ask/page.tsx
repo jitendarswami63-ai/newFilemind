@@ -34,6 +34,8 @@ import { ReadAloudButton } from '@/components/audio/ReadAloudButton'
 import { useAudioRecorder } from '@/lib/audio/use-audio-recorder'
 import { useAudioPlayer } from '@/lib/audio/use-audio-player'
 import { VaultMfaUnlockChallenge } from '@/components/auth/VaultMfaUnlockChallenge'
+import { ProBadge } from '@/components/ui/ProBadge'
+import { useUserPlan } from '@/lib/subscription/plan'
 
 interface UserDocItem {
   id: string
@@ -281,6 +283,7 @@ function deleteLocalConversation(convId: string) {
 }
 
 export default function AskAiPage() {
+  const { isPro } = useUserPlan()
   const searchParams = useSearchParams()
   const initialDocId = searchParams.get('documentId') || undefined
   const initialDocName = searchParams.get('docName') || undefined
@@ -756,12 +759,18 @@ export default function AskAiPage() {
             <div className="flex flex-col min-w-0">
               <h1 className="text-base sm:text-lg font-bold text-[#292720] tracking-tight flex items-center gap-2 truncate">
                 <span>Ask AI Assistant</span>
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FAF5EC] border border-[#E5DED1] text-[#9C7D47] uppercase tracking-wider hidden lg:inline-block">
-                  Grounded Citations
-                </span>
+                {isPro ? (
+                  <ProBadge variant="gold-pill" size="xs" label="PRO DUAL-ENGINE" />
+                ) : (
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#FAF5EC] border border-[#E5DED1] text-[#9C7D47] uppercase tracking-wider hidden lg:inline-block">
+                    Grounded Citations
+                  </span>
+                )}
               </h1>
               <p className="text-[11px] text-[#777064] truncate hidden sm:block">
-                Ask questions across documents with verified citations and automatic history persistence.
+                {isPro
+                  ? 'Dual-Engine Pro Fast Lane active (Gemini 3.8 + NVIDIA NIM) with verified grounded citations.'
+                  : 'Ask questions across documents with verified citations and automatic history persistence.'}
               </p>
             </div>
           </div>

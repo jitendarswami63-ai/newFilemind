@@ -1,7 +1,9 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Sparkles, Loader2, CheckCircle2 } from 'lucide-react'
+import Link from 'next/link'
+import { Sparkles, Loader2, CheckCircle2, Crown, ArrowRight } from 'lucide-react'
+import { setClientProStatus } from '@/lib/subscription/plan'
 
 declare global {
   interface Window {
@@ -96,6 +98,7 @@ export function RazorpayCheckoutButton({
 
             const verifyData = await verifyRes.json()
             if (verifyRes.ok && verifyData.success) {
+              setClientProStatus(true)
               setPaymentSuccess(response.razorpay_payment_id)
               onSuccess?.(response.razorpay_payment_id)
             } else {
@@ -136,9 +139,31 @@ export function RazorpayCheckoutButton({
 
   if (paymentSuccess) {
     return (
-      <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[#F0FDF4] border border-[#DCFCE7] text-xs font-semibold text-[#15803D]">
-        <CheckCircle2 className="h-4 w-4" />
-        <span>Paid Successfully! ID: {paymentSuccess.substring(0, 14)}...</span>
+      <div className="p-5 rounded-2xl bg-gradient-to-br from-[#2D281E] via-[#1B1D21] to-[#252015] border border-[#D4AF37]/60 text-[#F5F1E9] space-y-3.5 shadow-lg animate-in fade-in duration-300">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#AA771C] flex items-center justify-center text-[#1C180A] shadow-xs flex-shrink-0">
+            <Crown className="h-5 w-5 fill-[#1C180A]" />
+          </div>
+          <div>
+            <div className="text-sm font-black uppercase tracking-wider text-[#F3E5AB] flex items-center gap-2">
+              <span>Pro Intelligence Active</span>
+              <Sparkles className="h-3.5 w-3.5 text-[#F3E5AB]" />
+            </div>
+            <div className="text-[11px] text-[#C5A878]">
+              Transaction verified • ID: {paymentSuccess.substring(0, 16)}
+            </div>
+          </div>
+        </div>
+        <p className="text-xs text-[#FAF5EC]/90 leading-relaxed">
+          Welcome to FileMind Pro! Your premium benefits, dual AI engine, biometric WebAuthn vault, and unlimited analysis are now unlocked across your entire account.
+        </p>
+        <Link
+          href="/dashboard"
+          className="inline-flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-xs font-bold text-[#1C180A] bg-gradient-to-r from-[#D4AF37] via-[#F6E27A] to-[#AA771C] hover:opacity-95 shadow-sm transition-opacity"
+        >
+          <span>Open Pro Workspace</span>
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Link>
       </div>
     )
   }

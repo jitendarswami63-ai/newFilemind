@@ -22,17 +22,21 @@ import {
   ChevronDown,
   Share2,
   ExternalLink,
+  Crown,
 } from 'lucide-react'
 import { LandingNavbar } from './LandingNavbar'
 import { createClient } from '@/lib/supabase/client'
+import { ProBadge } from '@/components/ui/ProBadge'
+import { useUserPlan } from '@/lib/subscription/plan'
 
 interface LandingPageProps {
-  user?: { email?: string } | null
+  user?: { email?: string; user_metadata?: Record<string, any> } | null
 }
 
 export function LandingPage({ user: initialUser }: LandingPageProps) {
   const [user, setUser] = useState(initialUser)
   const [openFaq, setOpenFaq] = useState<number | null>(null)
+  const { isPro } = useUserPlan(user)
 
   useEffect(() => {
     if (initialUser) return
@@ -536,16 +540,26 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                 </Link>
               </div>
 
-              <div className="bg-[#FFFCF5] p-7 rounded-xl border-2 border-[#9C7D47] shadow-md flex flex-col justify-between relative">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-[#9C7D47] text-[10px] font-bold text-[#FFFCF5] uppercase tracking-wider shadow-xs">
-                  Most Popular
+              <div className={`bg-[#FFFCF5] p-7 rounded-xl ${isPro ? 'border-2 border-[#D4AF37] ring-2 ring-[#D4AF37]/20 shadow-lg' : 'border-2 border-[#9C7D47] shadow-md'} flex flex-col justify-between relative`}>
+                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-xs ${isPro ? 'bg-gradient-to-r from-[#D4AF37] to-[#AA771C] text-[#1C180A] flex items-center gap-1 font-black' : 'bg-[#9C7D47] text-[#FFFCF5]'}`}>
+                  {isPro ? (
+                    <>
+                      <Crown className="h-3 w-3 fill-[#1C180A]" />
+                      <span>Your Active Plan</span>
+                    </>
+                  ) : (
+                    'Most Popular'
+                  )}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-[#292720]">Pro Intelligence</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-[#292720]">Pro Intelligence</h3>
+                    {isPro && <ProBadge variant="gold-pill" size="xs" label="ACTIVE" />}
+                  </div>
                   <p className="text-xs text-[#777064] mt-1 mb-4">For legal, finance, and technical professionals.</p>
                   <div className="flex items-baseline gap-1 mb-6">
-                    <span className="text-4xl font-extrabold text-[#292720]">$24</span>
-                    <span className="text-xs text-[#777064]">/ month</span>
+                    <span className="text-4xl font-extrabold text-[#292720]">₹50</span>
+                    <span className="text-xs text-[#777064]">/ month (incl. GST)</span>
                   </div>
                   <ul className="space-y-3 text-xs text-[#292720] mb-8">
                     <li className="flex items-center gap-2">
@@ -570,13 +584,24 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                     </li>
                   </ul>
                 </div>
-                <Link
-                  href="/checkout"
-                  aria-label="Upgrade to FileMind Pro intelligence plan with Razorpay"
-                  className="w-full text-center py-2.5 text-xs font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] border border-[#856837] rounded-lg shadow-xs transition-colors cursor-pointer"
-                >
-                  Upgrade to Pro Plan
-                </Link>
+                {isPro ? (
+                  <Link
+                    href="/dashboard"
+                    aria-label="Open your FileMind Pro workspace"
+                    className="w-full text-center py-2.5 text-xs font-bold text-[#1C180A] bg-gradient-to-r from-[#D4AF37] via-[#F6E27A] to-[#AA771C] hover:opacity-95 rounded-lg shadow-sm transition-opacity cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Crown className="h-3.5 w-3.5 fill-[#1C180A]" />
+                    <span>Open Pro Workspace</span>
+                  </Link>
+                ) : (
+                  <Link
+                    href="/checkout"
+                    aria-label="Upgrade to FileMind Pro intelligence plan with Razorpay"
+                    className="w-full text-center py-2.5 text-xs font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] border border-[#856837] rounded-lg shadow-xs transition-colors cursor-pointer"
+                  >
+                    Upgrade to Pro Plan
+                  </Link>
+                )}
               </div>
 
               <div className="bg-[#FFFCF5] p-7 rounded-xl border border-[#E5DED1] shadow-xs flex flex-col justify-between">

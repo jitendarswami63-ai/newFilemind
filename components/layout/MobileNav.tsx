@@ -5,19 +5,22 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { LogOut, Menu, X } from 'lucide-react'
+import { LogOut, Menu, X, Crown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { navItems } from './nav-items'
+import { ProBadge } from '@/components/ui/ProBadge'
+import { useUserPlan } from '@/lib/subscription/plan'
 
 const emptySubscribe = () => () => {}
 
-export function MobileNav({ user }: { user: { email?: string; user_metadata?: { full_name?: string } } | null }) {
+export function MobileNav({ user }: { user: { email?: string; user_metadata?: Record<string, any> } | null }) {
   const [open, setOpen] = useState(false)
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false)
   const pathname = usePathname()
   const [prevPathname, setPrevPathname] = useState(pathname)
   const router = useRouter()
   const supabase = createClient()
+  const { isPro } = useUserPlan(user)
 
   if (prevPathname !== pathname) {
     setPrevPathname(pathname)
@@ -122,15 +125,23 @@ export function MobileNav({ user }: { user: { email?: string; user_metadata?: { 
           <div className="border-t border-[#2E3036] pt-3">
             <div className="flex items-center justify-between gap-2.5 p-2 rounded-xl bg-[#24262B] border border-[#2E3036]">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="h-8 w-8 rounded-full bg-[#34332F] border border-[#C5A878]/30 flex items-center justify-center text-xs font-bold text-[#C5A878] flex-shrink-0 shadow-sm">
+                <div className="relative h-8 w-8 rounded-full bg-[#34332F] border border-[#C5A878]/30 flex items-center justify-center text-xs font-bold text-[#C5A878] flex-shrink-0 shadow-sm">
                   {displayInitial}
+                  {isPro && (
+                    <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-gradient-to-r from-[#D4AF37] to-[#AA771C] flex items-center justify-center shadow-xs">
+                      <Crown className="h-2 w-2 text-[#1C180A] fill-[#1C180A]" />
+                    </span>
+                  )}
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-semibold text-[#F5F1E9] truncate leading-snug">
-                    {displayName}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-[#F5F1E9] truncate leading-snug">
+                      {displayName}
+                    </span>
+                    {isPro && <ProBadge variant="gold-pill" size="xs" label="PRO" />}
+                  </div>
                   <span className="text-[11px] text-[#A8A49B] truncate leading-snug">
-                    {user?.email}
+                    {isPro ? 'Pro Intelligence Active' : user?.email}
                   </span>
                 </div>
               </div>
@@ -163,9 +174,12 @@ export function MobileNav({ user }: { user: { email?: string; user_metadata?: { 
             className="h-full w-full object-contain"
           />
         </div>
-        <span className="font-bold text-base tracking-tight text-[#292720]">
-          FileMind
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="font-bold text-base tracking-tight text-[#292720]">
+            FileMind
+          </span>
+          {isPro && <ProBadge variant="gold-pill" size="xs" label="PRO" />}
+        </div>
       </Link>
 
       <button

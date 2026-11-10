@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { verifyRazorpaySignature } from '@/lib/payments/razorpay'
+import { createClient } from '@/lib/supabase/server'
+import { promoteUserToPro } from '@/lib/subscription/plan-server'
 
 export async function POST(req: Request) {
   try {
@@ -26,12 +28,41 @@ export async function POST(req: Request) {
       )
     }
 
-    return NextResponse.json({
+    try {
+      const supabase = await createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      const targetUserId = body.userId || user?.id
+      if (targetUserId) {
+        await promoteUserToPro(targetUserId, {
+          razorpay_order_id,
+          razorpay_payment_id,
+          plan_activated_at: new Date().toISOString(),
+        })
+      }
+    } catch (authErr) {
+      console.warn('[Payments Verify] Could not auto-promote user session:', authErr)
+    }
+
+    const response = NextResponse.json({
       success: true,
       message: 'Payment verified and confirmed successfully',
+      is_pro: true,
+      plan: 'pro',
       paymentId: razorpay_payment_id,
       orderId: razorpay_order_id,
     })
+
+    response.cookies.set('filemind_plan', 'pro', {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: 'lax',
+      httpOnly: false,
+    })
+
+    return response
   } catch (error: any) {
     console.error('[Razorpay Verify Error]:', error)
     return NextResponse.json(

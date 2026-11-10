@@ -2,9 +2,14 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
 import Script from 'next/script'
-import { Check, ShieldCheck, Zap } from 'lucide-react'
+import { Check, ShieldCheck, Zap, Crown, ArrowRight } from 'lucide-react'
 import { LandingNavbar } from '@/components/landing/LandingNavbar'
 import { RazorpayCheckoutButton } from '@/components/checkout/RazorpayCheckoutButton'
+import { createClient } from '@/lib/supabase/server'
+import { isServerUserPro } from '@/lib/subscription/plan-server'
+import { ProBadge } from '@/components/ui/ProBadge'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
   title: 'Upgrade to FileMind Pro – Razorpay Secure Checkout',
@@ -12,11 +17,18 @@ export const metadata: Metadata = {
     'Complete your FileMind subscription securely using Razorpay Standard Checkout. Supports UPI, Cards, NetBanking, and Wallets.',
 }
 
-export default function CheckoutPage() {
+export default async function CheckoutPage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const isPro = await isServerUserPro(user)
+
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-[#292720] flex flex-col selection:bg-[#9C7D47]/20 selection:text-[#292720]">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
-      <LandingNavbar />
+      <LandingNavbar user={user} />
 
       <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20 space-y-10">
         <section className="text-center space-y-3">
@@ -31,6 +43,32 @@ export default function CheckoutPage() {
             Get unlimited AI document analysis, FIDO2 biometric encryption, and fast vector indexing with Razorpay Standard Web Checkout.
           </p>
         </section>
+
+        {isPro && (
+          <div className="p-5 rounded-2xl bg-gradient-to-r from-[#2D281E] via-[#1B1D21] to-[#252015] border border-[#D4AF37]/60 text-[#F5F1E9] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#AA771C] flex items-center justify-center text-[#1C180A] shadow-xs">
+                <Crown className="h-5 w-5 fill-[#1C180A]" />
+              </div>
+              <div>
+                <div className="text-sm font-bold text-[#F3E5AB] flex items-center gap-2">
+                  <span>Pro Intelligence is Active</span>
+                  <ProBadge variant="gold-pill" size="xs" label="ACTIVE" />
+                </div>
+                <p className="text-xs text-[#C5A878]">
+                  Your account already has full Pro access. You can manage your subscription in Settings.
+                </p>
+              </div>
+            </div>
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-[#1C180A] bg-gradient-to-r from-[#D4AF37] via-[#F6E27A] to-[#AA771C] hover:opacity-95 shadow-xs transition-opacity flex-shrink-0"
+            >
+              <span>Go to Workspace</span>
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
           {/* Order Summary Card */}
@@ -81,6 +119,8 @@ export default function CheckoutPage() {
                 amount={50}
                 currency="INR"
                 planName="Pro Intelligence"
+                userName={user?.user_metadata?.full_name}
+                userEmail={user?.email}
                 buttonText="Pay ₹50 with Razorpay"
                 className="w-full text-center py-3 text-sm font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] border border-[#856837] rounded-xl shadow-xs transition-colors cursor-pointer"
               />
