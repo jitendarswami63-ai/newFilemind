@@ -39,15 +39,9 @@ export async function POST(req: Request) {
     })
   } catch (error: any) {
     console.error('[Razorpay Create Order Error]:', error)
-    const keyId = (process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || '').trim()
-    const keySecret = (process.env.RAZORPAY_KEY_SECRET || '').trim()
-
     if (error?.statusCode === 401 || error?.error?.code === 'BAD_REQUEST_ERROR') {
       return NextResponse.json(
-        {
-          error: error.error?.description || 'Razorpay authentication failed',
-          details: `Configured KeyId starts with '${keyId.substring(0, 10)}...' (length ${keyId.length}), Secret length ${keySecret.length}`,
-        },
+        { error: error.error?.description || 'Razorpay authentication failed' },
         { status: 401 }
       )
     }
