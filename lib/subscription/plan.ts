@@ -11,57 +11,46 @@ export interface UserPlanInfo {
 
 /**
  * Authoritatively checks whether a user has an active Pro plan.
- * Verified strictly from Supabase user_metadata or secure server cookie.
+ * Verified strictly from the user's personal user_metadata.
+ * No cookies or local storage fallbacks are used so Pro status never leaks across accounts.
  */
 export function isUserPro(
-  user?: { user_metadata?: Record<string, any> | null } | null,
-  cookieValue?: string | null
+  user?: { user_metadata?: Record<string, any> | null } | null
 ): boolean {
-  const meta = user?.user_metadata || {}
-  const proInMeta =
+  if (!user) return false
+  const meta = user.user_metadata || {}
+  return Boolean(
     meta.plan === 'pro' ||
     meta.is_pro === true ||
     meta.tier === 'pro' ||
     meta.plan_tier === 'pro' ||
     meta.subscription === 'pro'
+  )
+}
 
-  if (proInMeta) return true
-  if (cookieValue === 'pro') return true
-
-  // Read cookie on client if available
+/**
+ * Clears any legacy cookies that might have lingered from earlier sessions
+ */
+export function clearLegacyCookies() {
   if (typeof document !== 'undefined') {
-    const match = document.cookie.match(/(?:^|;\s*)filemind_plan=([^;]+)/)
-    if (match && match[1] === 'pro') return true
-  }
-
-  return false
-}
-
-/**
- * Sets Pro status cookie on client after verified payment
- */
-export function setClientProStatus(isPro: boolean = true) {
-  if (typeof window === 'undefined') return
-  try {
-    if (isPro) {
-      document.cookie = 'filemind_plan=pro; path=/; max-age=31536000; SameSite=Lax'
-    } else {
+    try {
       document.cookie = 'filemind_plan=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-    }
-    window.dispatchEvent(new Event('filemind_plan_changed'))
-  } catch {
-    // ignore
+      localStorage.removeItem('filemind_user_plan')
+      localStorage.removeItem('filemind_is_pro')
+    } catch {}
   }
 }
 
 /**
- * React hook that auto-fetches and maintains the authoritative user plan directly from the system.
+ * React hook that auto-fetches and maintains the authoritative user plan strictly for the currently authenticated user.
  */
-export function useUserPlan(initialUser?: { user_metadata?: Record<string, any> | null } | null) {
+export function useUserPlan(initialUser?: { id?: string; email?: string; user_metadata?: Record<string, any> | null } | null) {
   const [isPro, setIsPro] = useState<boolean>(() => isUserPro(initialUser))
 
   useEffect(() => {
-    // Auto-fetch current subscription state from server API
+    // Clear any legacy cookie that might have leaked across accounts
+    clearLegacyCookies()
+
     let active = true
 
     const syncPlan = async () => {
@@ -92,7 +81,7 @@ export function useUserPlan(initialUser?: { user_metadata?: Record<string, any> 
       active = false
       window.removeEventListener('filemind_plan_changed', handlePlanUpdate)
     }
-  }, [initialUser])
+  }, [initialUser?.id, initialUser?.email])
 
   return {
     isPro,

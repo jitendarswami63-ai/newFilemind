@@ -9,7 +9,7 @@ import { LogOut, Menu, X, Crown } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { navItems } from './nav-items'
 import { ProBadge } from '@/components/ui/ProBadge'
-import { useUserPlan } from '@/lib/subscription/plan'
+import { useUserPlan, clearLegacyCookies } from '@/lib/subscription/plan'
 
 const emptySubscribe = () => () => {}
 
@@ -39,6 +39,7 @@ export function MobileNav({ user }: { user: { email?: string; user_metadata?: Re
   }, [open])
 
   const handleLogout = async () => {
+    clearLegacyCookies()
     await supabase.auth.signOut()
     router.push('/')
     router.refresh()

@@ -1,30 +1,24 @@
 import 'server-only'
-import { cookies } from 'next/headers'
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
 
-export async function isServerUserPro(user?: { user_metadata?: Record<string, any> | null } | null): Promise<boolean> {
-  const meta = user?.user_metadata || {}
-  if (
+/**
+ * Checks strictly if the specific authenticated user has an active Pro plan.
+ * Uses ONLY the user's authoritative metadata from Supabase database.
+ * No cookies are used to avoid leaking Pro status across multiple accounts in the same browser.
+ */
+export async function isServerUserPro(
+  user?: { user_metadata?: Record<string, any> | null } | null
+): Promise<boolean> {
+  if (!user) return false
+
+  const meta = user.user_metadata || {}
+  return Boolean(
     meta.plan === 'pro' ||
     meta.is_pro === true ||
     meta.tier === 'pro' ||
     meta.plan_tier === 'pro' ||
     meta.subscription === 'pro'
-  ) {
-    return true
-  }
-
-  try {
-    const cookieStore = await cookies()
-    const planCookie = cookieStore.get('filemind_plan')?.value
-    if (planCookie === 'pro') {
-      return true
-    }
-  } catch {
-    // ignore
-  }
-
-  return false
+  )
 }
 
 /**

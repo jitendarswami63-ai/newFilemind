@@ -3,7 +3,6 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { Sparkles, Loader2, CheckCircle2, Crown, ArrowRight } from 'lucide-react'
-import { setClientProStatus } from '@/lib/subscription/plan'
 
 declare global {
   interface Window {
@@ -98,7 +97,7 @@ export function RazorpayCheckoutButton({
 
             const verifyData = await verifyRes.json()
             if (verifyRes.ok && verifyData.success) {
-              setClientProStatus(true)
+              window.dispatchEvent(new Event('filemind_plan_changed'))
               setPaymentSuccess(response.razorpay_payment_id)
               onSuccess?.(response.razorpay_payment_id)
             } else {

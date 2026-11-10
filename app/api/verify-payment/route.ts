@@ -71,13 +71,9 @@ export async function POST(req: Request) {
       payment_id,
     })
 
-    // Set cookie so immediate page transitions recognize Pro
-    response.cookies.set('filemind_plan', 'pro', {
-      path: '/',
-      maxAge: 60 * 60 * 24 * 365,
-      sameSite: 'lax',
-      httpOnly: false,
-    })
+    // Wipe any generic browser cookie so other accounts never inherit Pro
+    response.cookies.delete('filemind_plan')
+    response.cookies.set('filemind_plan', '', { path: '/', expires: new Date(0) })
 
     return response
   } catch (error: any) {

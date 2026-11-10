@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client'
 import { navItems } from './nav-items'
 import { useSidebar } from './SidebarContext'
 import { ProBadge } from '@/components/ui/ProBadge'
-import { useUserPlan } from '@/lib/subscription/plan'
+import { useUserPlan, clearLegacyCookies } from '@/lib/subscription/plan'
 
 export function Sidebar({ user }: { user: { email?: string; user_metadata?: Record<string, any> } | null }) {
   const pathname = usePathname()
@@ -19,6 +19,7 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
   const { isPro } = useUserPlan(user)
 
   const handleLogout = async () => {
+    clearLegacyCookies()
     await supabase.auth.signOut()
     router.push('/')
     router.refresh()
