@@ -10,14 +10,13 @@ export interface UserPlanInfo {
 }
 
 /**
- * Checks whether a user has an active Pro plan.
- * Checks user_metadata, cookie, and client-side localStorage fallback.
+ * Authoritatively checks whether a user has an active Pro plan.
+ * Verified strictly from Supabase user_metadata or secure server cookie.
  */
 export function isUserPro(
   user?: { user_metadata?: Record<string, any> | null } | null,
   cookieValue?: string | null
 ): boolean {
-  // Check user metadata if available
   const meta = user?.user_metadata || {}
   const proInMeta =
     meta.plan === 'pro' ||
@@ -29,33 +28,24 @@ export function isUserPro(
   if (proInMeta) return true
   if (cookieValue === 'pro') return true
 
-  // Check client-side storage
-  if (typeof window !== 'undefined') {
-    try {
-      const localPlan = localStorage.getItem('filemind_user_plan')
-      const localIsPro = localStorage.getItem('filemind_is_pro')
-      if (localPlan === 'pro' || localIsPro === 'true') return true
-    } catch {
-      // ignore storage access errors
-    }
+  // Read cookie on client if available
+  if (typeof document !== 'undefined') {
+    const match = document.cookie.match(/(?:^|;\s*)filemind_plan=([^;]+)/)
+    if (match && match[1] === 'pro') return true
   }
 
   return false
 }
 
 /**
- * Sets Pro status in localStorage and document.cookie on client
+ * Sets Pro status cookie on client after verified payment
  */
 export function setClientProStatus(isPro: boolean = true) {
   if (typeof window === 'undefined') return
   try {
     if (isPro) {
-      localStorage.setItem('filemind_user_plan', 'pro')
-      localStorage.setItem('filemind_is_pro', 'true')
       document.cookie = 'filemind_plan=pro; path=/; max-age=31536000; SameSite=Lax'
     } else {
-      localStorage.removeItem('filemind_user_plan')
-      localStorage.removeItem('filemind_is_pro')
       document.cookie = 'filemind_plan=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
     }
     window.dispatchEvent(new Event('filemind_plan_changed'))
@@ -65,24 +55,42 @@ export function setClientProStatus(isPro: boolean = true) {
 }
 
 /**
- * React hook that returns live user plan information and stays in sync across tabs and updates.
+ * React hook that auto-fetches and maintains the authoritative user plan directly from the system.
  */
 export function useUserPlan(initialUser?: { user_metadata?: Record<string, any> | null } | null) {
   const [isPro, setIsPro] = useState<boolean>(() => isUserPro(initialUser))
 
   useEffect(() => {
-    setIsPro(isUserPro(initialUser))
+    // Auto-fetch current subscription state from server API
+    let active = true
+
+    const syncPlan = async () => {
+      try {
+        const res = await fetch('/api/subscription', { cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          if (active && typeof data?.is_pro === 'boolean') {
+            setIsPro(data.is_pro)
+          }
+        }
+      } catch {
+        if (active) {
+          setIsPro(isUserPro(initialUser))
+        }
+      }
+    }
+
+    syncPlan()
 
     const handlePlanUpdate = () => {
-      setIsPro(isUserPro(initialUser))
+      syncPlan()
     }
 
     window.addEventListener('filemind_plan_changed', handlePlanUpdate)
-    window.addEventListener('storage', handlePlanUpdate)
 
     return () => {
+      active = false
       window.removeEventListener('filemind_plan_changed', handlePlanUpdate)
-      window.removeEventListener('storage', handlePlanUpdate)
     }
   }, [initialUser])
 

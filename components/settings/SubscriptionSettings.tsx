@@ -1,11 +1,11 @@
 'use client'
 
-import React, { useState } from 'react'
+import React from 'react'
 import Link from 'next/link'
-import { Crown, Sparkles, Check, ArrowRight, ShieldCheck, RefreshCw, Zap } from 'lucide-react'
+import { Crown, Sparkles, Check, ArrowRight, ShieldCheck, Zap } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 import { ProBadge } from '@/components/ui/ProBadge'
-import { useUserPlan, setClientProStatus } from '@/lib/subscription/plan'
+import { useUserPlan } from '@/lib/subscription/plan'
 
 interface SubscriptionSettingsProps {
   initialUser?: {
@@ -15,36 +15,7 @@ interface SubscriptionSettingsProps {
 }
 
 export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps) {
-  const { isPro, planName } = useUserPlan(initialUser)
-  const [syncing, setSyncing] = useState(false)
-  const [syncMsg, setSyncMsg] = useState<string | null>(null)
-
-  const handleSyncOrActivate = async (targetPlan: 'pro' | 'free') => {
-    setSyncing(true)
-    setSyncMsg(null)
-    try {
-      const res = await fetch('/api/subscription', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: targetPlan === 'pro' ? 'activate_pro' : 'reset_free' }),
-      })
-      const data = await res.json()
-      if (res.ok && data.success) {
-        setClientProStatus(targetPlan === 'pro')
-        setSyncMsg(targetPlan === 'pro' ? 'Pro status activated & synced successfully!' : 'Reset to Free tier.')
-      } else {
-        // Fallback to client state
-        setClientProStatus(targetPlan === 'pro')
-        setSyncMsg('Updated subscription status.')
-      }
-    } catch {
-      setClientProStatus(targetPlan === 'pro')
-      setSyncMsg('Updated local subscription status.')
-    } finally {
-      setSyncing(false)
-      setTimeout(() => setSyncMsg(null), 4000)
-    }
-  }
+  const { isPro } = useUserPlan(initialUser)
 
   return (
     <Card className="border-[#E5DED1] rounded-2xl relative overflow-hidden bg-[#FFFCF5] shadow-2xs">
@@ -66,33 +37,27 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
                 )}
               </CardTitle>
               <CardDescription className="text-xs text-[#777064]">
-                Manage your billing tier, compute allowances, and multi-engine AI access.
+                Authoritative subscription status auto-fetched from system records.
               </CardDescription>
             </div>
           </div>
 
           <div className="flex items-center gap-2 self-start sm:self-auto">
-            <button
-              onClick={() => handleSyncOrActivate(isPro ? 'free' : 'pro')}
-              disabled={syncing}
-              className="text-[11px] font-semibold text-[#777064] hover:text-[#292720] bg-[#FAF5EC] hover:bg-[#F3EFE5] border border-[#E5DED1] px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-              title="Toggle or synchronize Pro plan status"
-            >
-              <RefreshCw className={`h-3 w-3 ${syncing ? 'animate-spin' : ''}`} />
-              <span>{isPro ? 'Switch to Free (Test)' : 'Activate Pro (Test/Sync)'}</span>
-            </button>
+            {isPro ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#EBF7EE] border border-[#C3E6CB] text-xs font-semibold text-[#1E7E34]">
+                <ShieldCheck className="h-3.5 w-3.5" />
+                <span>Verified by Payment Gateway</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FAF5EC] border border-[#E5DED1] text-xs font-semibold text-[#777064]">
+                <span>Standard Account</span>
+              </span>
+            )}
           </div>
         </div>
       </CardHeader>
 
       <CardContent className="space-y-4">
-        {syncMsg && (
-          <div className="p-2.5 rounded-lg bg-[#F0FDF4] border border-[#DCFCE7] text-xs font-semibold text-[#15803D] flex items-center gap-2">
-            <Sparkles className="h-3.5 w-3.5" />
-            <span>{syncMsg}</span>
-          </div>
-        )}
-
         {isPro ? (
           <div className="space-y-4">
             <ProBadge variant="banner" />
