@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthenticatedUser } from '@/lib/supabase/server'
 import { User, Shield, CheckCircle2 } from 'lucide-react'
 import { ProfileForm } from '@/components/profile/ProfileForm'
 import { SubscriptionSettings } from '@/components/settings/SubscriptionSettings'
@@ -42,10 +42,7 @@ function buildInitialProfile(user: any): UserProfileData {
 }
 
 export default async function ProfilePage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUser()
 
   const profile = buildInitialProfile(user)
   const completion = calculateProfileCompletion(profile)

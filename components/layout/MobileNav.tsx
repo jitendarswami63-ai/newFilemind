@@ -152,6 +152,7 @@ export function MobileNav({ user }: { user: { email?: string; user_metadata?: Re
                   <Link
                     key={item.name}
                     href={item.href}
+                    prefetch={false}
                     onClick={() => setOpen(false)}
                     className={`flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-xs font-medium transition-all ${
                       isActive

@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { getRazorpayClient } from '@/lib/payments/razorpay'
 import { PLAN_CONFIGS, STORAGE_PACKS } from '@/lib/subscription/plans'
 
+export const dynamic = 'force-dynamic'
+
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}))

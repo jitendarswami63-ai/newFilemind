@@ -38,7 +38,7 @@ export function VaultMfaUnlockChallenge({
       try {
         const supabase = createClient()
         const { data } = await supabase.auth.mfa.listFactors()
-        const verified = data?.totp?.find((f) => f.status === 'verified')
+        const verified = data?.totp?.find((f: any) => f.status === 'verified')
 
         if (!isCancelled && verified) {
           setResolvedFactorId(verified.id)

@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthenticatedUser } from '@/lib/supabase/server'
 import { DashboardShell } from '@/components/layout/DashboardShell'
 
 export const dynamic = 'force-dynamic'
@@ -28,13 +28,9 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUser()
 
-  if (error || !user) {
+  if (!user) {
     const headerList = await headers()
     const targetUrl = headerList.get('x-url') || '/dashboard'
     const safeTarget = targetUrl.startsWith('/') && !targetUrl.startsWith('//') && !targetUrl.startsWith('/\\')

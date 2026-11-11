@@ -67,7 +67,7 @@ export function LoginForm() {
     const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
     if (aalData && aalData.nextLevel === 'aal2' && aalData.currentLevel !== 'aal2') {
       const { data: factorsData } = await supabase.auth.mfa.listFactors()
-      const verifiedTotp = factorsData?.totp?.find((f) => f.status === 'verified')
+      const verifiedTotp = factorsData?.totp?.find((f: any) => f.status === 'verified')
       if (verifiedTotp) {
         setMfaFactorId(verifiedTotp.id)
         setStep('mfa')

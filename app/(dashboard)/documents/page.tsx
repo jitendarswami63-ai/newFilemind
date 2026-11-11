@@ -1,6 +1,6 @@
 import React from 'react'
 import type { Metadata } from 'next'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthenticatedUser } from '@/lib/supabase/server'
 import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
 import { DocumentList } from '@/components/documents/DocumentList'
 import { UploadZone } from '@/components/documents/UploadZone'
@@ -15,8 +15,11 @@ export const metadata: Metadata = {
 }
 
 export default async function DocumentsPage() {
-  const supabase = await createClient()
-  const auth = await verifyVaultAccess(supabase)
+  const [supabase, user] = await Promise.all([
+    createClient(),
+    getAuthenticatedUser(),
+  ])
+  const auth = await verifyVaultAccess(supabase, user)
 
   if (auth.code === 'MFA_REQUIRED') {
     return (

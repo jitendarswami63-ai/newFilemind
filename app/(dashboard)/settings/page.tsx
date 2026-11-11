@@ -1,6 +1,6 @@
 import React from 'react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
-import { createClient } from '@/lib/supabase/server'
+import { getAuthenticatedUser } from '@/lib/supabase/server'
 import { User, Shield, Sparkles, Database, Lock } from 'lucide-react'
 import { VaultMfaSettings } from '@/components/settings/VaultMfaSettings'
 import { BiometricVaultSettings } from '@/components/settings/BiometricVaultSettings'
@@ -10,10 +10,7 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function SettingsPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const user = await getAuthenticatedUser()
 
   const displayName = user?.user_metadata?.full_name || 'Not provided'
   const email = user?.email || 'N/A'

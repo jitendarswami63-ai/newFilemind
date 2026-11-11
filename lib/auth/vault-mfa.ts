@@ -13,22 +13,27 @@ export interface VaultAuthResult {
 }
 
 export async function verifyVaultAccess(
-  supabase: SupabaseClient
+  supabase: SupabaseClient,
+  existingUser?: User | null
 ): Promise<VaultAuthResult> {
   try {
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    let user = existingUser
+    if (!user) {
+      const {
+        data: { user: fetchedUser },
+        error: userError,
+      } = await supabase.auth.getUser()
 
-    if (userError || !user) {
-      return {
-        authorized: false,
-        status: 401,
-        code: 'UNAUTHORIZED',
-        error: 'Authentication required to access Private Vault.',
-        mfaEnrolled: false,
+      if (userError || !fetchedUser) {
+        return {
+          authorized: false,
+          status: 401,
+          code: 'UNAUTHORIZED',
+          error: 'Authentication required to access Private Vault.',
+          mfaEnrolled: false,
+        }
       }
+      user = fetchedUser
     }
 
     let isVaultLockedCookie = false
@@ -40,15 +45,18 @@ export async function verifyVaultAccess(
       isVaultLockedCookie = false
     }
 
-    const { data: aalData } =
-      await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+    // Run MFA assurance level and factors lookup concurrently in parallel
+    const [aalResult, factorsResult] = await Promise.all([
+      supabase.auth.mfa.getAuthenticatorAssuranceLevel(),
+      supabase.auth.mfa.listFactors(),
+    ])
+
+    const aalData = aalResult.data
+    const factorsData = factorsResult.data
 
     const rawCurrentLevel = (aalData?.currentLevel as 'aal1' | 'aal2') || 'aal1'
     const currentLevel = isVaultLockedCookie ? 'aal1' : rawCurrentLevel
     const nextLevel = (aalData?.nextLevel as 'aal1' | 'aal2') || 'aal1'
-
-    const { data: factorsData } =
-      await supabase.auth.mfa.listFactors()
 
     const verifiedTotp = factorsData?.totp?.find(
       (factor) => factor.status === 'verified'

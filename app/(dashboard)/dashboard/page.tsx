@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, getAuthenticatedUser } from '@/lib/supabase/server'
 import { FileText, Database, ArrowRight, ShieldCheck, Crown, Sparkles } from 'lucide-react'
 import { UploadZone } from '@/components/documents/UploadZone'
 import { StatusBadge, DocumentStatus } from '@/components/documents/StatusBadge'
@@ -18,10 +18,10 @@ export const metadata: Metadata = {
 }
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const [supabase, user] = await Promise.all([
+    createClient(),
+    getAuthenticatedUser(),
+  ])
 
   const { data: documents } = await supabase
     .from('documents')

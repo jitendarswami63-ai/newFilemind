@@ -39,7 +39,7 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
       }`}
     >
       <div className="flex h-16 items-center justify-between px-4 border-b border-[#2E3036]">
-        <Link href="/" className="flex items-center gap-3 min-w-0" title="Return to FileMind Home">
+        <Link href="/" prefetch={false} className="flex items-center gap-3 min-w-0" title="Return to FileMind Home">
           <div className="h-9 w-9 rounded-xl border border-[#3E4149] flex items-center justify-center flex-shrink-0 bg-[#24262B] shadow-sm p-1.5">
             <Image
               src="/filemind-ai-pdf-manager-logo.png"
@@ -165,6 +165,7 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
               <div key={item.name} className="relative group">
                 <Link
                   href={item.href}
+                  prefetch={false}
                   className={`flex items-center gap-2.5 py-2.5 text-xs font-medium transition-all ${
                     isCollapsed ? 'justify-center px-2 rounded-xl' : 'px-3 rounded-xl'
                   } ${

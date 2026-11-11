@@ -44,8 +44,8 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
     let isMounted = true
     try {
       const supabase = createClient()
-      supabase.auth.getUser().then(({ data }) => {
-        if (isMounted && data?.user) setUser(data.user)
+      supabase.auth.getUser().then((res: any) => {
+        if (isMounted && res?.data?.user) setUser(res.data.user)
       }).catch(() => {})
     } catch {}
     return () => {
