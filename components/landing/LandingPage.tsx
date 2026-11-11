@@ -34,6 +34,16 @@ interface LandingPageProps {
   user?: { email?: string; user_metadata?: Record<string, any> } | null
 }
 
+function InstagramIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
+    </svg>
+  )
+}
+
 export function LandingPage({ user: initialUser }: LandingPageProps) {
   const [user, setUser] = useState(initialUser)
   const [openFaq, setOpenFaq] = useState<number | null>(null)
@@ -1007,8 +1017,18 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
               </a>
             </div>
 
-            <div className="flex items-center gap-4 text-xs text-[#777064]">
-              <span className="font-semibold text-[#292720]">Resources:</span>
+            <div className="flex flex-wrap items-center gap-4 text-xs text-[#777064]">
+              <span className="font-semibold text-[#292720]">Resources & Studio:</span>
+              <a
+                href="https://www.instagram.com/elevate_web_studio_?utm_source=ig_web_button_share_sheet&exln=ZDNlZDc0MzIxNw=="
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Elevate Web Studio on Instagram"
+                className="hover:text-[#292720] inline-flex items-center gap-1.5 transition-colors font-medium text-[#9C7D47]"
+              >
+                <InstagramIcon className="h-3.5 w-3.5 text-[#E1306C]" />
+                <span>Elevate Web Studio</span>
+              </a>
               <a
                 href="https://github.com/jitendarswami63-ai/newFilemind"
                 target="_blank"
@@ -1032,13 +1052,29 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
             </div>
           </div>
 
-          <div className="border-t border-[#E5DED1]/70 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#777064]">
-            <p className="max-w-2xl text-center sm:text-left text-[11px] leading-relaxed">
+          <div className="border-t border-[#E5DED1]/70 pt-6 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-[#777064]">
+            <p className="max-w-xl text-center md:text-left text-[11px] leading-relaxed">
               Hardware-bound WebAuthn encryption and zero-training document privacy. Your private files are stored securely with strict row-level isolation and are never used to train external AI models. For support or enterprise inquiries, reach out to <a href="mailto:contact@filemindhub.xyz" className="text-[#9C7D47] underline underline-offset-2 hover:text-[#7A5F32]">contact@filemindhub.xyz</a>.
             </p>
-            <p className="text-[11px] whitespace-nowrap text-center sm:text-right">
-              © {new Date().getFullYear()} FileMind Technologies Inc. All rights reserved.
-            </p>
+            <div className="flex flex-col sm:flex-row items-center gap-3">
+              <a
+                href="https://www.instagram.com/elevate_web_studio_?utm_source=ig_web_button_share_sheet&exln=ZDNlZDc0MzIxNw=="
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Designed by Jitendar - Elevate Web Studio on Instagram"
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#D8D0C2] bg-[#FFFCF5] hover:bg-[#FAF5EC] text-xs font-medium text-[#292720] hover:border-[#9C7D47]/40 shadow-2xs transition-all active:scale-95 group"
+              >
+                <span className="flex h-2 w-2 rounded-full bg-[#10B981] animate-pulse"></span>
+                <span className="text-[#777064]">Designed by</span>
+                <span className="font-bold text-[#292720] group-hover:text-[#9C7D47] transition-colors">Jitendar</span>
+                <span className="text-[#DDD5C7]">•</span>
+                <InstagramIcon className="h-3.5 w-3.5 text-[#E1306C] group-hover:scale-110 transition-transform" />
+                <span className="text-[#9C7D47] font-semibold text-[11px]">@elevate_web_studio_</span>
+              </a>
+              <p className="text-[11px] whitespace-nowrap text-center md:text-right">
+                © {new Date().getFullYear()} FileMind Technologies Inc. All rights reserved.
+              </p>
+            </div>
           </div>
         </div>
       </footer>
