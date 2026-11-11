@@ -1,10 +1,10 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { LogOut, ChevronLeft, ChevronRight, Crown, Lock } from 'lucide-react'
+import { LogOut, ChevronLeft, ChevronRight, Crown, Lock, ShieldAlert } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { navItems } from './nav-items'
 import { useSidebar } from './SidebarContext'
@@ -19,8 +19,23 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
   const { isCollapsed, toggleCollapse } = useSidebar()
   const { isPro, isElite, tier } = useUserPlan(user)
   const { openUpgradeModal } = useUpgradeModal()
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const hasByok = Boolean(user?.user_metadata?.byok_gemini_key)
+
+  useEffect(() => {
+    if (!user?.email) return
+    let isMounted = true
+    fetch('/api/admin/check')
+      .then((r) => r.json())
+      .then((d) => {
+        if (isMounted && d?.isAdmin) setIsAdmin(true)
+      })
+      .catch(() => {})
+    return () => {
+      isMounted = false
+    }
+  }, [user?.email])
 
   const handleLogout = async () => {
     clearLegacyCookies()
@@ -185,6 +200,22 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
               </div>
             )
           })}
+
+          {isAdmin && (
+            <div className="pt-2 mt-2 border-t border-[#2E3036]/60">
+              <Link
+                href="/admin"
+                prefetch={false}
+                className={`flex items-center gap-2.5 py-2 text-xs font-semibold transition-all ${
+                  isCollapsed ? 'justify-center px-2 rounded-xl' : 'px-3 rounded-xl'
+                } bg-[#9C7D47]/15 text-[#D4AF37] hover:bg-[#9C7D47]/25 border border-[#D4AF37]/30 shadow-xs`}
+                title={isCollapsed ? 'Admin Control Center' : undefined}
+              >
+                <ShieldAlert className="h-4 w-4 text-[#D4AF37] flex-shrink-0" />
+                {!isCollapsed && <span>Admin Portal</span>}
+              </Link>
+            </div>
+          )}
         </nav>
       </div>
 

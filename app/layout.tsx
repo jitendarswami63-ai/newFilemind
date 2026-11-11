@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from 'next'
-import Script from 'next/script'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 
@@ -65,14 +64,7 @@ export const metadata: Metadata = {
     title: 'FileMind – AI PDF Manager, Document Search & Understanding',
     description:
       'FileMind is an AI-powered PDF manager that helps you organize documents, understand content, and find information with AI-powered semantic search.',
-    images: [
-      {
-        url: `${siteUrl}/filemind-ai-pdf-manager-logo.png`,
-        width: 512,
-        height: 512,
-        alt: 'FileMind – AI PDF Manager, Document Search & Understanding',
-      },
-    ],
+    images: [`${siteUrl}/filemind-ai-pdf-manager-logo.png`],
   },
   twitter: {
     card: 'summary_large_image',
@@ -114,13 +106,16 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
-        <Script
+        <script
+          async
           src={`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`}
-          strategy="afterInteractive"
         />
-        <Script id="google-analytics" strategy="afterInteractive">
-          {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${gaMeasurementId}',{page_path:window.location.pathname});`}
-        </Script>
+        <script
+          id="google-analytics"
+          dangerouslySetInnerHTML={{
+            __html: `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${gaMeasurementId}',{page_path:window.location.pathname});`,
+          }}
+        />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

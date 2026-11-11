@@ -26,8 +26,23 @@ interface LandingNavbarProps {
 export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [user, setUser] = useState(initialUser)
+  const [isAdmin, setIsAdmin] = useState(false)
   const { isPro } = useUserPlan(user)
   const drawerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!user?.email) return
+    let isMounted = true
+    fetch('/api/admin/check')
+      .then((r) => r.json())
+      .then((d) => {
+        if (isMounted && d?.isAdmin) setIsAdmin(true)
+      })
+      .catch(() => {})
+    return () => {
+      isMounted = false
+    }
+  }, [user?.email])
 
   useEffect(() => {
     if (initialUser) return
@@ -162,6 +177,17 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
                 >
                   Dashboard
                 </Link>
+
+                {isAdmin && (
+                  <Link
+                    href="/admin"
+                    className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold text-[#D4AF37] bg-[#24262B] hover:bg-[#31333B] border border-[#D4AF37]/40 shadow-2xs transition-colors"
+                    title="Admin Control Center"
+                  >
+                    <ShieldCheck className="h-3.5 w-3.5 text-[#D4AF37]" />
+                    <span>Admin</span>
+                  </Link>
+                )}
 
                 <Link
                   href="/dashboard"
@@ -307,6 +333,24 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
                       <span className="text-xs font-bold text-[#292720]">Workspace Dashboard</span>
                     </div>
                   </Link>
+
+                  {isAdmin && (
+                    <Link
+                      href="/admin"
+                      onClick={() => setMenuOpen(false)}
+                      className="flex items-center justify-between p-2.5 rounded-2xl bg-[#9C7D47]/15 hover:bg-[#9C7D47]/25 border border-[#D4AF37]/40 transition-colors"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-7 w-7 rounded-lg bg-[#24262B] text-[#D4AF37] border border-[#3E4149] flex items-center justify-center">
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                        </div>
+                        <span className="text-xs font-bold text-[#292720]">Admin Control Center</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-[#D4AF37] bg-[#24262B] px-2 py-0.5 rounded-full border border-[#3E4149]">
+                        PORTAL
+                      </span>
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>

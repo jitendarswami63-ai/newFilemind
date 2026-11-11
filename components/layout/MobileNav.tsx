@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { LogOut, Menu, X, Crown, Lock } from 'lucide-react'
+import { LogOut, Menu, X, Crown, Lock, ShieldAlert } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { navItems } from './nav-items'
 import { ProBadge } from '@/components/ui/ProBadge'
@@ -23,8 +23,23 @@ export function MobileNav({ user }: { user: { email?: string; user_metadata?: Re
   const supabase = createClient()
   const { isPro, isElite, tier } = useUserPlan(user)
   const { openUpgradeModal } = useUpgradeModal()
+  const [isAdmin, setIsAdmin] = useState(false)
 
   const hasByok = Boolean(user?.user_metadata?.byok_gemini_key)
+
+  useEffect(() => {
+    if (!user?.email) return
+    let isMounted = true
+    fetch('/api/admin/check')
+      .then((r) => r.json())
+      .then((d) => {
+        if (isMounted && d?.isAdmin) setIsAdmin(true)
+      })
+      .catch(() => {})
+    return () => {
+      isMounted = false
+    }
+  }, [user?.email])
 
   if (prevPathname !== pathname) {
     setPrevPathname(pathname)
@@ -165,6 +180,19 @@ export function MobileNav({ user }: { user: { email?: string; user_metadata?: Re
                   </Link>
                 )
               })}
+
+              {isAdmin && (
+                <div className="pt-2 mt-2 border-t border-[#2E3036]/60">
+                  <Link
+                    href="/admin"
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-semibold bg-[#9C7D47]/15 text-[#D4AF37] border border-[#D4AF37]/30 shadow-xs"
+                  >
+                    <ShieldAlert className="h-4 w-4 text-[#D4AF37] flex-shrink-0" />
+                    <span>Admin Control Center</span>
+                  </Link>
+                </div>
+              )}
             </nav>
           </div>
 
