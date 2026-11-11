@@ -1,5 +1,5 @@
 import React from 'react'
-import { FileText, Search, Settings, LayoutDashboard, Sparkles } from 'lucide-react'
+import { FileText, Search, Settings, LayoutDashboard, Sparkles, UserCircle } from 'lucide-react'
 
 export interface NavItem {
   name: string
@@ -13,5 +13,6 @@ export const navItems: NavItem[] = [
   { name: 'My Documents', href: '/documents', icon: FileText },
   { name: 'Search', href: '/search', icon: Search },
   { name: 'Ask AI', href: '/ask', icon: Sparkles },
+  { name: 'Profile', href: '/profile', icon: UserCircle },
   { name: 'Settings', href: '/settings', icon: Settings },
 ]

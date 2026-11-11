@@ -129,8 +129,8 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
 
       <div className="p-3 border-t border-[#2E3036] bg-[#24262B]">
         <div className={`flex items-center justify-between gap-2.5 rounded-xl ${isCollapsed ? 'p-1' : 'px-2 py-1.5'}`}>
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="relative h-8 w-8 rounded-full bg-[#34332F] border border-[#C5A878]/30 flex items-center justify-center text-xs font-bold text-[#C5A878] flex-shrink-0 shadow-sm">
+          <Link href="/profile" className="flex items-center gap-2.5 min-w-0 group cursor-pointer" title="Manage Personal Profile">
+            <div className="relative h-8 w-8 rounded-full bg-[#34332F] border border-[#C5A878]/30 group-hover:border-[#C5A878] flex items-center justify-center text-xs font-bold text-[#C5A878] flex-shrink-0 shadow-sm transition-colors">
               {displayInitial}
               {isPro && isCollapsed && (
                 <span className="absolute -top-1 -right-1 h-3.5 w-3.5 rounded-full bg-gradient-to-r from-[#D4AF37] to-[#AA771C] flex items-center justify-center shadow-xs">
@@ -141,7 +141,7 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
             {!isCollapsed && (
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-semibold text-[#F5F1E9] truncate leading-snug">
+                  <span className="text-xs font-semibold text-[#F5F1E9] group-hover:text-[#C5A878] truncate leading-snug transition-colors">
                     {displayName}
                   </span>
                   {isPro && <ProBadge variant="gold-pill" size="xs" label="PRO" />}
@@ -151,7 +151,7 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
                 </span>
               </div>
             )}
-          </div>
+          </Link>
 
           {!isCollapsed && (
             <button
