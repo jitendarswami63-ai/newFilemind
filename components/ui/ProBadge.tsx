@@ -4,7 +4,7 @@ import React from 'react'
 import { Crown, Sparkles, CheckCircle2, ShieldCheck, Zap } from 'lucide-react'
 
 interface ProBadgeProps {
-  variant?: 'gold-pill' | 'dark-chip' | 'minimal' | 'banner'
+  variant?: 'gold-pill' | 'dark-chip' | 'minimal' | 'banner' | 'elite-pill'
   size?: 'xs' | 'sm' | 'md' | 'lg'
   showIcon?: boolean
   label?: string
@@ -18,12 +18,39 @@ export function ProBadge({
   showIcon = true,
   label = 'PRO',
   className = '',
-  tooltip = 'Pro Intelligence Member — Unlimited AI Document Intelligence',
+  tooltip,
 }: ProBadgeProps) {
+  const sizeClasses = {
+    xs: 'px-2 py-0.5 text-[9px] gap-1',
+    sm: 'px-2.5 py-0.5 text-[10px] gap-1.5',
+    md: 'px-3 py-1 text-xs gap-1.5',
+    lg: 'px-4 py-1.5 text-sm gap-2',
+  }[size]
+
+  if (variant === 'elite-pill') {
+    return (
+      <span
+        title={tooltip || 'Elite Intelligence Member — Maximum 10 GB Storage & Priority AI Engine'}
+        className={`inline-flex items-center rounded-full font-black tracking-widest uppercase bg-[#18191D] border border-[#D4AF37] shadow-[0_0_12px_rgba(212,175,55,0.45)] select-none transition-transform hover:scale-105 cursor-default ${sizeClasses} ${className}`}
+      >
+        {showIcon && (
+          <Crown
+            className={`fill-[#F6E27A] text-[#D4AF37] ${
+              size === 'xs' ? 'h-2.5 w-2.5' : size === 'sm' ? 'h-3 w-3' : 'h-3.5 w-3.5'
+            }`}
+          />
+        )}
+        <span className="bg-gradient-to-r from-[#F6E27A] via-[#D4AF37] to-[#F3E5AB] bg-clip-text text-transparent font-black">
+          {label || 'ELITE'}
+        </span>
+      </span>
+    )
+  }
+
   if (variant === 'dark-chip') {
     return (
       <span
-        title={tooltip}
+        title={tooltip || 'Pro Intelligence Member — Unlimited AI Document Intelligence'}
         className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#2A261D] border border-[#C5A878]/60 text-[#F5E6C8] font-bold tracking-wide shadow-xs transition-transform hover:scale-[1.02] cursor-default ${
           size === 'xs' ? 'text-[9px]' : size === 'sm' ? 'text-[10px]' : 'text-xs'
         } ${className}`}
@@ -37,7 +64,7 @@ export function ProBadge({
   if (variant === 'minimal') {
     return (
       <span
-        title={tooltip}
+        title={tooltip || 'Pro Intelligence Member'}
         className={`inline-flex items-center gap-1 font-extrabold text-[#AA771C] ${
           size === 'xs' ? 'text-[10px]' : 'text-xs'
         } ${className}`}
@@ -87,17 +114,10 @@ export function ProBadge({
     )
   }
 
-  // Default: gold-pill (luxury gold metallic badge)
-  const sizeClasses = {
-    xs: 'px-2 py-0.5 text-[9px] gap-1',
-    sm: 'px-2.5 py-0.5 text-[10px] gap-1.5',
-    md: 'px-3 py-1 text-xs gap-1.5',
-    lg: 'px-4 py-1.5 text-sm gap-2',
-  }[size]
-
+  // Default: gold-pill (luxury gold metallic badge for Pro)
   return (
     <span
-      title={tooltip}
+      title={tooltip || 'Pro Intelligence Member — Unlimited AI Document Intelligence'}
       className={`inline-flex items-center rounded-full font-black tracking-wider uppercase text-[#1C180A] bg-gradient-to-r from-[#D4AF37] via-[#F6E27A] to-[#AA771C] border border-[#E5C158] shadow-[0_0_10px_rgba(212,175,55,0.35)] select-none transition-transform hover:scale-105 cursor-default ${sizeClasses} ${className}`}
     >
       {showIcon && (

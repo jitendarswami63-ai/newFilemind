@@ -688,7 +688,7 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                 <div>
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold text-[#F5F1E9]">Elite Intelligence</h3>
-                    {tier === 'elite' && <ProBadge variant="gold-pill" size="xs" label="ACTIVE" />}
+                    {tier === 'elite' && <ProBadge variant="elite-pill" size="xs" label="ACTIVE" />}
                   </div>
                   <p className="text-xs text-[#A8A49B] mt-1 mb-4">High-volume workflows, 10 GB storage, and hardware biometric vault.</p>
                   <div className="flex items-baseline gap-1 mb-6">

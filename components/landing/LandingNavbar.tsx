@@ -27,7 +27,7 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [user, setUser] = useState(initialUser)
   const [isAdmin, setIsAdmin] = useState(false)
-  const { isPro } = useUserPlan(user)
+  const { isPro, isElite, tier } = useUserPlan(user)
   const drawerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -151,11 +151,15 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
           <div className="flex items-center gap-2 sm:gap-3">
             {user ? (
               <div className="flex items-center gap-2 sm:gap-3">
-                {isPro && (
+                {isElite ? (
+                  <Link href="/settings" title="Elite Intelligence Member" className="hidden sm:inline-block">
+                    <ProBadge variant="elite-pill" size="xs" label="ELITE" />
+                  </Link>
+                ) : isPro ? (
                   <Link href="/settings" title="Pro Intelligence Member" className="hidden sm:inline-block">
                     <ProBadge variant="gold-pill" size="xs" label="PRO" />
                   </Link>
-                )}
+                ) : null}
 
                 <Link
                   href="/profile"
@@ -164,9 +168,9 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
                 >
                   <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#9C7D47]" />
                   <span className="hidden sm:inline ml-1.5">Profile</span>
-                  {isPro && (
+                  {(isElite || isPro) && (
                     <span className="sm:hidden absolute -top-0.5 -right-0.5 flex h-2 w-2">
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-[#9C7D47]"></span>
+                      <span className={`relative inline-flex rounded-full h-2 w-2 ${isElite ? 'bg-[#D4AF37]' : 'bg-[#9C7D47]'}`}></span>
                     </span>
                   )}
                 </Link>
@@ -193,7 +197,7 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
                   href="/dashboard"
                   className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-xl shadow-xs transition-colors"
                 >
-                  <span>{isPro ? 'Workspace' : 'Open'}</span>
+                  <span>{isElite ? 'Elite Workspace' : isPro ? 'Pro Workspace' : 'Workspace'}</span>
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </div>
@@ -380,7 +384,7 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
                     onClick={() => setMenuOpen(false)}
                     className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-xl transition-colors shadow-2xs"
                   >
-                    <span>{isPro ? 'Open Pro Workspace' : 'Open Workspace'}</span>
+                    <span>{isElite ? 'Open Elite Workspace' : isPro ? 'Open Pro Workspace' : 'Open Workspace'}</span>
                     <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
                 </div>

@@ -72,9 +72,7 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
                   FileMind
                 </span>
                 {isElite ? (
-                  <span className="text-[9px] bg-gradient-to-r from-[#D4AF37] to-[#AA771C] text-[#1C180A] px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider shadow-xs">
-                    ELITE
-                  </span>
+                  <ProBadge variant="elite-pill" size="xs" label="ELITE" />
                 ) : isPro ? (
                   <ProBadge variant="gold-pill" size="xs" label="PRO" />
                 ) : (
@@ -237,9 +235,7 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
                     {displayName}
                   </span>
                   {isElite ? (
-                    <span className="text-[9px] bg-gradient-to-r from-[#D4AF37] to-[#AA771C] text-[#1C180A] px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider">
-                      ELITE
-                    </span>
+                    <ProBadge variant="elite-pill" size="xs" label="ELITE" />
                   ) : isPro ? (
                     <ProBadge variant="gold-pill" size="xs" label="PRO" />
                   ) : null}

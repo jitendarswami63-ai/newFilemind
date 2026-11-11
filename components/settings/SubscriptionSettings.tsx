@@ -172,9 +172,7 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
               <CardTitle className="text-base sm:text-lg font-bold text-[#292720] flex items-center gap-2">
                 <span>Subscription, Storage & Usage</span>
                 {isElite ? (
-                  <span className="text-[10px] bg-gradient-to-r from-[#D4AF37] to-[#AA771C] text-[#1C180A] px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider shadow-xs">
-                    ELITE ACTIVE
-                  </span>
+                  <ProBadge variant="elite-pill" size="xs" label="ELITE ACTIVE" />
                 ) : isPro ? (
                   <ProBadge variant="gold-pill" size="xs" label="PRO ACTIVE" />
                 ) : (
