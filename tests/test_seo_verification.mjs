@@ -59,6 +59,10 @@ async function run() {
   assert.ok(structuredSrc.includes("https://www.filemindhub.xyz"), 'JSON-LD must use production URL')
   console.log('PASS: Structured Data - WebSite, Organization, and SoftwareApplication JSON-LD verified')
 
+  assert.ok(layoutSrc.includes("googletagmanager.com/gtag/js"), 'Layout must include Google Analytics gtag.js script')
+  assert.ok(layoutSrc.includes("google-analytics"), 'Layout must include Google Analytics config script')
+  console.log('PASS: Web Analytics & SEO Tracking - Google Analytics script tags verified')
+
   const dashLayoutSrc = fs.readFileSync(path.join(process.cwd(), 'app/(dashboard)/layout.tsx'), 'utf8')
   assert.ok(dashLayoutSrc.includes("index: false"), 'Workspace pages must be barred from indexing via robots metadata')
   assert.ok(dashLayoutSrc.includes("follow: false"), 'Workspace pages must be barred from crawl follow via robots metadata')

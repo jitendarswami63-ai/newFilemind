@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import Script from 'next/script'
 import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 
@@ -106,6 +107,7 @@ const siteTitle = 'FileMind – AI PDF Manager, Document Search & Understanding'
 const siteDescription =
   'FileMind is an AI-powered PDF manager that helps you organize documents, understand content, and find information with AI-powered semantic search.'
 const siteImage = `${siteUrl}/filemind-ai-pdf-manager-logo.png`
+const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || 'G-FLMND9PDF1'
 
 export default function RootLayout({
   children,
@@ -118,7 +120,13 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
-        {/* Canonical Structured Data (Schema.org JSON-LD) */}
+        <Script
+          src={`https://www.googletagmanager.com/gtag/js?id=${gaMeasurementId}`}
+          strategy="afterInteractive"
+        />
+        <Script id="google-analytics" strategy="afterInteractive">
+          {`window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${gaMeasurementId}',{page_path:window.location.pathname});`}
+        </Script>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
