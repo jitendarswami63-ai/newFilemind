@@ -17,6 +17,7 @@ const cspHeader = `
 const nextConfig: NextConfig = {
   compress: true,
   poweredByHeader: false,
+  productionBrowserSourceMaps: false,
   turbopack: {
     root: path.resolve(__dirname),
   },
@@ -52,7 +53,7 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        source: '/(.*).(png|jpg|jpeg|gif|webp|svg|ico)',
+        source: '/(.*).(png|jpg|jpeg|gif|webp|svg|ico|js|css)',
         headers: [
           {
             key: 'Cache-Control',

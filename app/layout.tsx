@@ -72,12 +72,6 @@ export const metadata: Metadata = {
         height: 512,
         alt: 'FileMind – AI PDF Manager, Document Search & Understanding',
       },
-      {
-        url: `${siteUrl}/filemind-pdf-intelligence-brand.png`,
-        width: 555,
-        height: 175,
-        alt: 'FileMind Document Intelligence Platform Logo',
-      },
     ],
   },
   twitter: {

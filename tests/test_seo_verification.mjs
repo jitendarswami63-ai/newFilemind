@@ -49,6 +49,8 @@ async function run() {
   assert.ok(layoutSrc.includes("openGraph:"), 'Root metadata must specify OpenGraph sharing configuration')
   assert.ok(layoutSrc.includes("twitter:"), 'Root metadata must specify Twitter card sharing configuration')
   assert.ok(layoutSrc.includes("viewport: Viewport"), 'Root layout must specify explicit viewport configuration')
+  const pageSrc = fs.readFileSync(path.join(process.cwd(), 'app/page.tsx'), 'utf8')
+  assert.ok(!pageSrc.includes("openGraph:"), 'Home page must not define redundant openGraph to avoid duplicate OG tags')
   console.log('PASS: Metadata & Social Sharing - OpenGraph, Twitter, canonical, and keywords verified')
 
   const structuredSrc = fs.readFileSync(path.join(process.cwd(), 'app/layout.tsx'), 'utf8')
