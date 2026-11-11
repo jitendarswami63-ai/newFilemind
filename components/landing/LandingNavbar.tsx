@@ -133,22 +133,27 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
             </Link>
           </div>
 
-          <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {user ? (
               <div className="flex items-center gap-2 sm:gap-3">
                 {isPro && (
-                  <Link href="/settings" title="Pro Intelligence Member">
+                  <Link href="/settings" title="Pro Intelligence Member" className="hidden sm:inline-block">
                     <ProBadge variant="gold-pill" size="xs" label="PRO" />
                   </Link>
                 )}
 
                 <Link
                   href="/profile"
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold text-[#292720] hover:text-[#9C7D47] bg-[#FFFCF5] hover:bg-[#FAF5EC] border border-[#D8D0C2] shadow-2xs transition-all hover:border-[#9C7D47]/40 cursor-pointer"
+                  className="relative inline-flex items-center justify-center h-8 sm:h-auto px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold text-[#292720] hover:text-[#9C7D47] bg-[#FFFCF5] hover:bg-[#FAF5EC] border border-[#D8D0C2] shadow-2xs transition-all hover:border-[#9C7D47]/40 cursor-pointer active:scale-95"
                   title="View and edit your personal profile"
                 >
                   <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#9C7D47]" />
-                  <span>Profile</span>
+                  <span className="hidden sm:inline ml-1.5">Profile</span>
+                  {isPro && (
+                    <span className="sm:hidden absolute -top-0.5 -right-0.5 flex h-2 w-2">
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-[#9C7D47]"></span>
+                    </span>
+                  )}
                 </Link>
 
                 <Link
@@ -160,7 +165,7 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
 
                 <Link
                   href="/dashboard"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-xl shadow-xs transition-colors"
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-xl shadow-xs transition-colors"
                 >
                   <span>{isPro ? 'Workspace' : 'Open'}</span>
                   <ArrowRight className="h-3.5 w-3.5" />
@@ -170,7 +175,7 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
               <div className="flex items-center gap-2 sm:gap-3">
                 <Link
                   href="/login?next=/profile"
-                  className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold text-[#292720] hover:text-[#9C7D47] bg-[#FFFCF5] hover:bg-[#FAF5EC] border border-[#D8D0C2] shadow-2xs transition-colors"
+                  className="hidden sm:inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold text-[#292720] hover:text-[#9C7D47] bg-[#FFFCF5] hover:bg-[#FAF5EC] border border-[#D8D0C2] shadow-2xs transition-colors"
                   title="Sign in to view your profile"
                 >
                   <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#777064]" />
@@ -179,17 +184,17 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
 
                 <Link
                   href="/login"
-                  className="px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-[#292720] hover:text-[#9C7D47] transition-colors"
+                  className="hidden sm:inline-block px-2.5 sm:px-3 py-1.5 text-xs sm:text-sm font-medium text-[#292720] hover:text-[#9C7D47] transition-colors"
                 >
                   Sign In
                 </Link>
 
                 <Link
                   href="/signup"
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs sm:text-sm font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-xl shadow-xs border border-[#856837] transition-colors"
+                  className="inline-flex items-center justify-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-xl shadow-xs border border-[#856837] transition-colors whitespace-nowrap active:scale-95"
                 >
                   <span>Get Started</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  <ArrowRight className="h-3.5 w-3.5 hidden xs:inline" />
                 </Link>
               </div>
             )}
@@ -308,21 +313,31 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
 
             <div className="pt-4 border-t border-[#E5DED1] space-y-3">
               {user ? (
-                <div className="flex items-center justify-between p-2.5 rounded-2xl bg-[#FAF5EC] border border-[#E5DED1]">
-                  <div className="min-w-0">
-                    <span className="text-xs font-bold text-[#292720] block truncate">
-                      {user.user_metadata?.full_name || 'Active User'}
-                    </span>
-                    <span className="text-[10px] text-[#777064] block truncate">
-                      {user.email}
-                    </span>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-2.5 rounded-2xl bg-[#FAF5EC] border border-[#E5DED1]">
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-[#292720] block truncate">
+                        {user.user_metadata?.full_name || 'Active User'}
+                      </span>
+                      <span className="text-[10px] text-[#777064] block truncate">
+                        {user.email}
+                      </span>
+                    </div>
+                    <Link
+                      href="/profile"
+                      onClick={() => setMenuOpen(false)}
+                      className="text-[11px] font-bold text-[#9C7D47] hover:underline"
+                    >
+                      Edit
+                    </Link>
                   </div>
                   <Link
-                    href="/profile"
+                    href="/dashboard"
                     onClick={() => setMenuOpen(false)}
-                    className="text-[11px] font-bold text-[#9C7D47] hover:underline"
+                    className="w-full flex items-center justify-center gap-1.5 py-2.5 text-xs font-bold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-xl transition-colors shadow-2xs"
                   >
-                    Edit
+                    <span>{isPro ? 'Open Pro Workspace' : 'Open Workspace'}</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
                   </Link>
                 </div>
               ) : (

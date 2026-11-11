@@ -54,34 +54,35 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
   }, [initialUser])
 
   return (
-    <div className="min-h-screen bg-[#F3EFE5] text-[#292720] flex flex-col selection:bg-[#C5A878]/30 selection:text-[#292720]">
+    <div className="min-h-screen bg-[#F3EFE5] text-[#292720] flex flex-col selection:bg-[#C5A878]/30 selection:text-[#292720] overflow-x-hidden">
       <LandingNavbar user={user} />
 
       <main id="main-content" tabIndex={-1} className="flex-1 focus:outline-none">
-        <section className="relative pt-16 pb-20 md:pt-24 md:pb-28 overflow-hidden">
+        <section className="relative pt-8 sm:pt-16 pb-14 sm:pb-20 md:pt-24 md:pb-28 overflow-hidden">
           <div className="ambient-glow" aria-hidden="true" />
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="max-w-7xl mx-auto px-5 sm:px-6 lg:px-8 relative z-10">
             <div className="max-w-3xl mx-auto text-center">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-[#D8D0C2] bg-[#FFFCF5] text-xs font-semibold text-[#9C7D47] shadow-xs mb-8">
-                <Sparkles className="h-3.5 w-3.5" />
+              <div className="inline-flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-full border border-[#D8D0C2] bg-[#FFFCF5] text-[11px] sm:text-xs font-semibold text-[#9C7D47] shadow-xs mb-6 sm:mb-8 max-w-full text-center leading-snug">
+                <Sparkles className="h-3.5 w-3.5 flex-shrink-0" />
                 <span>AI Document Management • AI PDF Search Platform</span>
               </div>
 
-              <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight text-[#292720] leading-[1.1] mb-6">
-                Your Documents. <span className="text-[#9C7D47]">Understood with AI.</span>
+              <h1 className="text-[clamp(2rem,6.5vw,3.75rem)] font-extrabold tracking-tight text-[#292720] leading-[1.12] mb-4 sm:mb-6 max-w-3xl mx-auto">
+                Your Documents.{' '}
+                <span className="text-[#9C7D47] block sm:inline">Understood with AI.</span>
               </h1>
 
-              <p className="text-lg sm:text-xl text-[#777064] leading-relaxed mb-10 max-w-2xl mx-auto">
+              <p className="text-[16px] sm:text-lg md:text-xl text-[#777064] leading-relaxed mb-8 sm:mb-10 max-w-2xl mx-auto">
                 Transform how your documents are understood with AI. FileMind is an AI PDF manager that organizes your files, answers complex questions with page-accurate citations, and ensures your private documents are understood, indexed, and protected with hardware-grade biometric vault encryption.
               </p>
 
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-14">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-10 sm:mb-14 w-full max-w-sm sm:max-w-none mx-auto">
                 {user ? (
                   <>
                     <Link
                       href="/dashboard"
                       aria-label="Go to your FileMind dashboard workspace"
-                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 text-base font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-xl shadow-sm border border-[#856837] transition-all cursor-pointer"
+                      className="w-full sm:w-auto h-12 inline-flex items-center justify-center gap-2 px-6 sm:px-7 text-sm sm:text-base font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-xl shadow-sm border border-[#856837] transition-all cursor-pointer active:scale-[0.99]"
                     >
                       <span>{isElite ? 'Go to Elite Workspace' : isPro ? 'Go to Pro Workspace' : 'Go to Workspace'}</span>
                       <ArrowRight className="h-4 w-4" />
@@ -89,7 +90,7 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                     <Link
                       href="#pricing"
                       aria-label="View pricing plans and storage upgrades"
-                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 text-base font-semibold text-[#292720] bg-[#FFFCF5] hover:bg-[#FAF5EC] rounded-xl border border-[#E5DED1] hover:border-[#DDD5C7] shadow-xs transition-all cursor-pointer"
+                      className="w-full sm:w-auto h-12 inline-flex items-center justify-center gap-2 px-6 sm:px-7 text-sm sm:text-base font-semibold text-[#292720] bg-[#FFFCF5] hover:bg-[#FAF5EC] rounded-xl border border-[#E5DED1] hover:border-[#DDD5C7] shadow-xs transition-all cursor-pointer active:scale-[0.99]"
                     >
                       <span>View Pricing & Plans</span>
                     </Link>
@@ -99,7 +100,7 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                     <Link
                       href="/signup"
                       aria-label="Get started free with FileMind AI document manager"
-                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 text-base font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-xl shadow-sm border border-[#856837] transition-all cursor-pointer"
+                      className="w-full sm:w-auto h-12 inline-flex items-center justify-center gap-2 px-6 sm:px-7 text-sm sm:text-base font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-xl shadow-sm border border-[#856837] transition-all cursor-pointer active:scale-[0.99]"
                     >
                       <span>Get Started Free</span>
                       <ArrowRight className="h-4 w-4" />
@@ -107,7 +108,7 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                     <Link
                       href="/login"
                       aria-label="Sign in to your FileMind account"
-                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 text-base font-semibold text-[#292720] bg-[#FFFCF5] hover:bg-[#FAF5EC] rounded-xl border border-[#E5DED1] hover:border-[#DDD5C7] shadow-xs transition-all cursor-pointer"
+                      className="w-full sm:w-auto h-12 inline-flex items-center justify-center gap-2 px-6 sm:px-7 text-sm sm:text-base font-semibold text-[#292720] bg-[#FFFCF5] hover:bg-[#FAF5EC] rounded-xl border border-[#E5DED1] hover:border-[#DDD5C7] shadow-xs transition-all cursor-pointer active:scale-[0.99]"
                     >
                       <span>Sign In to Workspace</span>
                     </Link>
@@ -115,44 +116,44 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto pt-4 border-t border-[#E5DED1]/70 text-left">
-                <div className="flex items-center gap-2.5">
-                  <div className="h-7 w-7 rounded-lg bg-[#FFFCF5] border border-[#E5DED1] flex items-center justify-center text-[#9C7D47]">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 max-w-3xl mx-auto pt-6 border-t border-[#E5DED1]/70 text-left">
+                <div className="flex items-center gap-2 sm:gap-2.5 p-2 sm:p-0 rounded-xl bg-[#FAF5EC]/40 sm:bg-transparent">
+                  <div className="h-7 w-7 rounded-lg bg-[#FFFCF5] border border-[#E5DED1] flex items-center justify-center text-[#9C7D47] flex-shrink-0">
                     <Zap className="h-4 w-4" />
                   </div>
-                  <div>
-                    <div className="text-xs font-bold text-[#292720]">49 MB / File</div>
-                    <div className="text-[11px] text-[#777064]">Up to 150 Bulk PDFs</div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-[#292720] truncate">49 MB / File</div>
+                    <div className="text-[11px] text-[#777064] truncate">Up to 150 Bulk PDFs</div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5">
-                  <div className="h-7 w-7 rounded-lg bg-[#FFFCF5] border border-[#E5DED1] flex items-center justify-center text-[#9C7D47]">
+                <div className="flex items-center gap-2 sm:gap-2.5 p-2 sm:p-0 rounded-xl bg-[#FAF5EC]/40 sm:bg-transparent">
+                  <div className="h-7 w-7 rounded-lg bg-[#FFFCF5] border border-[#E5DED1] flex items-center justify-center text-[#9C7D47] flex-shrink-0">
                     <Search className="h-4 w-4" />
                   </div>
-                  <div>
-                    <div className="text-xs font-bold text-[#292720]">Hybrid Retrieval</div>
-                    <div className="text-[11px] text-[#777064]">Dense Vector + BM25</div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-[#292720] truncate">Hybrid Retrieval</div>
+                    <div className="text-[11px] text-[#777064] truncate">Dense Vector + BM25</div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5">
-                  <div className="h-7 w-7 rounded-lg bg-[#FFFCF5] border border-[#E5DED1] flex items-center justify-center text-[#9C7D47]">
+                <div className="flex items-center gap-2 sm:gap-2.5 p-2 sm:p-0 rounded-xl bg-[#FAF5EC]/40 sm:bg-transparent">
+                  <div className="h-7 w-7 rounded-lg bg-[#FFFCF5] border border-[#E5DED1] flex items-center justify-center text-[#9C7D47] flex-shrink-0">
                     <CheckCircle2 className="h-4 w-4" />
                   </div>
-                  <div>
-                    <div className="text-xs font-bold text-[#292720]">Exact Citations</div>
-                    <div className="text-[11px] text-[#777064]">Zero Hallucinations</div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-[#292720] truncate">Exact Citations</div>
+                    <div className="text-[11px] text-[#777064] truncate">Zero Hallucinations</div>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5">
-                  <div className="h-7 w-7 rounded-lg bg-[#FFFCF5] border border-[#E5DED1] flex items-center justify-center text-[#9C7D47]">
+                <div className="flex items-center gap-2 sm:gap-2.5 p-2 sm:p-0 rounded-xl bg-[#FAF5EC]/40 sm:bg-transparent">
+                  <div className="h-7 w-7 rounded-lg bg-[#FFFCF5] border border-[#E5DED1] flex items-center justify-center text-[#9C7D47] flex-shrink-0">
                     <Fingerprint className="h-4 w-4" />
                   </div>
-                  <div>
-                    <div className="text-xs font-bold text-[#292720]">Private Vault</div>
-                    <div className="text-[11px] text-[#777064]">FIDO2 Biometric MFA</div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-[#292720] truncate">Private Vault</div>
+                    <div className="text-[11px] text-[#777064] truncate">FIDO2 Biometric MFA</div>
                   </div>
                 </div>
               </div>
