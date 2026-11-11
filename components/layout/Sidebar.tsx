@@ -4,19 +4,23 @@ import React from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { LogOut, ChevronLeft, ChevronRight, Crown } from 'lucide-react'
+import { LogOut, ChevronLeft, ChevronRight, Crown, Lock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { navItems } from './nav-items'
 import { useSidebar } from './SidebarContext'
 import { ProBadge } from '@/components/ui/ProBadge'
 import { useUserPlan, clearLegacyCookies } from '@/lib/subscription/plan'
+import { useUpgradeModal } from '@/components/subscription/UpgradeModalContext'
 
 export function Sidebar({ user }: { user: { email?: string; user_metadata?: Record<string, any> } | null }) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
   const { isCollapsed, toggleCollapse } = useSidebar()
-  const { isPro } = useUserPlan(user)
+  const { isPro, isElite, tier } = useUserPlan(user)
+  const { openUpgradeModal } = useUpgradeModal()
+
+  const hasByok = Boolean(user?.user_metadata?.byok_gemini_key)
 
   const handleLogout = async () => {
     clearLegacyCookies()
@@ -35,7 +39,7 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
       }`}
     >
       <div className="flex h-16 items-center justify-between px-4 border-b border-[#2E3036]">
-        <Link href="/" className="flex items-center gap-3 min-w-0">
+        <Link href="/" className="flex items-center gap-3 min-w-0" title="Return to FileMind Home">
           <div className="h-9 w-9 rounded-xl border border-[#3E4149] flex items-center justify-center flex-shrink-0 bg-[#24262B] shadow-sm p-1.5">
             <Image
               src="/filemind-ai-pdf-manager-logo.png"
@@ -52,10 +56,20 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
                 <span className="font-bold text-sm tracking-tight text-[#F5F1E9] leading-tight">
                   FileMind
                 </span>
-                {isPro && <ProBadge variant="gold-pill" size="xs" label="PRO" />}
+                {isElite ? (
+                  <span className="text-[9px] bg-gradient-to-r from-[#D4AF37] to-[#AA771C] text-[#1C180A] px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider shadow-xs">
+                    ELITE
+                  </span>
+                ) : isPro ? (
+                  <ProBadge variant="gold-pill" size="xs" label="PRO" />
+                ) : (
+                  <span className="text-[9px] bg-[#2E3036] text-[#A8A49B] px-1.5 py-0.2 rounded font-semibold uppercase tracking-wider">
+                    FREE
+                  </span>
+                )}
               </div>
               <span className="text-[11px] font-medium text-[#C5A878] leading-tight">
-                {isPro ? 'Pro Intelligence' : 'Document Intelligence'}
+                {isElite ? 'Elite Intelligence' : isPro ? 'Pro Intelligence' : 'Document Intelligence'}
               </span>
             </div>
           )}
@@ -82,9 +96,15 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
         <nav className="space-y-1.5">
           {navItems.map((item) => {
             const isActive = pathname === item.href
-            return (
-              <div key={item.name} className="relative group">
-                {item.disabled ? (
+            const isLocked =
+              (item.requiredTier === 'pro' && !isPro && !hasByok) ||
+              (item.requiredTier === 'elite' && !isElite)
+
+            const badgeText = item.requiredTier === 'elite' ? 'ELITE' : 'PRO'
+
+            if (item.disabled) {
+              return (
+                <div key={item.name} className="relative group">
                   <div
                     className={`flex items-center rounded-xl py-2.5 text-xs font-medium text-[#A8A49B]/60 cursor-not-allowed opacity-50 ${
                       isCollapsed ? 'justify-center px-2' : 'justify-between px-3'
@@ -101,26 +121,66 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
                       </span>
                     )}
                   </div>
-                ) : (
-                  <Link
-                    href={item.href}
-                    className={`flex items-center gap-2.5 py-2.5 text-xs font-medium transition-all ${
-                      isCollapsed ? 'justify-center px-2 rounded-xl' : 'px-3 rounded-xl'
-                    } ${
-                      isActive
-                        ? 'bg-[#34332F] text-[#F5F1E9] font-semibold border-l-2 border-[#C5A878] shadow-xs'
-                        : 'text-[#A8A49B] hover:text-[#F5F1E9] hover:bg-[#24262B]'
+                </div>
+              )
+            }
+
+            if (isLocked) {
+              return (
+                <div key={item.name} className="relative group">
+                  <button
+                    onClick={() =>
+                      openUpgradeModal({
+                        targetTier: item.requiredTier,
+                        featureName: item.name,
+                      })
+                    }
+                    className={`w-full flex items-center py-2.5 text-xs font-medium transition-all rounded-xl text-[#A8A49B]/80 hover:text-[#F5F1E9] hover:bg-[#24262B]/80 cursor-pointer ${
+                      isCollapsed ? 'justify-center px-2' : 'justify-between px-3'
                     }`}
-                    title={isCollapsed ? item.name : undefined}
+                    title={isCollapsed ? `${item.name} (Upgrade to ${badgeText} required)` : undefined}
                   >
-                    <item.icon
-                      className={`h-4 w-4 flex-shrink-0 transition-colors ${
-                        isActive ? 'text-[#C5A878]' : 'text-[#A8A49B] group-hover:text-[#F5F1E9]'
-                      }`}
-                    />
-                    {!isCollapsed && <span>{item.name}</span>}
-                  </Link>
-                )}
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="relative">
+                        <item.icon className="h-4 w-4 text-[#A8A49B]" />
+                        <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#1B1D21] flex items-center justify-center">
+                          <Lock className="h-2 w-2 text-[#C5A878]" />
+                        </span>
+                      </div>
+                      {!isCollapsed && <span className="truncate">{item.name}</span>}
+                    </div>
+
+                    {!isCollapsed && (
+                      <span className="flex items-center gap-1 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-[#9C7D47]/20 text-[#D4AF37] border border-[#D4AF37]/30">
+                        <Lock className="h-2.5 w-2.5" />
+                        <span>{badgeText}</span>
+                      </span>
+                    )}
+                  </button>
+                </div>
+              )
+            }
+
+            return (
+              <div key={item.name} className="relative group">
+                <Link
+                  href={item.href}
+                  className={`flex items-center gap-2.5 py-2.5 text-xs font-medium transition-all ${
+                    isCollapsed ? 'justify-center px-2 rounded-xl' : 'px-3 rounded-xl'
+                  } ${
+                    isActive
+                      ? 'bg-[#34332F] text-[#F5F1E9] font-semibold border-l-2 border-[#C5A878] shadow-xs'
+                      : 'text-[#A8A49B] hover:text-[#F5F1E9] hover:bg-[#24262B]'
+                  }`}
+                  title={isCollapsed ? item.name : undefined}
+                >
+                  <item.icon
+                    className={`h-4 w-4 flex-shrink-0 transition-colors ${
+                      isActive ? 'text-[#C5A878]' : 'text-[#A8A49B] group-hover:text-[#F5F1E9]'
+                    }`}
+                  />
+                  {!isCollapsed && <span>{item.name}</span>}
+                </Link>
               </div>
             )
           })}
@@ -144,10 +204,16 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
                   <span className="text-xs font-semibold text-[#F5F1E9] group-hover:text-[#C5A878] truncate leading-snug transition-colors">
                     {displayName}
                   </span>
-                  {isPro && <ProBadge variant="gold-pill" size="xs" label="PRO" />}
+                  {isElite ? (
+                    <span className="text-[9px] bg-gradient-to-r from-[#D4AF37] to-[#AA771C] text-[#1C180A] px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider">
+                      ELITE
+                    </span>
+                  ) : isPro ? (
+                    <ProBadge variant="gold-pill" size="xs" label="PRO" />
+                  ) : null}
                 </div>
                 <span className="text-[11px] text-[#A8A49B] truncate leading-snug" title={user?.email}>
-                  {isPro ? 'Pro Intelligence Active' : user?.email}
+                  {isElite ? 'Elite Member' : isPro ? 'Pro Intelligence' : user?.email}
                 </span>
               </div>
             )}

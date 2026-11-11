@@ -4,17 +4,23 @@ export const dynamic = 'force-dynamic'
 
 import React, { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Search, Loader2, FileText, ArrowRight, Sparkles, AlertCircle, FileSearch } from 'lucide-react'
+import { Search, Loader2, FileText, ArrowRight, Sparkles, AlertCircle, FileSearch, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import type { SearchResultItem } from '@/types'
+import { useUserPlan } from '@/lib/subscription/plan'
+import { useUpgradeModal } from '@/components/subscription/UpgradeModalContext'
 
 export default function SearchPage() {
+  const { isPro, entitlements } = useUserPlan()
+  const { openUpgradeModal } = useUpgradeModal()
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResultItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
   const [, startTransition] = useTransition()
+
+  const isSemanticLocked = !isPro && !entitlements?.hasByok
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault()
@@ -48,8 +54,17 @@ export default function SearchPage() {
       <div className="border-b border-[#E5DED1] pb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FAF5EC] border border-[#E5DED1] text-[11px] font-semibold text-[#9C7D47] mb-3 tracking-wider uppercase">
-            <Sparkles className="h-3 w-3 text-[#9C7D47]" />
-            <span>Neural + Lexical RRF Engine</span>
+            {isSemanticLocked ? (
+              <>
+                <Lock className="h-3 w-3 text-[#9C7D47]" />
+                <span>Exact Keyword Search (Semantic Vector Search Locked - Pro)</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-3 w-3 text-[#9C7D47]" />
+                <span>Neural + Lexical RRF Engine</span>
+              </>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#292720] flex items-center gap-3">
             <div className="h-11 w-11 rounded-xl bg-[#FAF5EC] border border-[#E5DED1] flex items-center justify-center text-[#9C7D47] shadow-2xs">
@@ -70,6 +85,29 @@ export default function SearchPage() {
           <span>Ask AI with Evidence →</span>
         </Link>
       </div>
+
+      {isSemanticLocked && (
+        <div className="p-4 rounded-2xl bg-[#FFFCF5] border border-[#D4AF37]/50 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5">
+            <div className="h-8 w-8 rounded-lg bg-[#FAF5EC] border border-[#E5DED1] flex items-center justify-center text-[#9C7D47] flex-shrink-0">
+              <Lock className="h-4 w-4" />
+            </div>
+            <div>
+              <span className="font-bold text-[#292720] block">Semantic AI Vector Search Locked</span>
+              <span className="text-[#777064]">
+                Searching by exact keywords. Upgrade to Pro to search concepts, deep meanings, and extracted pages with vector embeddings.
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => openUpgradeModal({ targetTier: 'pro', featureName: 'Hybrid Semantic Search' })}
+            className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] shadow-xs cursor-pointer flex-shrink-0"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-[#F6E27A]" />
+            <span>Unlock Pro (₹249)</span>
+          </button>
+        </div>
+      )}
 
       <form onSubmit={handleSearch} className="relative flex flex-col sm:flex-row items-stretch gap-3">
         <div className="relative flex-1 group">

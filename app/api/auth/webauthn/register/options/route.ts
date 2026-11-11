@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { generateRegistrationOptions } from '@simplewebauthn/server'
 import { createClient } from '@/lib/supabase/server'
 import { getRpConfig, storeChallenge, listUserBiometricCredentials } from '@/lib/auth/webauthn'
+import { getServerUserTier } from '@/lib/subscription/plan-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,6 +13,17 @@ export async function POST(request: Request) {
 
     if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const tier = await getServerUserTier(user)
+    if (tier !== 'elite') {
+      return NextResponse.json(
+        {
+          error: 'Biometric hardware vault encryption is exclusive to the Elite Intelligence plan (₹499/mo). Please upgrade to enroll hardware keys.',
+          code: 'ELITE_TIER_REQUIRED',
+        },
+        { status: 403 }
+      )
     }
 
     const { rpName, rpID } = getRpConfig(request)

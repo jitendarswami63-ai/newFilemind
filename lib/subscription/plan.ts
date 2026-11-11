@@ -48,6 +48,14 @@ export function useUserPlan(
   )
   const [loading, setLoading] = useState<boolean>(true)
 
+  useEffect(() => {
+    if (initialUser) {
+      const computedTier = getUserPlanTier(initialUser)
+      setTier(computedTier)
+      setEntitlements(calculateUserEntitlements(initialUser, 0))
+    }
+  }, [initialUser])
+
   const syncPlan = useCallback(async () => {
     try {
       const res = await fetch('/api/subscription', { cache: 'no-store' })

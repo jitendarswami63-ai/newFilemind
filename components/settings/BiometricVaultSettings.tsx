@@ -18,6 +18,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/Button'
 import { BiometricEnrollmentModal } from '@/components/auth/BiometricEnrollmentModal'
 import { platformAuthenticatorIsAvailable, browserSupportsWebAuthn } from '@simplewebauthn/browser'
+import { useUserPlan } from '@/lib/subscription/plan'
+import { useUpgradeModal } from '@/components/subscription/UpgradeModalContext'
 
 interface BiometricCredentialItem {
   id: string
@@ -30,6 +32,8 @@ interface BiometricCredentialItem {
 }
 
 export function BiometricVaultSettings() {
+  const { isElite } = useUserPlan()
+  const { openUpgradeModal } = useUpgradeModal()
   const [credentials, setCredentials] = useState<BiometricCredentialItem[]>([])
   const [loading, setLoading] = useState(true)
   const [supported, setSupported] = useState<boolean | null>(null)
@@ -137,8 +141,18 @@ export function BiometricVaultSettings() {
                 <Fingerprint className="h-5 w-5" />
               </div>
               <div>
-                <CardTitle className="text-base font-bold text-[#292720]">
-                  Biometric Secure Vault (Windows Hello / Platform Authenticator)
+                <CardTitle className="text-base font-bold text-[#292720] flex items-center gap-2">
+                  <span>Biometric Secure Vault</span>
+                  {!isElite ? (
+                    <span className="flex items-center gap-1 text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-[#D4AF37]/20 text-[#D4AF37] border border-[#D4AF37]/40">
+                      <Lock className="h-2.5 w-2.5" />
+                      <span>ELITE FEATURE</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] bg-[#EBF7EE] text-[#1E7E34] px-2 py-0.5 rounded-full border border-[#C3E6CB] font-bold">
+                      UNLOCKED
+                    </span>
+                  )}
                 </CardTitle>
                 <CardDescription className="text-xs text-[#777064]">
                   Hardware-bound WebAuthn encryption & document-level security.
@@ -151,8 +165,8 @@ export function BiometricVaultSettings() {
                 variant="secondary"
                 size="sm"
                 onClick={handleRelockAll}
-                disabled={relocking}
-                className="text-xs font-semibold rounded-xl flex items-center gap-1.5"
+                disabled={relocking || !isElite}
+                className="text-xs font-semibold rounded-xl flex items-center gap-1.5 disabled:opacity-50"
                 title="Immediately expire all active 15-minute biometric decryption leases"
               >
                 {relocking ? (
@@ -167,17 +181,48 @@ export function BiometricVaultSettings() {
 
               <Button
                 size="sm"
-                onClick={() => setShowEnrollModal(true)}
-                className="text-xs font-semibold rounded-xl bg-[#9C7D47] hover:bg-[#856837] text-[#FFFCF5] flex items-center gap-1.5"
+                onClick={() => {
+                  if (!isElite) {
+                    openUpgradeModal({
+                      targetTier: 'elite',
+                      featureName: 'FIDO2 Biometric Hardware Vault',
+                    })
+                  } else {
+                    setShowEnrollModal(true)
+                  }
+                }}
+                className="text-xs font-semibold rounded-xl bg-[#9C7D47] hover:bg-[#856837] text-[#FFFCF5] flex items-center gap-1.5 cursor-pointer"
               >
+                {!isElite && <Lock className="h-3.5 w-3.5 text-[#F6E27A]" />}
                 <Plus className="h-3.5 w-3.5" />
-                <span>Enroll Device</span>
+                <span>{!isElite ? 'Unlock Passkeys (Elite)' : 'Enroll Device'}</span>
               </Button>
             </div>
           </div>
         </CardHeader>
 
         <CardContent className="space-y-4">
+          {!isElite && (
+            <div className="p-4 rounded-xl bg-[#FFFCF5] border border-[#D4AF37]/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2.5">
+                <div className="h-8 w-8 rounded-lg bg-[#FAF5EC] border border-[#E5DED1] flex items-center justify-center text-[#9C7D47] flex-shrink-0">
+                  <Lock className="h-4 w-4" />
+                </div>
+                <div>
+                  <span className="font-bold text-[#292720] block">Biometric Hardware Passkey Protection Locked</span>
+                  <span className="text-[#777064]">
+                    Available exclusively on Elite Tier. Upgrade to Elite (₹499/mo) to protect confidential documents with Windows Hello, Touch ID, or hardware security keys.
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => openUpgradeModal({ targetTier: 'elite', featureName: 'FIDO2 Biometric Hardware Vault' })}
+                className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] shadow-xs cursor-pointer flex-shrink-0"
+              >
+                <span>Upgrade to Elite (₹499)</span>
+              </button>
+            </div>
+          )}
           {supported === false && (
             <div className="p-3.5 rounded-2xl bg-[#FEF8EC] border border-[#FDE68A] text-xs text-[#B45309] flex items-start gap-2.5">
               <ShieldAlert className="h-4 w-4 flex-shrink-0 mt-0.5 text-[#B45309]" />

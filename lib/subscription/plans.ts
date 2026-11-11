@@ -274,3 +274,127 @@ export function calculateUserEntitlements(
     activatedAt: meta.plan_activated_at || null,
   }
 }
+
+export type FeatureKey =
+  | 'basic_upload'
+  | 'pdf_preview'
+  | 'basic_storage'
+  | 'ask_ai'
+  | 'semantic_search'
+  | 'ai_summaries'
+  | 'advanced_metadata'
+  | 'priority_processing'
+  | 'large_pdf_splitting'
+  | 'biometric_vault'
+  | 'bulk_management'
+
+export interface FeatureDefinition {
+  key: FeatureKey
+  name: string
+  requiredTier: 'free' | 'pro' | 'elite'
+  description: string
+  badgeLabel?: string
+}
+
+export const FEATURE_DEFINITIONS: Record<FeatureKey, FeatureDefinition> = {
+  basic_upload: {
+    key: 'basic_upload',
+    name: 'Basic PDF Upload',
+    requiredTier: 'free',
+    description: 'Upload up to 5 MB PDF documents',
+  },
+  pdf_preview: {
+    key: 'pdf_preview',
+    name: 'PDF Preview & Download',
+    requiredTier: 'free',
+    description: 'Instant PDF preview and secure download links',
+  },
+  basic_storage: {
+    key: 'basic_storage',
+    name: 'Private Document Storage',
+    requiredTier: 'free',
+    description: 'Private 100 MB vault storage',
+  },
+  ask_ai: {
+    key: 'ask_ai',
+    name: 'Ask AI with Grounded Citations',
+    requiredTier: 'pro',
+    description: 'Direct conversational analysis with exact page citations and excerpts',
+    badgeLabel: 'PRO',
+  },
+  semantic_search: {
+    key: 'semantic_search',
+    name: 'Hybrid Semantic Search',
+    requiredTier: 'pro',
+    description: 'Vector embeddings search across document concepts and meanings',
+    badgeLabel: 'PRO',
+  },
+  ai_summaries: {
+    key: 'ai_summaries',
+    name: 'AI Summaries & Categorization',
+    requiredTier: 'pro',
+    description: 'Automatic document classification, summaries, and semantic tags',
+    badgeLabel: 'PRO',
+  },
+  advanced_metadata: {
+    key: 'advanced_metadata',
+    name: 'Structured Metadata Extraction',
+    requiredTier: 'pro',
+    description: 'Automatic key-value extraction of dates, invoice numbers, and entities',
+    badgeLabel: 'PRO',
+  },
+  priority_processing: {
+    key: 'priority_processing',
+    name: 'Priority Background Processing',
+    requiredTier: 'elite',
+    description: 'Skip standard queues with dedicated high-speed vector indexing',
+    badgeLabel: 'ELITE',
+  },
+  large_pdf_splitting: {
+    key: 'large_pdf_splitting',
+    name: 'Large-PDF Adaptive Splitting',
+    requiredTier: 'elite',
+    description: 'Adaptive bisection for very large research PDFs preserving page maps',
+    badgeLabel: 'ELITE',
+  },
+  biometric_vault: {
+    key: 'biometric_vault',
+    name: 'FIDO2 Biometric Hardware Vault',
+    requiredTier: 'elite',
+    description: 'Hardware-bound WebAuthn biometric passkey encryption for confidential PDFs',
+    badgeLabel: 'ELITE',
+  },
+  bulk_management: {
+    key: 'bulk_management',
+    name: 'Advanced Bulk Document Management',
+    requiredTier: 'elite',
+    description: 'High-volume batch uploads (up to 150 PDFs) and bulk processing',
+    badgeLabel: 'ELITE',
+  },
+}
+
+export function isFeatureAccessible(
+  featureKey: FeatureKey,
+  tier: PlanTier,
+  hasByok: boolean = false
+): boolean {
+  if (hasByok && ['ask_ai', 'semantic_search', 'ai_summaries', 'advanced_metadata'].includes(featureKey)) {
+    return true
+  }
+
+  const def = FEATURE_DEFINITIONS[featureKey]
+  if (!def) return false
+
+  if (def.requiredTier === 'free') return true
+  if (def.requiredTier === 'pro') return tier === 'pro' || tier === 'elite'
+  if (def.requiredTier === 'elite') return tier === 'elite'
+
+  return false
+}
+
+export function getFeatureRequiredTier(featureKey: FeatureKey): 'pro' | 'elite' | null {
+  const def = FEATURE_DEFINITIONS[featureKey]
+  if (!def || def.requiredTier === 'free') return null
+  return def.requiredTier
+}
+

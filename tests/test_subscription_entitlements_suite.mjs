@@ -5,6 +5,9 @@ import {
   calculateUserEntitlements,
   formatINR,
   formatBytes,
+  isFeatureAccessible,
+  getFeatureRequiredTier,
+  FEATURE_DEFINITIONS,
 } from '../lib/subscription/plans.ts'
 
 console.log('Testing FileMind Subscription & Storage Entitlements Suite...\n')
@@ -105,5 +108,36 @@ assert.strictEqual(entByok.hasAiFeatures, true)
 assert.strictEqual(entByok.hasByok, true)
 assert.strictEqual(entByok.remainingAiCount, 999999)
 console.log('PASS: BYOK functionality verified for Free Tier.\n')
+
+// 6. Progressive Feature Locking & Visibility Matrix
+console.log('6. Checking Progressive Feature Locking & Visibility Matrix...')
+assert.strictEqual(getFeatureRequiredTier('ask_ai'), 'pro')
+assert.strictEqual(getFeatureRequiredTier('semantic_search'), 'pro')
+assert.strictEqual(getFeatureRequiredTier('biometric_vault'), 'elite')
+assert.strictEqual(getFeatureRequiredTier('priority_processing'), 'elite')
+assert.strictEqual(getFeatureRequiredTier('large_pdf_splitting'), 'elite')
+
+// Free Tier: Pro & Elite features locked (unless BYOK)
+assert.strictEqual(isFeatureAccessible('ask_ai', 'free', false), false)
+assert.strictEqual(isFeatureAccessible('ask_ai', 'free', true), true)
+assert.strictEqual(isFeatureAccessible('semantic_search', 'free', false), false)
+assert.strictEqual(isFeatureAccessible('biometric_vault', 'free', false), false)
+assert.strictEqual(isFeatureAccessible('priority_processing', 'free', false), false)
+
+// Pro Tier: Free & Pro accessible; Elite locked
+assert.strictEqual(isFeatureAccessible('ask_ai', 'pro', false), true)
+assert.strictEqual(isFeatureAccessible('semantic_search', 'pro', false), true)
+assert.strictEqual(isFeatureAccessible('ai_summaries', 'pro', false), true)
+assert.strictEqual(isFeatureAccessible('biometric_vault', 'pro', false), false)
+assert.strictEqual(isFeatureAccessible('priority_processing', 'pro', false), false)
+assert.strictEqual(isFeatureAccessible('large_pdf_splitting', 'pro', false), false)
+
+// Elite Tier: Everything unlocked
+assert.strictEqual(isFeatureAccessible('ask_ai', 'elite', false), true)
+assert.strictEqual(isFeatureAccessible('semantic_search', 'elite', false), true)
+assert.strictEqual(isFeatureAccessible('biometric_vault', 'elite', false), true)
+assert.strictEqual(isFeatureAccessible('priority_processing', 'elite', false), true)
+assert.strictEqual(isFeatureAccessible('large_pdf_splitting', 'elite', false), true)
+console.log('PASS: Progressive feature locking & tier accessibility matrix verified.\n')
 
 console.log('All FileMind Subscription & Storage Entitlements tests passed successfully!')

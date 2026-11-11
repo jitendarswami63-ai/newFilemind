@@ -4,8 +4,9 @@ import React from 'react'
 import { SidebarProvider, useSidebar } from './SidebarContext'
 import { Sidebar } from './Sidebar'
 import { MobileNav } from './MobileNav'
+import { UpgradeModalProvider } from '@/components/subscription/UpgradeModalContext'
 
-type ShellUser = { email?: string; user_metadata?: { full_name?: string } } | null
+type ShellUser = { email?: string; user_metadata?: Record<string, any> } | null
 
 function DashboardInnerShell({
   user,
@@ -41,8 +42,10 @@ export function DashboardShell({
   children: React.ReactNode
 }) {
   return (
-    <SidebarProvider>
-      <DashboardInnerShell user={user}>{children}</DashboardInnerShell>
-    </SidebarProvider>
+    <UpgradeModalProvider user={user}>
+      <SidebarProvider>
+        <DashboardInnerShell user={user}>{children}</DashboardInnerShell>
+      </SidebarProvider>
+    </UpgradeModalProvider>
   )
 }

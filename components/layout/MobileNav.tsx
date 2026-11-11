@@ -5,11 +5,12 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
-import { LogOut, Menu, X, Crown } from 'lucide-react'
+import { LogOut, Menu, X, Crown, Lock } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { navItems } from './nav-items'
 import { ProBadge } from '@/components/ui/ProBadge'
 import { useUserPlan, clearLegacyCookies } from '@/lib/subscription/plan'
+import { useUpgradeModal } from '@/components/subscription/UpgradeModalContext'
 
 const emptySubscribe = () => () => {}
 
@@ -20,7 +21,10 @@ export function MobileNav({ user }: { user: { email?: string; user_metadata?: Re
   const [prevPathname, setPrevPathname] = useState(pathname)
   const router = useRouter()
   const supabase = createClient()
-  const { isPro } = useUserPlan(user)
+  const { isPro, isElite, tier } = useUserPlan(user)
+  const { openUpgradeModal } = useUpgradeModal()
+
+  const hasByok = Boolean(user?.user_metadata?.byok_gemini_key)
 
   if (prevPathname !== pathname) {
     setPrevPathname(pathname)
@@ -60,7 +64,7 @@ export function MobileNav({ user }: { user: { email?: string; user_metadata?: Re
         >
           <div>
             <div className="flex justify-between items-center pb-4 border-b border-[#2E3036] mb-5">
-              <div className="flex items-center gap-2.5">
+              <Link href="/" onClick={() => setOpen(false)} className="flex items-center gap-2.5">
                 <div className="h-9 w-9 rounded-xl border border-[#3E4149] flex items-center justify-center flex-shrink-0 bg-[#24262B] shadow-sm p-1.5">
                   <Image
                     src="/filemind-ai-pdf-manager-logo.png"
@@ -75,10 +79,10 @@ export function MobileNav({ user }: { user: { email?: string; user_metadata?: Re
                     FileMind
                   </span>
                   <span className="text-[10px] font-medium text-[#C5A878]">
-                    Document Intelligence
+                    {isElite ? 'Elite Intelligence' : isPro ? 'Pro Intelligence' : 'Document Intelligence'}
                   </span>
                 </div>
-              </div>
+              </Link>
               <button
                 onClick={() => setOpen(false)}
                 className="min-h-[44px] min-w-[44px] flex items-center justify-center text-[#A8A49B] hover:text-[#F5F1E9] cursor-pointer rounded-xl hover:bg-[#24262B]"
@@ -91,20 +95,60 @@ export function MobileNav({ user }: { user: { email?: string; user_metadata?: Re
             <nav className="space-y-1.5">
               {navItems.map((item) => {
                 const isActive = pathname === item.href
-                return item.disabled ? (
-                  <div
-                    key={item.name}
-                    className="flex items-center justify-between rounded-xl px-3 py-2.5 text-xs font-medium text-[#A8A49B]/50 opacity-60"
-                  >
-                    <div className="flex items-center gap-2.5">
-                      <item.icon className="h-4 w-4 text-[#A8A49B]" />
-                      <span>{item.name}</span>
+                const isLocked =
+                  (item.requiredTier === 'pro' && !isPro && !hasByok) ||
+                  (item.requiredTier === 'elite' && !isElite)
+
+                const badgeText = item.requiredTier === 'elite' ? 'ELITE' : 'PRO'
+
+                if (item.disabled) {
+                  return (
+                    <div
+                      key={item.name}
+                      className="flex items-center justify-between rounded-xl px-3 py-2.5 text-xs font-medium text-[#A8A49B]/50 opacity-60"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <item.icon className="h-4 w-4 text-[#A8A49B]" />
+                        <span>{item.name}</span>
+                      </div>
+                      <span className="text-[10px] font-medium bg-[#24262B] text-[#A8A49B] px-1.5 py-0.5 rounded-full border border-[#2E3036]">
+                        Soon
+                      </span>
                     </div>
-                    <span className="text-[10px] font-medium bg-[#24262B] text-[#A8A49B] px-1.5 py-0.5 rounded-full border border-[#2E3036]">
-                      Soon
-                    </span>
-                  </div>
-                ) : (
+                  )
+                }
+
+                if (isLocked) {
+                  return (
+                    <button
+                      key={item.name}
+                      onClick={() => {
+                        setOpen(false)
+                        openUpgradeModal({
+                          targetTier: item.requiredTier,
+                          featureName: item.name,
+                        })
+                      }}
+                      className="w-full flex items-center justify-between rounded-xl px-3 py-2.5 text-xs font-medium text-[#A8A49B]/80 hover:text-[#F5F1E9] hover:bg-[#24262B] transition-all cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="relative">
+                          <item.icon className="h-4 w-4 text-[#A8A49B]" />
+                          <span className="absolute -top-1 -right-1 h-2.5 w-2.5 rounded-full bg-[#1B1D21] flex items-center justify-center">
+                            <Lock className="h-2 w-2 text-[#C5A878]" />
+                          </span>
+                        </div>
+                        <span>{item.name}</span>
+                      </div>
+                      <span className="flex items-center gap-1 text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-[#9C7D47]/20 text-[#D4AF37] border border-[#D4AF37]/30">
+                        <Lock className="h-2.5 w-2.5" />
+                        <span>{badgeText}</span>
+                      </span>
+                    </button>
+                  )
+                }
+
+                return (
                   <Link
                     key={item.name}
                     href={item.href}
@@ -139,10 +183,16 @@ export function MobileNav({ user }: { user: { email?: string; user_metadata?: Re
                     <span className="text-xs font-semibold text-[#F5F1E9] group-hover:text-[#C5A878] truncate leading-snug transition-colors">
                       {displayName}
                     </span>
-                    {isPro && <ProBadge variant="gold-pill" size="xs" label="PRO" />}
+                    {isElite ? (
+                      <span className="text-[9px] bg-gradient-to-r from-[#D4AF37] to-[#AA771C] text-[#1C180A] px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider">
+                        ELITE
+                      </span>
+                    ) : isPro ? (
+                      <ProBadge variant="gold-pill" size="xs" label="PRO" />
+                    ) : null}
                   </div>
                   <span className="text-[11px] text-[#A8A49B] truncate leading-snug">
-                    {isPro ? 'Pro Intelligence Active' : user?.email}
+                    {isElite ? 'Elite Member' : isPro ? 'Pro Intelligence' : user?.email}
                   </span>
                 </div>
               </Link>
@@ -165,7 +215,7 @@ export function MobileNav({ user }: { user: { email?: string; user_metadata?: Re
 
   return (
     <div className="md:hidden flex items-center justify-between border-b border-[#E5DED1] bg-[#FFFCF5] px-4 py-3 sticky top-0 z-40 w-full shadow-xs">
-      <Link href="/dashboard" className="flex items-center gap-2.5">
+      <Link href="/" className="flex items-center gap-2.5" title="FileMind Home">
         <div className="h-8 w-8 rounded-xl border border-[#DDD5C7] flex items-center justify-center flex-shrink-0 bg-[#F8F4EA] shadow-2xs p-1">
           <Image
             src="/filemind-ai-pdf-manager-logo.png"
@@ -179,7 +229,13 @@ export function MobileNav({ user }: { user: { email?: string; user_metadata?: Re
           <span className="font-bold text-base tracking-tight text-[#292720]">
             FileMind
           </span>
-          {isPro && <ProBadge variant="gold-pill" size="xs" label="PRO" />}
+          {isElite ? (
+            <span className="text-[9px] bg-gradient-to-r from-[#D4AF37] to-[#AA771C] text-[#1C180A] px-1.5 py-0.5 rounded-full font-black uppercase tracking-wider">
+              ELITE
+            </span>
+          ) : isPro ? (
+            <ProBadge variant="gold-pill" size="xs" label="PRO" />
+          ) : null}
         </div>
       </Link>
 

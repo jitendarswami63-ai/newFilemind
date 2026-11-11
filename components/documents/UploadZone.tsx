@@ -13,6 +13,8 @@ import {
   Plus,
   Trash2,
   FileText,
+  Lock,
+  Crown,
 } from 'lucide-react'
 import {
   MAX_FILE_SIZE_MB,
@@ -20,6 +22,9 @@ import {
 } from '@/lib/constants'
 import { formatFileSize } from '@/lib/utils'
 import { BatchUploadManager, BatchFileItem } from '@/lib/upload/batch-upload-manager'
+import { useUserPlan } from '@/lib/subscription/plan'
+import { useUpgradeModal } from '@/components/subscription/UpgradeModalContext'
+import { PLAN_CONFIGS } from '@/lib/subscription/plans'
 
 interface UploadZoneProps {
   onUploadComplete?: (documentId: string) => void
@@ -33,6 +38,14 @@ export function UploadZone({ onUploadComplete, compact = false, className = '' }
   const [batchNotice, setBatchNotice] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [manager] = useState(() => new BatchUploadManager())
+
+  const { tier, isPro, isElite } = useUserPlan()
+  const { openUpgradeModal } = useUpgradeModal()
+
+  const currentPlanConfig = PLAN_CONFIGS[tier] || PLAN_CONFIGS.free
+  const allowedFileSizeMB = currentPlanConfig.maxFileSizeMB
+  const allowedBatchFiles = currentPlanConfig.maxBatchFiles
+  const allowedFileSizeBytes = currentPlanConfig.maxFileSizeBytes
 
   useEffect(() => {
     const unsubscribe = manager.subscribe((updatedItems) => {
@@ -157,11 +170,32 @@ export function UploadZone({ onUploadComplete, compact = false, className = '' }
 
     if (pdfOnly.length === 0) return
 
-    const remainingSlots = Math.max(0, MAX_BATCH_FILES - items.length)
-    if (pdfOnly.length > remainingSlots) {
+    const oversizeFile = pdfOnly.find((f) => f.size > allowedFileSizeBytes)
+    if (oversizeFile) {
+      const targetTier = tier === 'free' ? 'pro' : 'elite'
+      const fileSizeMB = (oversizeFile.size / (1024 * 1024)).toFixed(1)
       setBatchNotice(
-        `Batch limit is ${MAX_BATCH_FILES} files. Enqueuing first ${remainingSlots} document(s).`
+        `"${oversizeFile.name}" is ${fileSizeMB} MB, exceeding your ${currentPlanConfig.name} limit (${allowedFileSizeMB} MB).`
       )
+      openUpgradeModal({
+        targetTier,
+        featureName: `${targetTier === 'elite' ? '49 MB' : '25 MB'} File Upload Limit`,
+      })
+      return
+    }
+
+    const remainingSlots = Math.max(0, allowedBatchFiles - items.length)
+    if (pdfOnly.length > remainingSlots) {
+      const targetTier = tier === 'free' ? 'pro' : 'elite'
+      setBatchNotice(
+        `Your plan limit is ${allowedBatchFiles} files per batch. Upgrade to upload more files simultaneously.`
+      )
+      if (tier !== 'elite') {
+        openUpgradeModal({
+          targetTier,
+          featureName: `${targetTier === 'elite' ? '150' : '100'} PDFs Per Batch`,
+        })
+      }
     }
 
     const accepted = pdfOnly.slice(0, remainingSlots)
@@ -309,9 +343,26 @@ export function UploadZone({ onUploadComplete, compact = false, className = '' }
           </button>
 
           <div className="pt-2 text-[11px] text-[#777064] border-t border-[#E5DED1] w-full space-y-1">
-            <p className="font-semibold text-[#292720]">
-              Supports PDF up to {MAX_FILE_SIZE_MB} MB • Up to {MAX_BATCH_FILES} files
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-1.5 font-semibold text-[#292720]">
+              <span>
+                Supports PDF up to {allowedFileSizeMB} MB • Up to {allowedBatchFiles} files
+              </span>
+              {!isElite && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    openUpgradeModal({
+                      targetTier: isPro ? 'elite' : 'pro',
+                      featureName: isPro ? '49 MB PDF Upload Limit' : '25 MB PDF Upload Limit',
+                    })
+                  }
+                  className="inline-flex items-center gap-1 text-[10px] text-[#9C7D47] hover:text-[#856837] underline font-bold cursor-pointer transition-colors"
+                >
+                  <Lock className="h-2.5 w-2.5" />
+                  <span>Unlock {isPro ? '49 MB (Elite)' : '25 MB (Pro)'}</span>
+                </button>
+              )}
+            </div>
             <p className="text-[11px] text-[#777064] leading-normal">
               Documents are automatically processed and indexed for AI search & grounded question answering.
             </p>

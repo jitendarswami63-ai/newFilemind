@@ -6,7 +6,8 @@ import { StatusBadge, DocumentStatus } from '@/components/documents/StatusBadge'
 import { WorkspaceSearchBar } from '@/components/dashboard/WorkspaceSearchBar'
 import { formatDate, formatFileSize } from '@/lib/utils'
 import { ProBadge } from '@/components/ui/ProBadge'
-import { isServerUserPro } from '@/lib/subscription/plan-server'
+import { isServerUserPro, getServerUserTier } from '@/lib/subscription/plan-server'
+import { PLAN_CONFIGS } from '@/lib/subscription/plans'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -39,7 +40,10 @@ export default async function DashboardPage() {
   }).format(new Date())
 
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'
-  const isPro = await isServerUserPro(user)
+  const tier = await getServerUserTier(user)
+  const isPro = tier === 'pro' || tier === 'elite'
+  const isElite = tier === 'elite'
+  const currentPlan = PLAN_CONFIGS[tier] || PLAN_CONFIGS.free
 
   return (
     <div className="space-y-8 w-full max-w-6xl mx-auto">
@@ -49,16 +53,24 @@ export default async function DashboardPage() {
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#292720]">
               Your workspace
             </h1>
-            {isPro && (
+            {isElite ? (
+              <Link href="/settings" title="Elite Intelligence Member">
+                <span className="text-[10px] bg-gradient-to-r from-[#D4AF37] to-[#AA771C] text-[#1C180A] px-2.5 py-0.5 rounded-full font-black uppercase tracking-wider shadow-xs">
+                  ELITE ACTIVE
+                </span>
+              </Link>
+            ) : isPro ? (
               <Link href="/settings" title="Pro Intelligence Member">
                 <ProBadge variant="gold-pill" size="sm" label="PRO ACTIVE" />
               </Link>
-            )}
+            ) : null}
           </div>
           <p className="text-xs sm:text-sm text-[#777064] mt-1">
-            {isPro
+            {isElite
+              ? 'Elite Intelligence Active • High-priority queue, 10 GB vault, and hardware biometric protection.'
+              : isPro
               ? 'Pro Intelligence Active • Unlimited AI document synthesis, dual AI engines, and hardware-bound biometric vault.'
-              : 'Upload, search, and synthesize insights across your documents with AI-powered retrieval.'}
+              : 'Free Tier Active • Upload PDFs, private storage vault, and keyword indexing.'}
           </p>
         </div>
         <div className="text-xs text-[#777064] flex items-center gap-2 self-start sm:self-auto font-medium bg-[#FFFCF5] border border-[#E5DED1] px-3 py-1.5 rounded-full shadow-2xs">
@@ -108,7 +120,7 @@ export default async function DashboardPage() {
             {formatFileSize(totalStorageBytes)}
           </div>
           <p className="text-[11px] text-[#777064]">
-            49 MB per-file upload ceiling
+            {currentPlan.maxFileSizeMB} MB per-file • {currentPlan.name}
           </p>
         </div>
 

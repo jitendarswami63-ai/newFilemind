@@ -76,21 +76,43 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
               </p>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-14">
-                <Link
-                  href={user ? '/dashboard' : '/signup'}
-                  aria-label="Get started free with FileMind AI document manager"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 text-base font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-xl shadow-sm border border-[#856837] transition-all cursor-pointer"
-                >
-                  <span>{user ? 'Go to Workspace' : 'Get Started Free'}</span>
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  href={user ? '/dashboard' : '/login'}
-                  aria-label="Sign in to your FileMind account"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 text-base font-semibold text-[#292720] bg-[#FFFCF5] hover:bg-[#FAF5EC] rounded-xl border border-[#E5DED1] hover:border-[#DDD5C7] shadow-xs transition-all cursor-pointer"
-                >
-                  <span>{user ? 'Open Workspace' : 'Sign In to Workspace'}</span>
-                </Link>
+                {user ? (
+                  <>
+                    <Link
+                      href="/dashboard"
+                      aria-label="Go to your FileMind dashboard workspace"
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 text-base font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-xl shadow-sm border border-[#856837] transition-all cursor-pointer"
+                    >
+                      <span>{isElite ? 'Go to Elite Workspace' : isPro ? 'Go to Pro Workspace' : 'Go to Workspace'}</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                    <Link
+                      href="#pricing"
+                      aria-label="View pricing plans and storage upgrades"
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 text-base font-semibold text-[#292720] bg-[#FFFCF5] hover:bg-[#FAF5EC] rounded-xl border border-[#E5DED1] hover:border-[#DDD5C7] shadow-xs transition-all cursor-pointer"
+                    >
+                      <span>View Pricing & Plans</span>
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      href="/signup"
+                      aria-label="Get started free with FileMind AI document manager"
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 text-base font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-xl shadow-sm border border-[#856837] transition-all cursor-pointer"
+                    >
+                      <span>Get Started Free</span>
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                    <Link
+                      href="/login"
+                      aria-label="Sign in to your FileMind account"
+                      className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-3.5 text-base font-semibold text-[#292720] bg-[#FFFCF5] hover:bg-[#FAF5EC] rounded-xl border border-[#E5DED1] hover:border-[#DDD5C7] shadow-xs transition-all cursor-pointer"
+                    >
+                      <span>Sign In to Workspace</span>
+                    </Link>
+                  </>
+                )}
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto pt-4 border-t border-[#E5DED1]/70 text-left">

@@ -26,6 +26,8 @@ import {
   Cpu,
   Lock,
   Unlock,
+  Crown,
+  Check,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import type { AskAIMessage, AskAISource, Conversation } from '@/types'
@@ -36,6 +38,7 @@ import { useAudioPlayer } from '@/lib/audio/use-audio-player'
 import { VaultMfaUnlockChallenge } from '@/components/auth/VaultMfaUnlockChallenge'
 import { ProBadge } from '@/components/ui/ProBadge'
 import { useUserPlan } from '@/lib/subscription/plan'
+import { useUpgradeModal } from '@/components/subscription/UpgradeModalContext'
 
 interface UserDocItem {
   id: string
@@ -283,7 +286,8 @@ function deleteLocalConversation(convId: string) {
 }
 
 export default function AskAiPage() {
-  const { isPro } = useUserPlan()
+  const { isPro, entitlements, loading: planLoading } = useUserPlan()
+  const { openUpgradeModal } = useUpgradeModal()
   const searchParams = useSearchParams()
   const initialDocId = searchParams.get('documentId') || undefined
   const initialDocName = searchParams.get('docName') || undefined
@@ -630,6 +634,101 @@ export default function AskAiPage() {
       e.preventDefault()
       handleSend()
     }
+  }
+
+  if (!isPro && !entitlements?.hasByok && !planLoading) {
+    return (
+      <div className="w-full max-w-4xl mx-auto py-8 sm:py-12 space-y-8 animate-in fade-in duration-200">
+        <div className="text-center space-y-3">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#FAF5EC] border border-[#E5DED1] text-xs font-bold text-[#9C7D47]">
+            <Lock className="h-3.5 w-3.5" />
+            <span>Pro Feature Locked</span>
+          </div>
+          <h1 className="text-3xl sm:text-4xl font-extrabold text-[#292720] tracking-tight">
+            Unlock Grounded Ask AI
+          </h1>
+          <p className="text-sm sm:text-base text-[#777064] max-w-xl mx-auto">
+            Ask complex questions against your research library and receive answers synthesized with page-accurate quotes and verified excerpts.
+          </p>
+        </div>
+
+        <div className="bg-[#FFFCF5] border-2 border-[#9C7D47]/40 rounded-3xl p-7 sm:p-10 shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-[#E5DED1]">
+            <div>
+              <span className="text-xs font-bold text-[#9C7D47] uppercase tracking-wider">Required Plan</span>
+              <h2 className="text-2xl font-extrabold text-[#292720] mt-0.5">FileMind Pro Intelligence</h2>
+              <p className="text-xs text-[#777064]">Monthly billing • Instant activation • Cancel anytime</p>
+            </div>
+            <div className="text-right">
+              <span className="text-3xl font-extrabold text-[#292720]">₹249</span>
+              <span className="text-xs text-[#777064]"> / month</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex items-start gap-3">
+              <Check className="h-4 w-4 text-[#9C7D47] flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="text-xs font-bold text-[#292720] block">AI Document Understanding</span>
+                <span className="text-[11px] text-[#777064]">Dual AI Engine with Gemini 3.8 Flash & NVIDIA NIM</span>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Check className="h-4 w-4 text-[#9C7D47] flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="text-xs font-bold text-[#292720] block">Hybrid Semantic Search</span>
+                <span className="text-[11px] text-[#777064]">Vector embeddings search across document concepts</span>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Check className="h-4 w-4 text-[#9C7D47] flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="text-xs font-bold text-[#292720] block">Exact Page Excerpts & Citations</span>
+                <span className="text-[11px] text-[#777064]">Clickable source references jump directly to source text</span>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Check className="h-4 w-4 text-[#9C7D47] flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="text-xs font-bold text-[#292720] block">1 GB High-Speed Vault Storage</span>
+                <span className="text-[11px] text-[#777064]">Up to 100 PDFs per batch and 25 MB per individual file</span>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Check className="h-4 w-4 text-[#9C7D47] flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="text-xs font-bold text-[#292720] block">Automatic AI Summaries & Metadata</span>
+                <span className="text-[11px] text-[#777064]">Key entity extraction and intelligent tagging</span>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <Check className="h-4 w-4 text-[#9C7D47] flex-shrink-0 mt-0.5" />
+              <div>
+                <span className="text-xs font-bold text-[#292720] block">500 Monthly AI Queries</span>
+                <span className="text-[11px] text-[#777064]">Generous monthly allowance for high-volume research</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-[#E5DED1] flex flex-col sm:flex-row items-center justify-between gap-4">
+            <button
+              onClick={() => openUpgradeModal({ targetTier: 'pro', featureName: 'Ask AI with Grounded Citations' })}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-xs sm:text-sm font-bold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] shadow-xs transition-colors cursor-pointer"
+            >
+              <Sparkles className="h-4 w-4 text-[#F6E27A]" />
+              <span>Upgrade to Pro (₹249/mo)</span>
+            </button>
+
+            <Link
+              href="/settings"
+              className="text-xs font-semibold text-[#777064] hover:text-[#9C7D47] underline underline-offset-4"
+            >
+              Or connect your own Gemini API Key (BYOK) in Settings →
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (

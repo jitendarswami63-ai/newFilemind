@@ -1,7 +1,6 @@
 import type { Metadata } from 'next'
 import { LandingPage } from '@/components/landing/LandingPage'
-
-export const revalidate = 3600
+import { createClient } from '@/lib/supabase/server'
 
 const siteUrl = 'https://www.filemindhub.xyz'
 
@@ -55,6 +54,13 @@ export const metadata: Metadata = {
   },
 }
 
-export default function Home() {
-  return <LandingPage />
+export default async function Home() {
+  let user = null
+  try {
+    const supabase = await createClient()
+    const { data } = await supabase.auth.getUser()
+    user = data?.user || null
+  } catch {}
+
+  return <LandingPage user={user} />
 }
