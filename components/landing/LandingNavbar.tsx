@@ -85,7 +85,7 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
       name: 'Pricing',
       href: '/#pricing',
       icon: Crown,
-      description: 'Free tier & ₹50 Pro Intelligence plan',
+      description: 'Free tier, ₹249 Pro & ₹499 Elite plans',
     },
     {
       name: 'FAQ',

@@ -35,7 +35,7 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
       }`}
     >
       <div className="flex h-16 items-center justify-between px-4 border-b border-[#2E3036]">
-        <Link href="/dashboard" className="flex items-center gap-3 min-w-0">
+        <Link href="/" className="flex items-center gap-3 min-w-0">
           <div className="h-9 w-9 rounded-xl border border-[#3E4149] flex items-center justify-center flex-shrink-0 bg-[#24262B] shadow-sm p-1.5">
             <Image
               src="/filemind-ai-pdf-manager-logo.png"

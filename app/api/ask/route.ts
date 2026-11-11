@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { askAiQuestion, sanitizeAskAiError } from '@/lib/ai/ask-ai'
 import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
 import { hasActiveBiometricLease } from '@/lib/auth/webauthn'
+import { getServerUserEntitlements, incrementUserAiUsage } from '@/lib/subscription/plan-server'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -48,6 +49,30 @@ export async function POST(request: NextRequest) {
     }
 
     const user = auth.user!
+
+    const entitlements = await getServerUserEntitlements(user.id, user.user_metadata)
+    if (!entitlements.hasAiFeatures) {
+      return NextResponse.json(
+        {
+          error: 'Grounded Ask AI is available on Pro (₹249/mo) and Elite (₹499/mo) plans. Upgrade your plan or connect your own Gemini API key in Settings.',
+          code: 'PLAN_UPGRADE_REQUIRED',
+          currentTier: entitlements.tier,
+        },
+        { status: 403 }
+      )
+    }
+
+    if (!entitlements.hasByok && entitlements.remainingAiCount <= 0) {
+      return NextResponse.json(
+        {
+          error: `Monthly AI query allowance reached (${entitlements.monthlyAiAllowance} queries limit). Your allowance resets at the start of your billing cycle. Upgrade to Elite or connect your own Gemini API key in Settings.`,
+          code: 'AI_ALLOWANCE_EXCEEDED',
+          usedCount: entitlements.usedAiCount,
+          monthlyAllowance: entitlements.monthlyAiAllowance,
+        },
+        { status: 429 }
+      )
+    }
 
     let body: unknown
     try {
@@ -310,6 +335,8 @@ export async function POST(request: NextRequest) {
       provider,
       model,
     })
+
+    await incrementUserAiUsage(user.id)
 
     if (activeConvId) {
       try {

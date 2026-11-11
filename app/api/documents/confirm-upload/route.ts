@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server'
 import { after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { MAX_FILE_SIZE_BYTES, PDF_MAGIC_BYTES } from '@/lib/constants'
+import { PDF_MAGIC_BYTES } from '@/lib/constants'
 import { processDocument } from '@/lib/ai/processor'
 import { isSameOrigin } from '@/lib/validation/origin'
 import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
+import { getServerUserEntitlements } from '@/lib/subscription/plan-server'
+import { formatBytes } from '@/lib/subscription/plans'
+import { PDFDocument } from 'pdf-lib'
+import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -13,6 +17,7 @@ interface ConfirmUploadBody {
   documentId?: string
   storagePath?: string
   fileSize?: number
+  skipImmediateProcessing?: boolean
 }
 
 export async function POST(request: Request) {
@@ -72,9 +77,29 @@ export async function POST(request: Request) {
   }
 
   const actualSize = matchedFile.metadata?.size || 0
-  if (actualSize > MAX_FILE_SIZE_BYTES) {
+
+  const entitlements = await getServerUserEntitlements(user.id, user.user_metadata)
+
+  if (actualSize > entitlements.maxFileSizeBytes) {
     await supabase.storage.from('documents').remove([storagePath])
-    return NextResponse.json({ error: 'File must be under 49 MB.' }, { status: 400 })
+    return NextResponse.json(
+      {
+        error: `File size (${formatBytes(actualSize)}) exceeds the ${entitlements.maxFileSizeMB} MB limit for ${entitlements.plan.name}. Upgrade your plan to upload larger files.`,
+        code: 'FILE_SIZE_LIMIT_EXCEEDED',
+      },
+      { status: 400 }
+    )
+  }
+
+  if (entitlements.usedStorageBytes + actualSize > entitlements.totalStorageBytes) {
+    await supabase.storage.from('documents').remove([storagePath])
+    return NextResponse.json(
+      {
+        error: `Storage quota exceeded (${formatBytes(entitlements.totalStorageBytes)} limit, ${formatBytes(entitlements.availableStorageBytes)} remaining). Please delete old documents or purchase additional storage.`,
+        code: 'STORAGE_QUOTA_EXCEEDED',
+      },
+      { status: 403 }
+    )
   }
 
   const { data: sessionData } = await supabase.auth.getSession()
@@ -137,20 +162,57 @@ export async function POST(request: Request) {
 
   if (resultStatus === 'rate_limited') {
     await supabase.storage.from('documents').remove([storagePath])
-    return NextResponse.json({ error: 'Upload limit reached. Try again later.' }, { status: 429 })
+    return NextResponse.json({ error: 'Upload rate limit reached. Try again later.' }, { status: 429 })
   }
 
   if (resultStatus === 'storage_quota_exceeded') {
     await supabase.storage.from('documents').remove([storagePath])
-    return NextResponse.json({ error: 'Storage quota exceeded (2 GB limit). Please delete old documents.' }, { status: 403 })
+    return NextResponse.json(
+      { error: `Storage quota exceeded (${formatBytes(entitlements.totalStorageBytes)} limit). Please delete old documents or upgrade your storage.` },
+      { status: 403 }
+    )
   }
 
-  const skipImmediate = (body as unknown as { skipImmediateProcessing?: boolean }).skipImmediateProcessing
+  if (!entitlements.hasAiFeatures) {
+    after(async () => {
+      try {
+        const admin = createSupabaseAdminClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        )
+        const { data: fileData } = await admin.storage.from('documents').download(storagePath)
+        let pageCount = 1
+        if (fileData) {
+          try {
+            const buf = await fileData.arrayBuffer()
+            const pdfDoc = await PDFDocument.load(buf, { ignoreEncryption: true })
+            pageCount = pdfDoc.getPageCount()
+          } catch {}
+        }
+
+        await admin
+          .from('documents')
+          .update({
+            status: 'completed',
+            page_count: pageCount,
+            doc_category: 'Standard Document',
+            tags: ['Free Tier'],
+            extracted_data: { notice: 'Free Tier storage - AI document understanding available on Pro & Elite' },
+          })
+          .eq('id', documentId)
+      } catch (freeErr) {
+        console.warn('[ConfirmUpload] Error setting completed status for free user doc:', freeErr)
+      }
+    })
+    return NextResponse.json({ success: true, documentId, plan: 'free' })
+  }
+
+  const skipImmediate = body.skipImmediateProcessing
   if (!skipImmediate) {
     after(async () => {
       await processDocument(documentId)
     })
   }
 
-  return NextResponse.json({ success: true, documentId })
+  return NextResponse.json({ success: true, documentId, plan: entitlements.tier })
 }

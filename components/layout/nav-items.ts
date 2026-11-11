@@ -1,5 +1,5 @@
 import React from 'react'
-import { FileText, Search, Settings, LayoutDashboard, Sparkles, UserCircle } from 'lucide-react'
+import { Home, FileText, Search, Settings, LayoutDashboard, Sparkles, UserCircle } from 'lucide-react'
 
 export interface NavItem {
   name: string
@@ -9,6 +9,7 @@ export interface NavItem {
 }
 
 export const navItems: NavItem[] = [
+  { name: 'Home', href: '/', icon: Home },
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'My Documents', href: '/documents', icon: FileText },
   { name: 'Search', href: '/search', icon: Search },

@@ -2,27 +2,28 @@ import type { Metadata } from 'next'
 import { createClient } from '@/lib/supabase/server'
 import { User, Shield, CheckCircle2 } from 'lucide-react'
 import { ProfileForm } from '@/components/profile/ProfileForm'
+import { SubscriptionSettings } from '@/components/settings/SubscriptionSettings'
 import { UserProfileData, calculateProfileCompletion } from '@/lib/profile/types'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export const metadata: Metadata = {
-  title: 'Personal Profile & Onboarding',
-  description: 'Manage your professional identity, AI preferences, and biometric vault settings.',
+  title: 'Personal Profile & Account Dashboard',
+  description: 'Manage your professional identity, AI preferences, biometric vault settings, and subscription entitlements.',
 }
 
 function buildInitialProfile(user: any): UserProfileData {
-  const meta = user.user_metadata || {}
+  const meta = user?.user_metadata || {}
   const saved = meta.profile_data || {}
 
-  const defaultUsername = user.email
+  const defaultUsername = user?.email
     ? user.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_-]/g, '')
     : 'researcher'
 
   return {
     full_name: saved.full_name || meta.full_name || meta.name || '',
-    email: user.email || '',
+    email: user?.email || '',
     username: saved.username || defaultUsername,
     bio: saved.bio || '',
     occupation_role: saved.occupation_role || '',
@@ -50,17 +51,17 @@ export default async function ProfilePage() {
   const completion = calculateProfileCompletion(profile)
 
   return (
-    <div className="space-y-8 w-full max-w-5xl mx-auto pb-12">
+    <div className="space-y-10 w-full max-w-5xl mx-auto pb-16">
       <div className="border-b border-[#E5DED1] pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#292720] flex items-center gap-3">
             <div className="h-11 w-11 rounded-2xl bg-[#FAF5EC] border border-[#E5DED1] flex items-center justify-center text-[#9C7D47] shadow-2xs">
               <User className="h-5 w-5" />
             </div>
-            <span>Personal Profile & Onboarding</span>
+            <span>Personal Profile & Account</span>
           </h1>
           <p className="text-xs sm:text-sm text-[#777064] mt-1.5">
-            Structured 4-step onboarding dashboard to customize your AI model routing, research domains, and vault parameters.
+            Structured 4-step onboarding dashboard, AI routing, storage quota tracking, and subscription entitlements.
           </p>
         </div>
 
@@ -73,6 +74,10 @@ export default async function ProfilePage() {
       </div>
 
       <ProfileForm initialProfile={profile} initialCompletion={completion} />
+
+      <div className="pt-4 border-t border-[#E5DED1]">
+        <SubscriptionSettings initialUser={user} />
+      </div>
     </div>
   )
 }

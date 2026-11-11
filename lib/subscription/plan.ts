@@ -1,36 +1,33 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import {
+  PlanTier,
+  PLAN_CONFIGS,
+  getUserPlanTier,
+  UserEntitlements,
+  calculateUserEntitlements,
+} from './plans'
 
 export interface UserPlanInfo {
   isPro: boolean
-  planName: 'Pro Intelligence' | 'Free Tier'
-  tier: 'pro' | 'free'
+  isElite: boolean
+  tier: PlanTier
+  planName: string
   badgeLabel: string
+  entitlements: UserEntitlements | null
+  loading: boolean
+  refreshPlan: () => Promise<void>
 }
 
-/**
- * Authoritatively checks whether a user has an active Pro plan.
- * Verified strictly from the user's personal user_metadata.
- * No cookies or local storage fallbacks are used so Pro status never leaks across accounts.
- */
 export function isUserPro(
   user?: { user_metadata?: Record<string, any> | null } | null
 ): boolean {
   if (!user) return false
-  const meta = user.user_metadata || {}
-  return Boolean(
-    meta.plan === 'pro' ||
-    meta.is_pro === true ||
-    meta.tier === 'pro' ||
-    meta.plan_tier === 'pro' ||
-    meta.subscription === 'pro'
-  )
+  const tier = getUserPlanTier(user)
+  return tier === 'pro' || tier === 'elite'
 }
 
-/**
- * Clears any legacy cookies that might have lingered from earlier sessions
- */
 export function clearLegacyCookies() {
   if (typeof document !== 'undefined') {
     try {
@@ -41,34 +38,37 @@ export function clearLegacyCookies() {
   }
 }
 
-/**
- * React hook that auto-fetches and maintains the authoritative user plan strictly for the currently authenticated user.
- */
-export function useUserPlan(initialUser?: { id?: string; email?: string; user_metadata?: Record<string, any> | null } | null) {
-  const [isPro, setIsPro] = useState<boolean>(() => isUserPro(initialUser))
+export function useUserPlan(
+  initialUser?: { id?: string; email?: string; user_metadata?: Record<string, any> | null } | null
+): UserPlanInfo {
+  const initialTier = getUserPlanTier(initialUser)
+  const [tier, setTier] = useState<PlanTier>(initialTier)
+  const [entitlements, setEntitlements] = useState<UserEntitlements | null>(() =>
+    initialUser ? calculateUserEntitlements(initialUser, 0) : null
+  )
+  const [loading, setLoading] = useState<boolean>(true)
 
-  useEffect(() => {
-    // Clear any legacy cookie that might have leaked across accounts
-    clearLegacyCookies()
-
-    let active = true
-
-    const syncPlan = async () => {
-      try {
-        const res = await fetch('/api/subscription', { cache: 'no-store' })
-        if (res.ok) {
-          const data = await res.json()
-          if (active && typeof data?.is_pro === 'boolean') {
-            setIsPro(data.is_pro)
+  const syncPlan = useCallback(async () => {
+    try {
+      const res = await fetch('/api/subscription', { cache: 'no-store' })
+      if (res.ok) {
+        const data = await res.json()
+        if (data?.success && data?.tier) {
+          setTier(data.tier)
+          if (data.entitlements) {
+            setEntitlements(data.entitlements)
           }
         }
-      } catch {
-        if (active) {
-          setIsPro(isUserPro(initialUser))
-        }
       }
+    } catch {
+      setTier(getUserPlanTier(initialUser))
+    } finally {
+      setLoading(false)
     }
+  }, [initialUser])
 
+  useEffect(() => {
+    clearLegacyCookies()
     syncPlan()
 
     const handlePlanUpdate = () => {
@@ -78,15 +78,20 @@ export function useUserPlan(initialUser?: { id?: string; email?: string; user_me
     window.addEventListener('filemind_plan_changed', handlePlanUpdate)
 
     return () => {
-      active = false
       window.removeEventListener('filemind_plan_changed', handlePlanUpdate)
     }
-  }, [initialUser?.id, initialUser?.email])
+  }, [syncPlan])
+
+  const planConfig = PLAN_CONFIGS[tier] || PLAN_CONFIGS.free
 
   return {
-    isPro,
-    planName: isPro ? ('Pro Intelligence' as const) : ('Free Tier' as const),
-    tier: isPro ? ('pro' as const) : ('free' as const),
-    badgeLabel: isPro ? 'PRO' : 'FREE',
+    isPro: tier === 'pro' || tier === 'elite',
+    isElite: tier === 'elite',
+    tier,
+    planName: planConfig.name,
+    badgeLabel: planConfig.badgeLabel,
+    entitlements,
+    loading,
+    refreshPlan: syncPlan,
   }
 }

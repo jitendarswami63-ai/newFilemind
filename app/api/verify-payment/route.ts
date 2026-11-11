@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { createClient } from '@/lib/supabase/server'
-import { promoteUserToPro } from '@/lib/subscription/plan-server'
+import { promoteUserPlan, addStoragePackToUser } from '@/lib/subscription/plan-server'
+import { getRazorpayClient } from '@/lib/payments/razorpay'
 
 export async function POST(req: Request) {
   try {
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
     const secret = (process.env.RAZORPAY_KEY_SECRET || '').replace(/^["']|["']$/g, '').trim()
     if (!secret) {
       return NextResponse.json(
-        { error: 'Server configuration error: missing secret' },
+        { error: 'Server configuration error: missing Razorpay secret' },
         { status: 500 }
       )
     }
@@ -38,40 +39,60 @@ export async function POST(req: Request) {
 
     if (!isValid) {
       return NextResponse.json(
-        { success: false, error: 'Signature mismatch' },
+        { success: false, error: 'Cryptographic payment signature mismatch' },
         { status: 400 }
       )
     }
 
-    // Try to associate with logged-in user if available
+    let orderNotes: Record<string, any> = {}
     try {
-      const supabase = await createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const razorpay = getRazorpayClient()
+      const order = await razorpay.orders.fetch(order_id)
+      orderNotes = order.notes || {}
+    } catch (orderFetchErr) {
+      console.warn('[Razorpay Verify] Could not fetch order notes, falling back to body:', orderFetchErr)
+    }
 
-      const targetUserId = body.userId || user?.id
-      if (targetUserId) {
-        await promoteUserToPro(targetUserId, {
+    const itemType = orderNotes.type || body.type || 'subscription'
+    const planTier = orderNotes.planTier || body.planTier || (body.planName?.toLowerCase().includes('elite') ? 'elite' : 'pro')
+    const packId = orderNotes.packId || body.packId
+
+    const supabase = await createClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    const targetUserId = body.userId || user?.id
+
+    if (targetUserId) {
+      if (itemType === 'storage_pack' && packId) {
+        await addStoragePackToUser(targetUserId, packId, {
           razorpay_order_id: order_id,
           razorpay_payment_id: payment_id,
-          plan_activated_at: new Date().toISOString(),
+        })
+      } else if (planTier === 'elite') {
+        await promoteUserPlan(targetUserId, 'elite', {
+          razorpay_order_id: order_id,
+          razorpay_payment_id: payment_id,
+        })
+      } else {
+        await promoteUserPlan(targetUserId, 'pro', {
+          razorpay_order_id: order_id,
+          razorpay_payment_id: payment_id,
         })
       }
-    } catch (authErr) {
-      console.warn('[Razorpay Verify] Could not auto-promote user session:', authErr)
     }
 
     const response = NextResponse.json({
       success: true,
-      message: 'Payment signature verified successfully',
-      is_pro: true,
-      plan: 'pro',
+      message: 'Payment verified and confirmed successfully',
+      itemType,
+      planTier: itemType === 'subscription' ? planTier : undefined,
+      packId: itemType === 'storage_pack' ? packId : undefined,
       order_id,
       payment_id,
     })
 
-    // Wipe any generic browser cookie so other accounts never inherit Pro
     response.cookies.delete('filemind_plan')
     response.cookies.set('filemind_plan', '', { path: '/', expires: new Date(0) })
 
@@ -79,7 +100,7 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error('[Razorpay Verify Error]:', error)
     return NextResponse.json(
-      { error: error.message || 'Verification failed' },
+      { error: error.message || 'Payment signature verification error' },
       { status: 500 }
     )
   }

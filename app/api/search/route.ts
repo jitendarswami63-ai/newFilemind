@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { executeHybridSearch } from '@/lib/search/hybrid-search'
 import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
+import { getServerUserEntitlements } from '@/lib/subscription/plan-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,6 +20,9 @@ export async function GET(request: NextRequest) {
         { status: auth.status }
       )
     }
+
+    const user = auth.user!
+    const entitlements = await getServerUserEntitlements(user.id, user.user_metadata)
 
     const searchParams = request.nextUrl.searchParams
     const rawQuery = searchParams.get('q')
@@ -54,6 +58,8 @@ export async function GET(request: NextRequest) {
       success: true,
       query: trimmedQuery,
       results,
+      semanticSearchGated: !entitlements.hasAiFeatures,
+      planTier: entitlements.tier,
     })
   } catch (error: unknown) {
     console.error('[Search] Internal API error:', error)

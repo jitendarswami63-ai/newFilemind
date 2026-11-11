@@ -2,67 +2,119 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
 import Script from 'next/script'
-import { Check, ShieldCheck, Zap, Crown, ArrowRight } from 'lucide-react'
+import { Check, ShieldCheck, Zap, Crown, ArrowRight, HardDrive, Sparkles } from 'lucide-react'
 import { LandingNavbar } from '@/components/landing/LandingNavbar'
 import { RazorpayCheckoutButton } from '@/components/checkout/RazorpayCheckoutButton'
 import { createClient } from '@/lib/supabase/server'
-import { isServerUserPro } from '@/lib/subscription/plan-server'
+import { getServerUserTier } from '@/lib/subscription/plan-server'
+import { PLAN_CONFIGS, STORAGE_PACKS, formatINR } from '@/lib/subscription/plans'
 import { ProBadge } from '@/components/ui/ProBadge'
 
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Upgrade to FileMind Pro – Razorpay Secure Checkout',
+  title: 'Upgrade Plan & Storage – Razorpay Secure Checkout | FileMind',
   description:
-    'Complete your FileMind subscription securely using Razorpay Standard Checkout. Supports UPI, Cards, NetBanking, and Wallets.',
+    'Complete your FileMind Pro, Elite, or Extra Storage order securely with Razorpay Standard Web Checkout. Supports UPI, Cards, NetBanking, and Wallets.',
 }
 
-export default async function CheckoutPage() {
+interface CheckoutPageProps {
+  searchParams: Promise<{ plan?: string; pack?: string }>
+}
+
+export default async function CheckoutPage({ searchParams }: CheckoutPageProps) {
+  const params = await searchParams
   const supabase = await createClient()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const isPro = await isServerUserPro(user)
+  const currentTier = await getServerUserTier(user)
+
+  const requestedPackId = params.pack && STORAGE_PACKS[params.pack] ? params.pack : null
+  const isStoragePack = Boolean(requestedPackId)
+  const selectedPack = requestedPackId ? STORAGE_PACKS[requestedPackId] : null
+
+  const selectedTier = params.plan === 'elite' ? 'elite' : 'pro'
+  const selectedPlan = PLAN_CONFIGS[selectedTier]
+
+  const title = isStoragePack
+    ? `Purchase ${selectedPack?.name}`
+    : `Upgrade to ${selectedPlan.name}`
+
+  const priceDisplay = isStoragePack
+    ? selectedPack?.priceDisplay
+    : selectedPlan.priceDisplay
+
+  const billingPeriod = isStoragePack
+    ? selectedPack?.billingPeriod
+    : selectedPlan.billingPeriod
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-[#292720] flex flex-col selection:bg-[#9C7D47]/20 selection:text-[#292720]">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" strategy="lazyOnload" />
       <LandingNavbar user={user} />
 
-      <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-20 space-y-10">
+      <main className="flex-1 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 space-y-10">
         <section className="text-center space-y-3">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FAF5EC] border border-[#E5DED1] text-xs font-semibold text-[#9C7D47]">
             <Zap className="h-3.5 w-3.5" />
             <span>Razorpay Secure Payment Gateway</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#292720]">
-            Complete Your Upgrade
+            {title}
           </h1>
           <p className="text-sm sm:text-base text-[#777064] max-w-xl mx-auto">
-            Get unlimited AI document analysis, FIDO2 biometric encryption, and fast vector indexing with Razorpay Standard Web Checkout.
+            {isStoragePack
+              ? 'Instant vault capacity upgrade. Combines cumulatively with your active plan storage.'
+              : 'Unlock premium AI document analysis, dual-engine intelligence, and expanded storage with instant Razorpay checkout.'}
           </p>
         </section>
 
-        {isPro && (
-          <div className="p-5 rounded-2xl bg-gradient-to-r from-[#2D281E] via-[#1B1D21] to-[#252015] border border-[#D4AF37]/60 text-[#F5F1E9] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg">
+        {!isStoragePack && (
+          <div className="flex items-center justify-center gap-3">
+            <Link
+              href="/checkout?plan=pro"
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                selectedTier === 'pro'
+                  ? 'bg-[#9C7D47] text-[#FFFCF5] shadow-xs'
+                  : 'bg-[#FFFCF5] text-[#292720] border border-[#E5DED1] hover:bg-[#FAF5EC]'
+              }`}
+            >
+              Pro Intelligence (₹249)
+            </Link>
+            <Link
+              href="/checkout?plan=elite"
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                selectedTier === 'elite'
+                  ? 'bg-[#1B1D21] text-[#F5F1E9] border border-[#D4AF37] shadow-xs'
+                  : 'bg-[#FFFCF5] text-[#292720] border border-[#E5DED1] hover:bg-[#FAF5EC]'
+              }`}
+            >
+              Elite Intelligence (₹499)
+            </Link>
+          </div>
+        )}
+
+        {currentTier === selectedTier && !isStoragePack && (
+          <div className="p-5 rounded-2xl bg-[#FAF5EC] border border-[#D4AF37]/50 text-[#292720] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xs">
             <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#AA771C] flex items-center justify-center text-[#1C180A] shadow-xs">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-r from-[#D4AF37] to-[#AA771C] flex items-center justify-center text-[#1C180A]">
                 <Crown className="h-5 w-5 fill-[#1C180A]" />
               </div>
               <div>
-                <div className="text-sm font-bold text-[#F3E5AB] flex items-center gap-2">
-                  <span>Pro Intelligence is Active</span>
+                <div className="text-sm font-bold text-[#292720] flex items-center gap-2">
+                  <span>{selectedPlan.name} is Currently Active</span>
                   <ProBadge variant="gold-pill" size="xs" label="ACTIVE" />
                 </div>
-                <p className="text-xs text-[#C5A878]">
-                  Your account already has full Pro access. You can manage your subscription in Settings.
+                <p className="text-xs text-[#777064]">
+                  Your account is already on this tier. Need more space? You can add standalone storage below.
                 </p>
               </div>
             </div>
             <Link
               href="/dashboard"
-              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-[#1C180A] bg-gradient-to-r from-[#D4AF37] via-[#F6E27A] to-[#AA771C] hover:opacity-95 shadow-xs transition-opacity flex-shrink-0"
+              className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] shadow-xs"
             >
               <span>Go to Workspace</span>
               <ArrowRight className="h-3.5 w-3.5" />
@@ -71,63 +123,70 @@ export default async function CheckoutPage() {
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-          {/* Order Summary Card */}
           <div className="p-7 rounded-2xl bg-[#FFFCF5] border-2 border-[#9C7D47] shadow-sm space-y-6">
             <div className="flex items-start justify-between">
               <div>
                 <span className="text-xs font-bold text-[#9C7D47] uppercase tracking-wider">
-                  Selected Plan
+                  {isStoragePack ? 'Storage Add-on' : 'Selected Plan'}
                 </span>
                 <h2 className="text-2xl font-extrabold text-[#292720] mt-1">
-                  Pro Intelligence
+                  {isStoragePack ? selectedPack?.name : selectedPlan.name}
                 </h2>
                 <p className="text-xs text-[#777064] mt-0.5">
-                  Monthly billing • Cancel anytime
+                  Monthly recurring • Cancel anytime
                 </p>
               </div>
               <div className="text-right">
-                <div className="text-3xl font-extrabold text-[#292720]">₹50</div>
-                <div className="text-[11px] text-[#777064]">/ month (incl. GST)</div>
+                <div className="text-3xl font-extrabold text-[#292720]">{priceDisplay}</div>
+                <div className="text-[11px] text-[#777064]">{billingPeriod}</div>
               </div>
             </div>
 
             <ul className="space-y-3 text-xs text-[#292720] pt-4 border-t border-[#E5DED1]">
-              <li className="flex items-center gap-2.5">
-                <Check className="h-4 w-4 text-[#9C7D47] flex-shrink-0" />
-                <span className="font-medium">Unlimited document uploads & questions</span>
-              </li>
-              <li className="flex items-center gap-2.5">
-                <Check className="h-4 w-4 text-[#9C7D47] flex-shrink-0" />
-                <span>Dual AI engine: Gemini 3.8 + NVIDIA NIM</span>
-              </li>
-              <li className="flex items-center gap-2.5">
-                <Check className="h-4 w-4 text-[#9C7D47] flex-shrink-0" />
-                <span>Hardware-bound biometric WebAuthn vault</span>
-              </li>
-              <li className="flex items-center gap-2.5">
-                <Check className="h-4 w-4 text-[#9C7D47] flex-shrink-0" />
-                <span>Deepgram neural voice playback</span>
-              </li>
-              <li className="flex items-center gap-2.5">
-                <Check className="h-4 w-4 text-[#9C7D47] flex-shrink-0" />
-                <span>Priority processing queue</span>
-              </li>
+              {isStoragePack ? (
+                <>
+                  <li className="flex items-center gap-2.5">
+                    <Check className="h-4 w-4 text-[#9C7D47] flex-shrink-0" />
+                    <span className="font-semibold">{selectedPack?.description}</span>
+                  </li>
+                  <li className="flex items-center gap-2.5">
+                    <Check className="h-4 w-4 text-[#9C7D47] flex-shrink-0" />
+                    <span>Instant quota activation upon payment verification</span>
+                  </li>
+                  <li className="flex items-center gap-2.5">
+                    <Check className="h-4 w-4 text-[#9C7D47] flex-shrink-0" />
+                    <span>Cumulative with Free (100MB), Pro (1GB) or Elite (10GB)</span>
+                  </li>
+                  <li className="flex items-center gap-2.5">
+                    <Check className="h-4 w-4 text-[#9C7D47] flex-shrink-0" />
+                    <span>Zero document deletion on plan changes</span>
+                  </li>
+                </>
+              ) : (
+                selectedPlan.features.slice(0, 6).map((feat) => (
+                  <li key={feat} className="flex items-center gap-2.5">
+                    <Check className="h-4 w-4 text-[#9C7D47] flex-shrink-0" />
+                    <span>{feat}</span>
+                  </li>
+                ))
+              )}
             </ul>
 
             <div className="pt-4 border-t border-[#E5DED1]">
               <RazorpayCheckoutButton
-                amount={50}
+                planTier={!isStoragePack ? selectedTier : undefined}
+                packId={isStoragePack ? (requestedPackId as any) : undefined}
+                amount={isStoragePack ? selectedPack?.priceINR : selectedPlan.priceINR}
                 currency="INR"
-                planName="Pro Intelligence"
+                planName={isStoragePack ? selectedPack?.name : selectedPlan.name}
                 userName={user?.user_metadata?.full_name}
                 userEmail={user?.email}
-                buttonText="Pay ₹50 with Razorpay"
+                buttonText={`Pay ${priceDisplay} with Razorpay`}
                 className="w-full text-center py-3 text-sm font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] border border-[#856837] rounded-xl shadow-xs transition-colors cursor-pointer"
               />
             </div>
           </div>
 
-          {/* Security & Supported Methods */}
           <div className="space-y-6">
             <div className="p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5DED1] space-y-4">
               <div className="flex items-center gap-3">
@@ -153,16 +212,16 @@ export default async function CheckoutPage() {
                 Supported Payment Options
               </h3>
               <div className="grid grid-cols-2 gap-2 text-xs text-[#777064]">
-                <div className="p-2 rounded-lg bg-[#FAF5EC] border border-[#E5DED1]">
+                <div className="p-2.5 rounded-xl bg-[#FAF5EC] border border-[#E5DED1]">
                   💳 Credit & Debit Cards
                 </div>
-                <div className="p-2 rounded-lg bg-[#FAF5EC] border border-[#E5DED1]">
+                <div className="p-2.5 rounded-xl bg-[#FAF5EC] border border-[#E5DED1]">
                   📱 UPI (GPay, PhonePe, Paytm)
                 </div>
-                <div className="p-2 rounded-lg bg-[#FAF5EC] border border-[#E5DED1]">
+                <div className="p-2.5 rounded-xl bg-[#FAF5EC] border border-[#E5DED1]">
                   🏦 NetBanking (50+ Banks)
                 </div>
-                <div className="p-2 rounded-lg bg-[#FAF5EC] border border-[#E5DED1]">
+                <div className="p-2.5 rounded-xl bg-[#FAF5EC] border border-[#E5DED1]">
                   👛 Wallets & PayLater
                 </div>
               </div>

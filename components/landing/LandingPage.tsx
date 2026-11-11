@@ -23,6 +23,7 @@ import {
   Share2,
   ExternalLink,
   Crown,
+  HardDrive,
 } from 'lucide-react'
 import { LandingNavbar } from './LandingNavbar'
 import { createClient } from '@/lib/supabase/client'
@@ -36,7 +37,7 @@ interface LandingPageProps {
 export function LandingPage({ user: initialUser }: LandingPageProps) {
   const [user, setUser] = useState(initialUser)
   const [openFaq, setOpenFaq] = useState<number | null>(null)
-  const { isPro } = useUserPlan(user)
+  const { isPro, isElite, tier } = useUserPlan(user)
 
   useEffect(() => {
     if (initialUser) return
@@ -492,156 +493,321 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                 Transparent Pricing
               </span>
               <h2 className="text-3xl sm:text-4xl font-extrabold text-[#292720] tracking-tight mt-2 mb-4">
-                Choose the plan that fits your research needs
+                Predictable plans for every scale of research
               </h2>
               <p className="text-base sm:text-lg text-[#777064]">
-                Start free today. Upgrade when you need unlimited document volume and enterprise-level vault security.
+                Start free with essential PDF management. Upgrade to Pro or Elite for dual-engine AI extraction, semantic vector search, and hardware-grade vault capacity.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
-              <div className="bg-[#FFFCF5] p-7 rounded-xl border border-[#E5DED1] shadow-xs flex flex-col justify-between">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch mb-16">
+              <div className={`bg-[#FFFCF5] p-7 rounded-2xl border ${tier === 'free' && user ? 'border-2 border-[#9C7D47] ring-2 ring-[#9C7D47]/10 shadow-md' : 'border-[#E5DED1] shadow-xs'} flex flex-col justify-between relative`}>
+                {tier === 'free' && user && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-xs bg-[#777064] text-[#FFFCF5]">
+                    Current Plan
+                  </div>
+                )}
                 <div>
-                  <h3 className="text-lg font-bold text-[#292720]">Starter</h3>
-                  <p className="text-xs text-[#777064] mt-1 mb-4">For individuals, researchers, and students.</p>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-[#292720]">Free Tier</h3>
+                    {tier === 'free' && user && <span className="text-[10px] bg-[#FAF5EC] text-[#777064] px-2 py-0.5 rounded-full border border-[#E5DED1] font-semibold uppercase tracking-wider">ACTIVE</span>}
+                  </div>
+                  <p className="text-xs text-[#777064] mt-1 mb-4">Essential PDF management & private storage for individuals.</p>
                   <div className="flex items-baseline gap-1 mb-6">
-                    <span className="text-4xl font-extrabold text-[#292720]">$0</span>
-                    <span className="text-xs text-[#777064]">/ forever</span>
+                    <span className="text-4xl font-extrabold text-[#292720]">₹0</span>
+                    <span className="text-xs text-[#777064]">/ month</span>
                   </div>
                   <ul className="space-y-3 text-xs text-[#292720] mb-8">
                     <li className="flex items-center gap-2">
                       <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
-                      <span>Up to 150 documents indexed</span>
+                      <span className="font-medium">100 MB total private storage</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
-                      <span>49 MB per-file upload limit</span>
+                      <span>Maximum 10 PDF files per batch</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
-                      <span>Hybrid Semantic + Keyword Search</span>
+                      <span>Maximum 5 MB per individual PDF</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
-                      <span>Grounded Ask AI synthesis</span>
+                      <span>Basic PDF upload & secure cloud storage</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
-                      <span>Standard PDF viewer & citations</span>
+                      <span>PDF preview, download and delete</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
+                      <span>Basic file management & tags</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
+                      <span className="text-[#777064]">BYOK Gemini API key supported</span>
                     </li>
                   </ul>
                 </div>
                 <Link
                   href={user ? '/dashboard' : '/signup'}
                   aria-label="Start with FileMind Free Tier"
-                  className="w-full text-center py-2.5 text-xs font-semibold text-[#292720] bg-[#FAF5EC] hover:bg-[#F3EFE5] border border-[#E5DED1] rounded-lg transition-colors cursor-pointer"
+                  className="w-full text-center py-2.5 text-xs font-semibold text-[#292720] bg-[#FAF5EC] hover:bg-[#F3EFE5] border border-[#E5DED1] rounded-xl transition-colors cursor-pointer"
                 >
-                  {user ? 'Open Free Tier' : 'Start with Free Tier'}
+                  {user ? 'Open Free Workspace' : 'Start Free'}
                 </Link>
               </div>
 
-              <div className={`bg-[#FFFCF5] p-7 rounded-xl ${isPro ? 'border-2 border-[#D4AF37] ring-2 ring-[#D4AF37]/20 shadow-lg' : 'border-2 border-[#9C7D47] shadow-md'} flex flex-col justify-between relative`}>
-                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-xs ${isPro ? 'bg-gradient-to-r from-[#D4AF37] to-[#AA771C] text-[#1C180A] flex items-center gap-1 font-black' : 'bg-[#9C7D47] text-[#FFFCF5]'}`}>
-                  {isPro ? (
+              <div className={`bg-[#FFFCF5] p-7 rounded-2xl ${tier === 'pro' ? 'border-2 border-[#D4AF37] ring-2 ring-[#D4AF37]/20 shadow-xl' : 'border-2 border-[#9C7D47] shadow-lg'} flex flex-col justify-between relative`}>
+                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-xs ${tier === 'pro' ? 'bg-gradient-to-r from-[#D4AF37] to-[#AA771C] text-[#1C180A] flex items-center gap-1 font-black' : 'bg-[#9C7D47] text-[#FFFCF5]'}`}>
+                  {tier === 'pro' ? (
                     <>
                       <Crown className="h-3 w-3 fill-[#1C180A]" />
                       <span>Your Active Plan</span>
                     </>
                   ) : (
-                    'Most Popular'
+                    'Recommended'
                   )}
                 </div>
                 <div>
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold text-[#292720]">Pro Intelligence</h3>
-                    {isPro && <ProBadge variant="gold-pill" size="xs" label="ACTIVE" />}
+                    {tier === 'pro' && <ProBadge variant="gold-pill" size="xs" label="ACTIVE" />}
                   </div>
-                  <p className="text-xs text-[#777064] mt-1 mb-4">For legal, finance, and technical professionals.</p>
+                  <p className="text-xs text-[#777064] mt-1 mb-4">For legal, finance, and technical researchers needing AI extraction.</p>
                   <div className="flex items-baseline gap-1 mb-6">
-                    <span className="text-4xl font-extrabold text-[#292720]">₹50</span>
+                    <span className="text-4xl font-extrabold text-[#292720]">₹249</span>
                     <span className="text-xs text-[#777064]">/ month (incl. GST)</span>
                   </div>
                   <ul className="space-y-3 text-xs text-[#292720] mb-8">
                     <li className="flex items-center gap-2">
                       <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
-                      <span className="font-semibold">Unlimited document library</span>
+                      <span className="font-semibold text-[#292720]">1 GB high-speed vault storage</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
-                      <span>Dual-Engine AI (Gemini + NVIDIA NIM)</span>
+                      <span>Maximum 100 PDFs per batch</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
-                      <span>FIDO2 WebAuthn Biometric Secure Vault</span>
+                      <span>Maximum 25 MB per individual PDF</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
-                      <span>Deepgram Speech-to-Text & Neural Audio</span>
+                      <span>AI document extraction & understanding</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
-                      <span>Priority background processing queue</span>
+                      <span>AI-generated titles, summaries & auto tags</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
+                      <span>Structured metadata property extraction</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
+                      <span>Hybrid keyword + semantic vector search</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
+                      <span>Grounded Ask AI with page citations</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
+                      <span>Background document processing</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
+                      <span className="font-semibold text-[#9C7D47]">500 monthly AI queries included</span>
                     </li>
                   </ul>
                 </div>
-                {isPro ? (
+                {tier === 'pro' ? (
                   <Link
                     href="/dashboard"
                     aria-label="Open your FileMind Pro workspace"
-                    className="w-full text-center py-2.5 text-xs font-bold text-[#1C180A] bg-gradient-to-r from-[#D4AF37] via-[#F6E27A] to-[#AA771C] hover:opacity-95 rounded-lg shadow-sm transition-opacity cursor-pointer flex items-center justify-center gap-1.5"
+                    className="w-full text-center py-2.5 text-xs font-bold text-[#1C180A] bg-gradient-to-r from-[#D4AF37] via-[#F6E27A] to-[#AA771C] hover:opacity-95 rounded-xl shadow-sm transition-opacity cursor-pointer flex items-center justify-center gap-1.5"
                   >
                     <Crown className="h-3.5 w-3.5 fill-[#1C180A]" />
                     <span>Open Pro Workspace</span>
                   </Link>
                 ) : (
                   <Link
-                    href="/checkout"
-                    aria-label="Upgrade to FileMind Pro intelligence plan with Razorpay"
-                    className="w-full text-center py-2.5 text-xs font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] border border-[#856837] rounded-lg shadow-xs transition-colors cursor-pointer"
+                    href="/checkout?plan=pro"
+                    aria-label="Upgrade to FileMind Pro intelligence plan for ₹249/month"
+                    className="w-full text-center py-2.5 text-xs font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] border border-[#856837] rounded-xl shadow-xs transition-colors cursor-pointer"
                   >
-                    Upgrade to Pro Plan
+                    Upgrade to Pro (₹249)
                   </Link>
                 )}
               </div>
 
-              <div className="bg-[#FFFCF5] p-7 rounded-xl border border-[#E5DED1] shadow-xs flex flex-col justify-between">
+              <div className={`bg-[#1B1D21] text-[#F5F1E9] p-7 rounded-2xl border ${tier === 'elite' ? 'border-2 border-[#D4AF37] ring-2 ring-[#D4AF37]/30 shadow-2xl' : 'border-[#3E4149] shadow-lg'} flex flex-col justify-between relative`}>
+                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-xs ${tier === 'elite' ? 'bg-gradient-to-r from-[#D4AF37] to-[#AA771C] text-[#1C180A] flex items-center gap-1 font-black' : 'bg-gradient-to-r from-[#C5A878] to-[#9C7D47] text-[#1B1D21]'}`}>
+                  {tier === 'elite' ? (
+                    <>
+                      <Crown className="h-3 w-3 fill-[#1C180A]" />
+                      <span>Your Active Plan</span>
+                    </>
+                  ) : (
+                    'Advanced Power'
+                  )}
+                </div>
                 <div>
-                  <h3 className="text-lg font-bold text-[#292720]">Enterprise</h3>
-                  <p className="text-xs text-[#777064] mt-1 mb-4">For organizations with compliance & SSO needs.</p>
-                  <div className="flex items-baseline gap-1 mb-6">
-                    <span className="text-4xl font-extrabold text-[#292720]">$89</span>
-                    <span className="text-xs text-[#777064]">/ seat / month</span>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-bold text-[#F5F1E9]">Elite Intelligence</h3>
+                    {tier === 'elite' && <ProBadge variant="gold-pill" size="xs" label="ACTIVE" />}
                   </div>
-                  <ul className="space-y-3 text-xs text-[#292720] mb-8">
+                  <p className="text-xs text-[#A8A49B] mt-1 mb-4">High-volume workflows, 10 GB storage, and hardware biometric vault.</p>
+                  <div className="flex items-baseline gap-1 mb-6">
+                    <span className="text-4xl font-extrabold text-[#F5F1E9]">₹499</span>
+                    <span className="text-xs text-[#A8A49B]">/ month (incl. GST)</span>
+                  </div>
+                  <ul className="space-y-3 text-xs text-[#DDD8CE] mb-8">
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
-                      <span>Dedicated isolated vector partition</span>
+                      <Check className="h-3.5 w-3.5 text-[#C5A878] flex-shrink-0" />
+                      <span className="font-semibold text-[#F5F1E9]">10 GB massive vault storage</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
-                      <span>SSO / SAML authentication</span>
+                      <Check className="h-3.5 w-3.5 text-[#C5A878] flex-shrink-0" />
+                      <span>Maximum 150 PDFs per batch upload</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
-                      <span>Audit logging & compliance exports</span>
+                      <Check className="h-3.5 w-3.5 text-[#C5A878] flex-shrink-0" />
+                      <span>Maximum 49 MB per individual PDF</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
-                      <span>Custom ingestion limits & dedicated SLA</span>
+                      <Check className="h-3.5 w-3.5 text-[#C5A878] flex-shrink-0" />
+                      <span className="font-semibold text-[#C5A878]">Priority background processing queue</span>
                     </li>
                     <li className="flex items-center gap-2">
-                      <Check className="h-3.5 w-3.5 text-[#9C7D47] flex-shrink-0" />
-                      <span>24/7 dedicated engineering support</span>
+                      <Check className="h-3.5 w-3.5 text-[#C5A878] flex-shrink-0" />
+                      <span className="font-semibold text-[#C5A878]">2,500 monthly AI queries included</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 text-[#C5A878] flex-shrink-0" />
+                      <span>Large-PDF adaptive bisection & splitting</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 text-[#C5A878] flex-shrink-0" />
+                      <span>FIDO2 WebAuthn biometric document vault</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 text-[#C5A878] flex-shrink-0" />
+                      <span>Advanced bulk document management</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 text-[#C5A878] flex-shrink-0" />
+                      <span>Priority dedicated engineering support</span>
                     </li>
                   </ul>
                 </div>
-                <Link
-                  href="/contact"
-                  aria-label="Contact our enterprise team for dedicated solutions"
-                  className="w-full text-center py-2.5 text-xs font-semibold text-[#292720] bg-[#FAF5EC] hover:bg-[#F3EFE5] border border-[#E5DED1] rounded-lg transition-colors cursor-pointer"
-                >
-                  Contact Enterprise Team
-                </Link>
+                {tier === 'elite' ? (
+                  <Link
+                    href="/dashboard"
+                    aria-label="Open your FileMind Elite workspace"
+                    className="w-full text-center py-2.5 text-xs font-bold text-[#1C180A] bg-gradient-to-r from-[#D4AF37] via-[#F6E27A] to-[#AA771C] hover:opacity-95 rounded-xl shadow-sm transition-opacity cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    <Crown className="h-3.5 w-3.5 fill-[#1C180A]" />
+                    <span>Open Elite Workspace</span>
+                  </Link>
+                ) : (
+                  <Link
+                    href="/checkout?plan=elite"
+                    aria-label="Upgrade to FileMind Elite intelligence plan for ₹499/month"
+                    className="w-full text-center py-2.5 text-xs font-semibold text-[#1C180A] bg-gradient-to-r from-[#C5A878] to-[#9C7D47] hover:opacity-95 rounded-xl shadow-xs transition-opacity cursor-pointer"
+                  >
+                    Upgrade to Elite (₹499)
+                  </Link>
+                )}
+              </div>
+            </div>
+
+            <div className="rounded-3xl bg-[#FFFCF5] border border-[#E5DED1] p-8 sm:p-10 shadow-xs">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-8 border-b border-[#E5DED1]">
+                <div>
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#FAF5EC] border border-[#E5DED1] text-xs font-semibold text-[#9C7D47] mb-3">
+                    <HardDrive className="h-3.5 w-3.5" />
+                    <span>Extra Storage Marketplace</span>
+                  </div>
+                  <h3 className="text-2xl sm:text-3xl font-extrabold text-[#292720] tracking-tight">
+                    Need more capacity? Expand your vault anytime
+                  </h3>
+                  <p className="text-xs sm:text-sm text-[#777064] mt-1 max-w-2xl">
+                    Standalone monthly storage add-ons that combine with your included plan quota. Works seamlessly with Free, Pro, and Elite tiers.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-xs font-semibold text-[#777064] bg-[#FAF5EC] px-4 py-2.5 rounded-2xl border border-[#E5DED1]">
+                  <Database className="h-4 w-4 text-[#9C7D47]" />
+                  <span>Cumulative Quota Model</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8">
+                <div className="p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5DED1] flex flex-col justify-between hover:border-[#9C7D47]/50 transition-colors">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-[#9C7D47] uppercase tracking-wider">Pack 1</span>
+                      <span className="text-[10px] font-semibold bg-[#FFFCF5] px-2 py-0.5 rounded-full border border-[#E5DED1] text-[#777064]">+1 GB</span>
+                    </div>
+                    <h4 className="text-base font-bold text-[#292720]">Additional 1 GB</h4>
+                    <p className="text-xs text-[#777064] mt-1 mb-4">Adds capacity for approximately 200 standard research documents.</p>
+                    <div className="flex items-baseline gap-1 mb-5">
+                      <span className="text-2xl font-extrabold text-[#292720]">₹49</span>
+                      <span className="text-xs text-[#777064]">/ month</span>
+                    </div>
+                  </div>
+                  <Link
+                    href="/checkout?pack=pack_1gb"
+                    className="w-full text-center py-2 text-xs font-semibold text-[#292720] bg-[#FFFCF5] hover:bg-[#F3EFE5] border border-[#D8D0C2] rounded-xl transition-colors"
+                  >
+                    Add 1 GB (₹49)
+                  </Link>
+                </div>
+
+                <div className="p-6 rounded-2xl bg-[#FAF5EC] border-2 border-[#9C7D47]/40 flex flex-col justify-between hover:border-[#9C7D47] transition-colors relative shadow-2xs">
+                  <div className="absolute -top-2.5 right-6 px-2.5 py-0.5 rounded-full bg-[#9C7D47] text-[#FFFCF5] text-[9px] font-bold uppercase tracking-wider">
+                    Popular
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-[#9C7D47] uppercase tracking-wider">Pack 2</span>
+                      <span className="text-[10px] font-semibold bg-[#FFFCF5] px-2 py-0.5 rounded-full border border-[#E5DED1] text-[#777064]">+5 GB</span>
+                    </div>
+                    <h4 className="text-base font-bold text-[#292720]">Additional 5 GB</h4>
+                    <p className="text-xs text-[#777064] mt-1 mb-4">Adds capacity for approximately 1,000 comprehensive files and reports.</p>
+                    <div className="flex items-baseline gap-1 mb-5">
+                      <span className="text-2xl font-extrabold text-[#292720]">₹199</span>
+                      <span className="text-xs text-[#777064]">/ month</span>
+                    </div>
+                  </div>
+                  <Link
+                    href="/checkout?pack=pack_5gb"
+                    className="w-full text-center py-2 text-xs font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-xl shadow-2xs transition-colors"
+                  >
+                    Add 5 GB (₹199)
+                  </Link>
+                </div>
+
+                <div className="p-6 rounded-2xl bg-[#FAF5EC] border border-[#E5DED1] flex flex-col justify-between hover:border-[#9C7D47]/50 transition-colors">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-[#9C7D47] uppercase tracking-wider">Pack 3</span>
+                      <span className="text-[10px] font-semibold bg-[#FFFCF5] px-2 py-0.5 rounded-full border border-[#E5DED1] text-[#777064]">+10 GB</span>
+                    </div>
+                    <h4 className="text-base font-bold text-[#292720]">Additional 10 GB</h4>
+                    <p className="text-xs text-[#777064] mt-1 mb-4">High-volume repository capacity for 2,000+ files and datasets.</p>
+                    <div className="flex items-baseline gap-1 mb-5">
+                      <span className="text-2xl font-extrabold text-[#292720]">₹349</span>
+                      <span className="text-xs text-[#777064]">/ month</span>
+                    </div>
+                  </div>
+                  <Link
+                    href="/checkout?pack=pack_10gb"
+                    className="w-full text-center py-2 text-xs font-semibold text-[#292720] bg-[#FFFCF5] hover:bg-[#F3EFE5] border border-[#D8D0C2] rounded-xl transition-colors"
+                  >
+                    Add 10 GB (₹349)
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
