@@ -300,65 +300,79 @@ export class BatchUploadManager {
     this.updateItem(id, { status: 'uploading', uploadProgress: 20 })
 
     try {
-      await new Promise<void>(async (resolve, reject) => {
-        const xhr = new XMLHttpRequest()
-        this.activeXhrs.set(id, xhr)
+      const sendFile = (targetUrl: string | null, targetMethod: string): Promise<void> => {
+        return new Promise<void>(async (resolve, reject) => {
+          const xhr = new XMLHttpRequest()
+          this.activeXhrs.set(id, xhr)
 
-        if (uploadUrl) {
-          xhr.open(uploadMethod, uploadUrl)
-          xhr.setRequestHeader('Content-Type', 'application/pdf')
-        } else {
-          const supabase = createClient()
-          const { data: sessionData } = await supabase.auth.getSession()
-          const jwt = sessionData.session?.access_token
-
-          if (!jwt) {
-            this.activeXhrs.delete(id)
-            reject(new Error('User session expired. Please sign in again.'))
-            return
-          }
-
-          const storageEndpoint = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/documents/${storagePath}`
-          xhr.open('POST', storageEndpoint)
-          xhr.setRequestHeader('Authorization', `Bearer ${jwt}`)
-          xhr.setRequestHeader('Content-Type', 'application/pdf')
-          xhr.setRequestHeader('x-upsert', 'false')
-        }
-
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            const rawProgress = (event.loaded / event.total) * 100
-            const mappedProgress = Math.min(85, Math.max(20, Math.round(20 + rawProgress * 0.65)))
-            this.updateItem(id, { uploadProgress: mappedProgress })
-          }
-        }
-
-        xhr.onload = () => {
-          this.activeXhrs.delete(id)
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve()
+          if (targetUrl) {
+            xhr.open(targetMethod, targetUrl)
+            xhr.setRequestHeader('Content-Type', 'application/pdf')
           } else {
-            let errMsg = 'Storage transmission failed'
-            try {
-              const resData = JSON.parse(xhr.responseText)
-              if (resData.message) errMsg = resData.message
-            } catch {}
-            reject(new Error(errMsg))
+            const supabase = createClient()
+            const { data: sessionData } = await supabase.auth.getSession()
+            const jwt = sessionData.session?.access_token
+
+            if (!jwt) {
+              this.activeXhrs.delete(id)
+              reject(new Error('User session expired. Please sign in again.'))
+              return
+            }
+
+            const storageEndpoint = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/documents/${storagePath}`
+            xhr.open('POST', storageEndpoint)
+            xhr.setRequestHeader('Authorization', `Bearer ${jwt}`)
+            xhr.setRequestHeader('Content-Type', 'application/pdf')
+            xhr.setRequestHeader('x-upsert', 'false')
           }
-        }
 
-        xhr.onerror = () => {
-          this.activeXhrs.delete(id)
-          reject(new Error('Network error during storage transfer'))
-        }
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const rawProgress = (event.loaded / event.total) * 100
+              const mappedProgress = Math.min(85, Math.max(20, Math.round(20 + rawProgress * 0.65)))
+              this.updateItem(id, { uploadProgress: mappedProgress })
+            }
+          }
 
-        xhr.onabort = () => {
-          this.activeXhrs.delete(id)
-          reject(new Error('Upload cancelled'))
-        }
+          xhr.onload = () => {
+            this.activeXhrs.delete(id)
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve()
+            } else {
+              let errMsg = 'Storage transmission failed'
+              try {
+                const resData = JSON.parse(xhr.responseText)
+                if (resData.message) errMsg = resData.message
+              } catch {}
+              reject(new Error(errMsg))
+            }
+          }
 
-        xhr.send(file)
-      })
+          xhr.onerror = () => {
+            this.activeXhrs.delete(id)
+            reject(new Error('Network error during storage transfer'))
+          }
+
+          xhr.onabort = () => {
+            this.activeXhrs.delete(id)
+            reject(new Error('Upload cancelled'))
+          }
+
+          xhr.send(file)
+        })
+      }
+
+      if (uploadUrl) {
+        try {
+          await sendFile(uploadUrl, uploadMethod)
+        } catch (r2Err) {
+          console.warn('[UploadManager] Direct R2 upload failed (e.g. CORS preflight), falling back to Supabase:', r2Err)
+          storageProvider = 'supabase'
+          await sendFile(null, 'POST')
+        }
+      } else {
+        await sendFile(null, 'POST')
+      }
     } catch (uploadErr) {
       if (this.isCancelled) return
       this.updateItem(id, {
