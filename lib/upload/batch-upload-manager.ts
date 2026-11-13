@@ -440,16 +440,40 @@ export class BatchUploadManager {
     if (!documentId) return
 
     try {
-      const res = await fetch('/api/documents/process-queue', {
+      await fetch('/api/documents/process-queue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ documentId }),
-      })
+      }).catch(() => {})
 
-      const data = await res.json().catch(() => ({}))
+      // Poll status for up to 90 seconds (polling /api/documents/:id every 2.5s)
+      const maxPollAttempts = 36
+      let pollCount = 0
+      let isDone = false
 
-      if (!res.ok || data.error) {
-        throw new Error(data.error || 'AI analysis failed')
+      while (pollCount < maxPollAttempts) {
+        await new Promise((resolve) => setTimeout(resolve, 2500))
+        pollCount++
+
+        if (this.isCancelled) return
+
+        try {
+          const statusRes = await fetch(`/api/documents/${documentId}`)
+          if (statusRes.ok) {
+            const docData = await statusRes.json().catch(() => ({}))
+            if (docData.status === 'completed') {
+              isDone = true
+              break
+            }
+            if (docData.status === 'failed') {
+              throw new Error(docData.error_message || 'AI document analysis failed')
+            }
+          }
+        } catch (pollErr) {
+          if (pollErr instanceof Error && pollErr.message.includes('analysis failed')) {
+            throw pollErr
+          }
+        }
       }
 
       this.updateItem(id, {

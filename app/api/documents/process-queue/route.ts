@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { processDocument } from '@/lib/ai/processor'
 
@@ -43,17 +44,20 @@ export async function POST(request: Request) {
       })
     }
 
-    try {
-      const processed = await processDocument(doc.id)
-      return NextResponse.json({
-        success: processed,
-        documentId: doc.id,
-        processed: true,
-      })
-    } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : 'Processing failed'
-      return NextResponse.json({ error: errorMsg, documentId: doc.id }, { status: 500 })
-    }
+    after(async () => {
+      try {
+        await processDocument(doc.id)
+      } catch (procErr) {
+        console.error('[ProcessQueue] Background document processing error:', procErr)
+      }
+    })
+
+    return NextResponse.json({
+      success: true,
+      documentId: doc.id,
+      scheduled: true,
+      status: 'processing',
+    })
   }
 
   const { data: claimedDocs, error: claimError } = await supabase.rpc('claim_next_pending_document', {
