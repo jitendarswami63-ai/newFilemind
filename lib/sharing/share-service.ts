@@ -318,13 +318,36 @@ export async function validatePublicShareToken(
   }
 
   // Fetch document details securely without exposing sensitive fields
-  const { data: doc, error: docError } = await admin
+  let doc: {
+    id: string
+    filename: string
+    file_size: number
+    mime_type: string
+    storage_path: string
+    storage_provider?: string | null
+    created_at: string
+  } | null = null
+
+  const { data: initialDoc, error: docError } = await admin
     .from('documents')
     .select('id, filename, file_size, mime_type, storage_path, storage_provider, created_at')
     .eq('id', share.document_id)
     .single()
 
-  if (docError || !doc) {
+  if (initialDoc) {
+    doc = initialDoc
+  } else if (docError && (docError.code === '42703' || docError.message?.includes('storage_provider'))) {
+    const { data: fallbackDoc } = await admin
+      .from('documents')
+      .select('id, filename, file_size, mime_type, storage_path, created_at')
+      .eq('id', share.document_id)
+      .single()
+    if (fallbackDoc) {
+      doc = { ...fallbackDoc, storage_provider: undefined }
+    }
+  }
+
+  if (!doc) {
     return { valid: false, reason: 'NOT_FOUND', share }
   }
 
