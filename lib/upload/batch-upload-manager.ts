@@ -300,31 +300,76 @@ export class BatchUploadManager {
     this.updateItem(id, { status: 'uploading', uploadProgress: 20 })
 
     try {
-      const sendFile = (targetUrl: string | null, targetMethod: string): Promise<void> => {
-        return new Promise<void>(async (resolve, reject) => {
+      const sendServerUpload = (): Promise<any> => {
+        return new Promise<any>((resolve, reject) => {
           const xhr = new XMLHttpRequest()
           this.activeXhrs.set(id, xhr)
 
-          if (targetUrl) {
-            xhr.open(targetMethod, targetUrl)
-            xhr.setRequestHeader('Content-Type', 'application/pdf')
-          } else {
-            const supabase = createClient()
-            const { data: sessionData } = await supabase.auth.getSession()
-            const jwt = sessionData.session?.access_token
+          const formData = new FormData()
+          formData.append('file', file)
+          formData.append('documentId', documentId)
 
-            if (!jwt) {
-              this.activeXhrs.delete(id)
-              reject(new Error('User session expired. Please sign in again.'))
-              return
+          xhr.open('POST', '/api/documents/upload')
+
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              const rawProgress = (event.loaded / event.total) * 100
+              const mappedProgress = Math.min(90, Math.max(20, Math.round(20 + rawProgress * 0.7)))
+              this.updateItem(id, { uploadProgress: mappedProgress })
             }
-
-            const storageEndpoint = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/documents/${storagePath}`
-            xhr.open('POST', storageEndpoint)
-            xhr.setRequestHeader('Authorization', `Bearer ${jwt}`)
-            xhr.setRequestHeader('Content-Type', 'application/pdf')
-            xhr.setRequestHeader('x-upsert', 'false')
           }
+
+          xhr.onload = () => {
+            this.activeXhrs.delete(id)
+            if (xhr.status >= 200 && xhr.status < 300) {
+              try {
+                const resData = JSON.parse(xhr.responseText)
+                resolve(resData)
+              } catch {
+                resolve({ success: true, documentId })
+              }
+            } else {
+              let errMsg = 'Server upload failed'
+              try {
+                const resData = JSON.parse(xhr.responseText)
+                if (resData.error) errMsg = resData.error
+              } catch {}
+              reject(new Error(errMsg))
+            }
+          }
+
+          xhr.onerror = () => {
+            this.activeXhrs.delete(id)
+            reject(new Error('Network error during upload'))
+          }
+
+          xhr.onabort = () => {
+            this.activeXhrs.delete(id)
+            reject(new Error('Upload cancelled'))
+          }
+
+          xhr.send(formData)
+        })
+      }
+
+      // If file is within serverless size limits (< 4 MB), use reliable same-origin server upload to R2 (Zero CORS required!)
+      if (file.size <= 4 * 1024 * 1024) {
+        await sendServerUpload()
+        this.updateItem(id, {
+          status: 'secured',
+          uploadProgress: 100,
+        })
+        return
+      }
+
+      // For larger files (> 4 MB), try direct presigned R2 upload with fallback to server upload
+      const sendDirectR2 = (targetUrl: string, targetMethod: string): Promise<void> => {
+        return new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest()
+          this.activeXhrs.set(id, xhr)
+
+          xhr.open(targetMethod, targetUrl)
+          xhr.setRequestHeader('Content-Type', 'application/pdf')
 
           xhr.upload.onprogress = (event) => {
             if (event.lengthComputable) {
@@ -339,18 +384,13 @@ export class BatchUploadManager {
             if (xhr.status >= 200 && xhr.status < 300) {
               resolve()
             } else {
-              let errMsg = 'Storage transmission failed'
-              try {
-                const resData = JSON.parse(xhr.responseText)
-                if (resData.message) errMsg = resData.message
-              } catch {}
-              reject(new Error(errMsg))
+              reject(new Error(`Storage transfer failed (${xhr.status})`))
             }
           }
 
           xhr.onerror = () => {
             this.activeXhrs.delete(id)
-            reject(new Error('Network error during storage transfer'))
+            reject(new Error('Direct storage network error'))
           }
 
           xhr.onabort = () => {
@@ -364,14 +404,23 @@ export class BatchUploadManager {
 
       if (uploadUrl) {
         try {
-          await sendFile(uploadUrl, uploadMethod)
+          await sendDirectR2(uploadUrl, uploadMethod)
         } catch (r2Err) {
-          console.warn('[UploadManager] Direct R2 upload failed (e.g. CORS preflight), falling back to Supabase:', r2Err)
-          storageProvider = 'supabase'
-          await sendFile(null, 'POST')
+          console.warn('[UploadManager] Direct R2 upload failed, falling back to server-stream upload:', r2Err)
+          await sendServerUpload()
+          this.updateItem(id, {
+            status: 'secured',
+            uploadProgress: 100,
+          })
+          return
         }
       } else {
-        await sendFile(null, 'POST')
+        await sendServerUpload()
+        this.updateItem(id, {
+          status: 'secured',
+          uploadProgress: 100,
+        })
+        return
       }
     } catch (uploadErr) {
       if (this.isCancelled) return
