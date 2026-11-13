@@ -1,8 +1,8 @@
-import { MAX_FILENAME_LENGTH } from '../constants'
+export const MAX_FILENAME_LENGTH = 200
 
 export function sanitizeFilename(filename: string | undefined | null): string {
   if (!filename) {
-    return 'document.pdf'
+    return 'document.bin'
   }
 
   let sanitized = filename
@@ -30,13 +30,15 @@ export function sanitizeFilename(filename: string | undefined | null): string {
 
   const dotIndex = sanitized.lastIndexOf('.')
   let baseName = dotIndex !== -1 ? sanitized.slice(0, dotIndex) : sanitized
+  let ext = dotIndex !== -1 ? sanitized.slice(dotIndex).toLowerCase() : ''
   baseName = baseName.trim()
 
   if (!baseName) {
     baseName = 'document'
   }
 
-  const ext = '.pdf'
+  ext = ext.replace(/[^a-z0-9.]/gi, '')
+
   const maxBaseLength = MAX_FILENAME_LENGTH - ext.length
   if (baseName.length > maxBaseLength) {
     baseName = baseName.slice(0, maxBaseLength)

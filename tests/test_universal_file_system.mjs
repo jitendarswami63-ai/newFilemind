@@ -291,4 +291,19 @@ console.log('Testing FileMind Universal File Storage & Multi-Format Document Man
   console.log('PASS: Criterion 10 - Database schema migration 12 verified')
 }
 
-console.log('\nAll 10 FileMind Universal File System tests passed with 100% success!')
+// -----------------------------------------------------------------------------
+// Test 10: Multi-Format Filename Preservation (No PDF Overwrite)
+// -----------------------------------------------------------------------------
+{
+  const { sanitizeFilename } = await import('../lib/validation/filename.ts')
+  assert.strictEqual(sanitizeFilename('Screen Recording 2026-07-23 234232.mp4'), 'Screen Recording 2026-07-23 234232.mp4')
+  assert.strictEqual(sanitizeFilename('WIN_20260828_15_09_57_Pro.jpg'), 'WIN_20260828_15_09_57_Pro.jpg')
+  assert.strictEqual(sanitizeFilename('budget.xlsx'), 'budget.xlsx')
+  assert.strictEqual(sanitizeFilename('notes.txt'), 'notes.txt')
+  assert.strictEqual(sanitizeFilename('thesis.pdf'), 'thesis.pdf')
+  assert.strictEqual(sanitizeFilename('archive.tar.gz'), 'archive.tar.gz')
+  assert.strictEqual(sanitizeFilename('../../malicious.sh'), 'malicious.sh')
+  console.log('PASS: Criterion 11 - Universal extension sanitization and preservation verified')
+}
+
+console.log('\nAll 11 FileMind Universal File System tests passed with 100% success!')
