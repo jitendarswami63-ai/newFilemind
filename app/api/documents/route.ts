@@ -55,23 +55,23 @@ export async function GET(request: Request) {
     if (categoryFilter === 'pdfs') {
       query = query.or('mime_type.eq.application/pdf,filename.ilike.%.pdf')
     } else if (categoryFilter === 'documents') {
-      query = query.or('doc_category.eq.Document,filename.ilike.%.docx,filename.ilike.%.txt,filename.ilike.%.md,filename.ilike.%.rtf,filename.ilike.%.odt')
+      query = query.or('doc_category.ilike.document%,filename.ilike.%.docx,filename.ilike.%.doc,filename.ilike.%.txt,filename.ilike.%.md,filename.ilike.%.rtf,filename.ilike.%.odt,filename.ilike.%.epub')
     } else if (categoryFilter === 'images') {
-      query = query.or('doc_category.eq.Image,mime_type.ilike.image/%')
+      query = query.or('doc_category.ilike.image%,mime_type.ilike.image/%,filename.ilike.%.jpg,filename.ilike.%.jpeg,filename.ilike.%.png,filename.ilike.%.webp,filename.ilike.%.gif,filename.ilike.%.svg,filename.ilike.%.bmp,filename.ilike.%.tiff,filename.ilike.%.heic')
     } else if (categoryFilter === 'spreadsheets') {
-      query = query.or('doc_category.eq.Spreadsheet,filename.ilike.%.xlsx,filename.ilike.%.xls,filename.ilike.%.csv')
+      query = query.or('doc_category.ilike.spreadsheet%,filename.ilike.%.xlsx,filename.ilike.%.xls,filename.ilike.%.csv,filename.ilike.%.ods')
     } else if (categoryFilter === 'presentations') {
-      query = query.or('doc_category.eq.Presentation,filename.ilike.%.pptx,filename.ilike.%.ppt,filename.ilike.%.odp')
+      query = query.or('doc_category.ilike.presentation%,filename.ilike.%.pptx,filename.ilike.%.ppt,filename.ilike.%.odp')
     } else if (categoryFilter === 'videos') {
-      query = query.or('doc_category.eq.Video,mime_type.ilike.video/%')
+      query = query.or('doc_category.ilike.video%,mime_type.ilike.video/%,filename.ilike.%.mp4,filename.ilike.%.mov,filename.ilike.%.avi,filename.ilike.%.webm,filename.ilike.%.mkv')
     } else if (categoryFilter === 'audio') {
-      query = query.or('doc_category.eq.Audio,mime_type.ilike.audio/%')
+      query = query.or('doc_category.ilike.audio%,mime_type.ilike.audio/%,filename.ilike.%.mp3,filename.ilike.%.wav,filename.ilike.%.aac,filename.ilike.%.m4a,filename.ilike.%.flac,filename.ilike.%.ogg')
     } else if (categoryFilter === 'archives') {
-      query = query.or('doc_category.eq.Archive,filename.ilike.%.zip,filename.ilike.%.tar,filename.ilike.%.gz,filename.ilike.%.rar,filename.ilike.%.7z')
+      query = query.or('doc_category.ilike.archive%,filename.ilike.%.zip,filename.ilike.%.tar,filename.ilike.%.gz,filename.ilike.%.rar,filename.ilike.%.7z')
     } else if (categoryFilter === 'code') {
-      query = query.or('doc_category.eq.Code,filename.ilike.%.json,filename.ilike.%.js,filename.ilike.%.ts,filename.ilike.%.py,filename.ilike.%.html,filename.ilike.%.css')
+      query = query.or('doc_category.ilike.code%,filename.ilike.%.json,filename.ilike.%.js,filename.ilike.%.ts,filename.ilike.%.jsx,filename.ilike.%.tsx,filename.ilike.%.py,filename.ilike.%.html,filename.ilike.%.css,filename.ilike.%.sql,filename.ilike.%.yaml,filename.ilike.%.toml')
     } else if (categoryFilter === 'other') {
-      query = query.eq('doc_category', 'Other')
+      query = query.or('doc_category.ilike.other%,doc_category.is.null')
     }
   }
 
