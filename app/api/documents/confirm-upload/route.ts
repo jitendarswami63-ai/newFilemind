@@ -228,6 +228,22 @@ export async function POST(request: Request) {
         { status: 403 }
       )
     }
+
+    try {
+      const admin = createSupabaseAdminClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      )
+      await admin
+        .from('documents')
+        .update({
+          mime_type: detectedFormat.mimeType,
+          doc_category: detectedFormat.category,
+        })
+        .eq('id', documentId)
+    } catch (updateErr) {
+      console.warn('[ConfirmUpload] Failed to update format metadata:', updateErr)
+    }
   }
 
   if (!entitlements.hasAiFeatures) {
@@ -239,7 +255,7 @@ export async function POST(request: Request) {
         )
         const { buffer: fileBuf } = await storageService.downloadBuffer(storagePath, storageProvider)
         let pageCount = 1
-        if (fileBuf) {
+        if (fileBuf && detectedFormat.extension === 'pdf') {
           try {
             const pdfDoc = await PDFDocument.load(fileBuf, { ignoreEncryption: true })
             pageCount = pdfDoc.getPageCount()
@@ -252,7 +268,7 @@ export async function POST(request: Request) {
             status: 'completed',
             page_count: pageCount,
             storage_provider: storageProvider,
-            doc_category: 'Standard Document',
+            doc_category: detectedFormat.category || 'Standard Document',
             tags: ['Free Tier'],
             extracted_data: { notice: 'Free Tier storage - AI document understanding available on Pro & Elite' },
           })
