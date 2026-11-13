@@ -119,50 +119,105 @@ export async function POST(request: Request) {
   }
 
   const sanitizedFilename = segments[2]
-  const { data: rpcData, error: rpcError } = await supabase.rpc('create_document_with_quota', {
-    p_id: documentId,
-    p_user_id: user.id,
-    p_filename: sanitizedFilename,
-    p_storage_path: storagePath,
-    p_file_size: actualSize,
-  })
-
-  if (rpcError) {
-    const { data: alreadyCreated } = await supabase
-      .from('documents')
-      .select('id')
-      .eq('id', documentId)
-      .eq('user_id', user.id)
-      .maybeSingle()
-
-    if (alreadyCreated) {
-      return NextResponse.json({ success: true, documentId: alreadyCreated.id, alreadyConfirmed: true })
-    }
-
-    await storageService.deleteFile(storagePath, storageProvider)
-    return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 500 })
-  }
-
-  const resultStatus = Array.isArray(rpcData) && rpcData.length > 0 ? rpcData[0].result : rpcData
-
-  if (resultStatus === 'rate_limited') {
-    await storageService.deleteFile(storagePath, storageProvider)
-    return NextResponse.json({ error: 'Upload rate limit reached. Try again later.' }, { status: 429 })
-  }
-
-  if (resultStatus === 'storage_quota_exceeded') {
-    await storageService.deleteFile(storagePath, storageProvider)
-    return NextResponse.json(
-      { error: `Storage quota exceeded (${formatBytes(entitlements.totalStorageBytes)} limit). Please delete old documents or upgrade your storage.` },
-      { status: 403 }
-    )
-  }
 
   if (storageProvider === 'r2') {
-    await supabase
+    const { error: insertError } = await supabase
       .from('documents')
-      .update({ storage_provider: 'r2' })
-      .eq('id', documentId)
+      .insert({
+        id: documentId,
+        user_id: user.id,
+        filename: sanitizedFilename,
+        storage_path: storagePath,
+        storage_provider: 'r2',
+        file_size: actualSize,
+        mime_type: 'application/pdf',
+        status: 'pending',
+      })
+
+    if (insertError) {
+      if (insertError.code === '42703' || insertError.message?.includes('storage_provider')) {
+        const { error: retryError } = await supabase
+          .from('documents')
+          .insert({
+            id: documentId,
+            user_id: user.id,
+            filename: sanitizedFilename,
+            storage_path: storagePath,
+            file_size: actualSize,
+            mime_type: 'application/pdf',
+            status: 'pending',
+          })
+
+        if (retryError) {
+          const { data: alreadyCreated } = await supabase
+            .from('documents')
+            .select('id')
+            .eq('id', documentId)
+            .eq('user_id', user.id)
+            .maybeSingle()
+
+          if (alreadyCreated) {
+            return NextResponse.json({ success: true, documentId: alreadyCreated.id, alreadyConfirmed: true })
+          }
+
+          await storageService.deleteFile(storagePath, storageProvider)
+          return NextResponse.json({ error: 'Database document creation failed.' }, { status: 500 })
+        }
+      } else {
+        const { data: alreadyCreated } = await supabase
+          .from('documents')
+          .select('id')
+          .eq('id', documentId)
+          .eq('user_id', user.id)
+          .maybeSingle()
+
+        if (alreadyCreated) {
+          return NextResponse.json({ success: true, documentId: alreadyCreated.id, alreadyConfirmed: true })
+        }
+
+        await storageService.deleteFile(storagePath, storageProvider)
+        return NextResponse.json({ error: 'Database document creation failed.' }, { status: 500 })
+      }
+    }
+  } else {
+    const { data: rpcData, error: rpcError } = await supabase.rpc('create_document_with_quota', {
+      p_id: documentId,
+      p_user_id: user.id,
+      p_filename: sanitizedFilename,
+      p_storage_path: storagePath,
+      p_file_size: actualSize,
+    })
+
+    if (rpcError) {
+      const { data: alreadyCreated } = await supabase
+        .from('documents')
+        .select('id')
+        .eq('id', documentId)
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (alreadyCreated) {
+        return NextResponse.json({ success: true, documentId: alreadyCreated.id, alreadyConfirmed: true })
+      }
+
+      await storageService.deleteFile(storagePath, storageProvider)
+      return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 500 })
+    }
+
+    const resultStatus = Array.isArray(rpcData) && rpcData.length > 0 ? rpcData[0].result : rpcData
+
+    if (resultStatus === 'rate_limited') {
+      await storageService.deleteFile(storagePath, storageProvider)
+      return NextResponse.json({ error: 'Upload rate limit reached. Try again later.' }, { status: 429 })
+    }
+
+    if (resultStatus === 'storage_quota_exceeded') {
+      await storageService.deleteFile(storagePath, storageProvider)
+      return NextResponse.json(
+        { error: `Storage quota exceeded (${formatBytes(entitlements.totalStorageBytes)} limit). Please delete old documents or upgrade your storage.` },
+        { status: 403 }
+      )
+    }
   }
 
   if (!entitlements.hasAiFeatures) {
