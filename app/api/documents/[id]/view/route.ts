@@ -7,6 +7,49 @@ import { storageService, StorageProvider } from '@/lib/storage/storage-service'
 
 export const dynamic = 'force-dynamic'
 
+function createPdfResponse(
+  buffer: Buffer,
+  filename: string,
+  cacheControl: string,
+  rangeHeader?: string | null
+): Response {
+  if (rangeHeader && rangeHeader.startsWith('bytes=')) {
+    const parts = rangeHeader.replace(/bytes=/, '').split('-')
+    const start = parseInt(parts[0], 10)
+    const end = parts[1] ? parseInt(parts[1], 10) : buffer.length - 1
+
+    if (!isNaN(start) && start < buffer.length && end >= start) {
+      const safeEnd = Math.min(end, buffer.length - 1)
+      const chunk = buffer.subarray(start, safeEnd + 1)
+
+      return new Response(new Uint8Array(chunk), {
+        status: 206,
+        headers: {
+          'Content-Type': 'application/pdf',
+          'Content-Range': `bytes ${start}-${safeEnd}/${buffer.length}`,
+          'Content-Length': chunk.length.toString(),
+          'Accept-Ranges': 'bytes',
+          'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
+          'Cache-Control': cacheControl,
+          'X-Frame-Options': 'SAMEORIGIN',
+        },
+      })
+    }
+  }
+
+  return new Response(new Uint8Array(buffer), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Content-Length': buffer.length.toString(),
+      'Accept-Ranges': 'bytes',
+      'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
+      'Cache-Control': cacheControl,
+      'X-Frame-Options': 'SAMEORIGIN',
+    },
+  })
+}
+
 export async function HEAD(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -86,6 +129,44 @@ export async function GET(
   }
 
   if (fetchError || !doc) {
+    if (user.email) {
+      const { data: shareAccess } = await supabase
+        .from('document_shares')
+        .select('id, expires_at, status')
+        .eq('document_id', documentId)
+        .eq('recipient_email', user.email)
+        .eq('status', 'active')
+        .single()
+
+      if (shareAccess) {
+        const isExpired = shareAccess.expires_at && new Date(shareAccess.expires_at) < new Date()
+        if (!isExpired) {
+          const { data: sharedDoc, error: sharedErr } = await supabaseAdmin
+            .from('documents')
+            .select('id, user_id, filename, storage_path, storage_provider, is_locked, encrypted_dek, dek_iv, dek_tag, file_iv, file_tag, key_version')
+            .eq('id', documentId)
+            .single()
+
+          if (sharedDoc) {
+            doc = sharedDoc
+            fetchError = null
+          } else if (sharedErr && (sharedErr.code === '42703' || sharedErr.message?.includes('storage_provider'))) {
+            const { data: sharedFallback } = await supabaseAdmin
+              .from('documents')
+              .select('id, user_id, filename, storage_path, is_locked, encrypted_dek, dek_iv, dek_tag, file_iv, file_tag, key_version')
+              .eq('id', documentId)
+              .single()
+            if (sharedFallback) {
+              doc = { ...sharedFallback, storage_provider: undefined }
+              fetchError = null
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (fetchError || !doc) {
     return NextResponse.json({ error: 'Document not found' }, { status: 404 })
   }
 
@@ -134,17 +215,12 @@ export async function GET(
       )
     }
 
-    return new Response(new Uint8Array(plaintextBuffer), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Length': plaintextBuffer.length.toString(),
-        'Accept-Ranges': 'bytes',
-        'Content-Disposition': `inline; filename="${encodeURIComponent(doc.filename)}"`,
-        'Cache-Control': 'private, no-cache, no-store, must-revalidate',
-        'X-Frame-Options': 'SAMEORIGIN',
-      },
-    })
+    return createPdfResponse(
+      plaintextBuffer,
+      doc.filename,
+      'private, no-cache, no-store, must-revalidate',
+      request.headers.get('range')
+    )
   }
 
   let plaintextBuffer: Buffer
@@ -158,15 +234,10 @@ export async function GET(
     return NextResponse.json({ error: 'Failed to retrieve document' }, { status: 500 })
   }
 
-  return new Response(new Uint8Array(plaintextBuffer), {
-    status: 200,
-    headers: {
-      'Content-Type': 'application/pdf',
-      'Content-Length': plaintextBuffer.length.toString(),
-      'Accept-Ranges': 'bytes',
-      'Content-Disposition': `inline; filename="${encodeURIComponent(doc.filename)}"`,
-      'Cache-Control': 'private, max-age=300',
-      'X-Frame-Options': 'SAMEORIGIN',
-    },
-  })
+  return createPdfResponse(
+    plaintextBuffer,
+    doc.filename,
+    'private, max-age=300',
+    request.headers.get('range')
+  )
 }

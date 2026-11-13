@@ -84,9 +84,10 @@ export class StorageService {
         const command = new GetObjectCommand({
           Bucket: bucket,
           Key: storagePath,
+          ResponseContentType: 'application/pdf',
           ResponseContentDisposition: filename
             ? `attachment; filename="${encodeURIComponent(filename)}"`
-            : undefined,
+            : 'inline',
         })
 
         return await getSignedUrl(client, command, {
@@ -118,9 +119,10 @@ export class StorageService {
       const command = new GetObjectCommand({
         Bucket: bucket,
         Key: storagePath,
+        ResponseContentType: 'application/pdf',
         ResponseContentDisposition: filename
           ? `attachment; filename="${encodeURIComponent(filename)}"`
-          : undefined,
+          : 'inline',
       })
 
       return await getSignedUrl(client, command, {

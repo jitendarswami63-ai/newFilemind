@@ -122,16 +122,20 @@ export async function GET(
     const expiry = type === 'download' ? DOWNLOAD_SIGNED_URL_EXPIRY : VIEWER_SIGNED_URL_EXPIRY
     let signedUrl: string
 
-    try {
-      signedUrl = await storageService.getSignedDownloadUrl(
-        doc.storage_path,
-        expiry,
-        type === 'download' ? (doc.filename as string) || 'document.pdf' : undefined,
-        (doc.storage_provider as StorageProvider) || undefined
-      )
-    } catch (signErr) {
-      console.error('[Download API] Storage signing error:', signErr)
-      return NextResponse.json({ error: 'Could not generate URL for document' }, { status: 500 })
+    if (type === 'viewer') {
+      signedUrl = `/api/documents/${id}/view`
+    } else {
+      try {
+        signedUrl = await storageService.getSignedDownloadUrl(
+          doc.storage_path,
+          expiry,
+          (doc.filename as string) || 'document.pdf',
+          (doc.storage_provider as StorageProvider) || undefined
+        )
+      } catch (signErr) {
+        console.error('[Download API] Storage signing error:', signErr)
+        return NextResponse.json({ error: 'Could not generate URL for document' }, { status: 500 })
+      }
     }
 
     const expiresAt = new Date(Date.now() + expiry * 1000).toISOString()
