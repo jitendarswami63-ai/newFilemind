@@ -45,10 +45,14 @@ export async function POST(req: Request) {
     }
 
     if (action === 'publish') {
-      const result = await publishCMSContent({
-        id: auth.admin.user.id,
-        email: auth.admin.email,
-      })
+      const result = await publishCMSContent(
+        {
+          id: auth.admin.user.id,
+          email: auth.admin.email,
+        },
+        'global',
+        draft as CMSData | undefined
+      )
       return NextResponse.json({
         success: true,
         message: 'Content published to live website',

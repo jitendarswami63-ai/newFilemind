@@ -70,7 +70,7 @@ export default function AdminCMSPage() {
         body: JSON.stringify({ action: 'save_draft', draft: data }),
       })
       const result = await res.json()
-      if (result.success) {
+      if (res.ok && result.success) {
         setStatusMessage({ text: 'Draft saved securely. Ready for publishing.', type: 'success' })
         setHasChanges(true)
       } else {
@@ -91,21 +91,13 @@ export default function AdminCMSPage() {
     setIsPublishing(true)
     setStatusMessage(null)
     try {
-      // First save draft
-      await fetch('/api/admin/cms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'save_draft', draft: data }),
-      })
-
-      // Then publish
       const res = await fetch('/api/admin/cms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'publish' }),
+        body: JSON.stringify({ action: 'publish', draft: data }),
       })
       const result = await res.json()
-      if (result.success) {
+      if (res.ok && result.success) {
         setStatusMessage({ text: '🎉 Content successfully published to live website!', type: 'success' })
         setPublishedAt(result.publishedAt || new Date().toISOString())
         setHasChanges(false)

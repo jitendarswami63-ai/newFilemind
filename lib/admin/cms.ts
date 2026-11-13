@@ -57,11 +57,15 @@ export async function saveCMSDraft(
   sectionId = 'global'
 ) {
   const supabase = getAdminClient()
-  const { data: existing } = await supabase
+  const { data: existing, error: readErr } = await supabase
     .from('website_content')
     .select('published_content')
     .eq('id', sectionId)
     .maybeSingle()
+
+  if (readErr && (readErr.code === 'PGRST205' || readErr.message?.includes('website_content'))) {
+    throw new Error("Database table 'website_content' does not exist yet. Please run migration 10 in your Supabase SQL Editor.")
+  }
 
   const publishedContent = existing?.published_content || DEFAULT_CMS_DATA
 
@@ -77,6 +81,9 @@ export async function saveCMSDraft(
   )
 
   if (error) {
+    if (error.code === 'PGRST205' || error.message?.includes('website_content')) {
+      throw new Error("Database table 'website_content' does not exist yet. Please run migration 10 in your Supabase SQL Editor.")
+    }
     throw new Error(`Failed to save CMS draft: ${error.message}`)
   }
 
@@ -94,31 +101,53 @@ export async function saveCMSDraft(
 
 export async function publishCMSContent(
   adminUser: { id: string; email: string },
-  sectionId = 'global'
+  sectionId = 'global',
+  directDraft?: CMSData
 ) {
   const supabase = getAdminClient()
-  const { data: existing, error: fetchErr } = await supabase
-    .from('website_content')
-    .select('draft_content')
-    .eq('id', sectionId)
-    .maybeSingle()
+  const now = new Date().toISOString()
 
-  if (fetchErr || !existing) {
-    throw new Error('No draft content found to publish.')
+  let contentToPublish: CMSData = DEFAULT_CMS_DATA
+
+  if (directDraft) {
+    contentToPublish = directDraft
+  } else {
+    const { data: existing, error: fetchErr } = await supabase
+      .from('website_content')
+      .select('draft_content')
+      .eq('id', sectionId)
+      .maybeSingle()
+
+    if (fetchErr) {
+      if (fetchErr.code === 'PGRST205' || fetchErr.message?.includes('website_content')) {
+        throw new Error("Database table 'website_content' does not exist yet. Please run migration 10 in your Supabase SQL Editor.")
+      }
+      throw new Error(`Failed to read draft: ${fetchErr.message}`)
+    }
+
+    if (!existing || !existing.draft_content) {
+      throw new Error('No draft content found to publish. Please enter your changes and click Publish Live.')
+    }
+
+    contentToPublish = existing.draft_content
   }
 
-  const now = new Date().toISOString()
-  const { error } = await supabase
-    .from('website_content')
-    .update({
-      published_content: existing.draft_content,
+  const { error } = await supabase.from('website_content').upsert(
+    {
+      id: sectionId,
+      draft_content: contentToPublish,
+      published_content: contentToPublish,
       published_at: now,
       updated_by: adminUser.email,
       updated_at: now,
-    })
-    .eq('id', sectionId)
+    },
+    { onConflict: 'id' }
+  )
 
   if (error) {
+    if (error.code === 'PGRST205' || error.message?.includes('website_content')) {
+      throw new Error("Database table 'website_content' does not exist yet. Please run migration 10 in your Supabase SQL Editor.")
+    }
     throw new Error(`Failed to publish CMS content: ${error.message}`)
   }
 
@@ -145,8 +174,15 @@ export async function discardCMSDraft(
     .eq('id', sectionId)
     .maybeSingle()
 
-  if (fetchErr || !existing) {
-    throw new Error('No content found to revert.')
+  if (fetchErr) {
+    if (fetchErr.code === 'PGRST205' || fetchErr.message?.includes('website_content')) {
+      throw new Error("Database table 'website_content' does not exist yet. Please run migration 10 in your Supabase SQL Editor.")
+    }
+    throw new Error(`Failed to revert: ${fetchErr.message}`)
+  }
+
+  if (!existing) {
+    return { success: true }
   }
 
   const { error } = await supabase
