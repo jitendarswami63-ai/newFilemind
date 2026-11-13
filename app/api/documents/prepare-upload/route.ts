@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sanitizeFilename } from '@/lib/validation/filename'
-import { ALLOWED_MIME_TYPE } from '@/lib/constants'
 import { isSameOrigin } from '@/lib/validation/origin'
 import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
 import { getServerUserEntitlements } from '@/lib/subscription/plan-server'
 import { formatBytes } from '@/lib/subscription/plans'
 import { storageService } from '@/lib/storage/storage-service'
+import { detectFileFormat, isDangerousFile } from '@/lib/files/file-types'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,17 +40,25 @@ export async function POST(request: Request) {
   }
 
   const { filename, fileSize, mimeType } = body
-  if (mimeType !== ALLOWED_MIME_TYPE) {
-    return NextResponse.json({ error: 'Only PDF files are supported.' }, { status: 400 })
+
+  if (typeof filename !== 'string' || !filename.trim()) {
+    return NextResponse.json({ error: 'Invalid filename' }, { status: 400 })
   }
 
   if (typeof fileSize !== 'number' || fileSize <= 0) {
     return NextResponse.json({ error: 'Invalid file size specified.' }, { status: 400 })
   }
 
-  if (typeof filename !== 'string' || !filename) {
-    return NextResponse.json({ error: 'Invalid filename' }, { status: 400 })
+  const dangerCheck = isDangerousFile(filename)
+  if (dangerCheck.dangerous) {
+    return NextResponse.json(
+      { error: dangerCheck.reason || 'Dangerous or executable files are strictly prohibited.' },
+      { status: 400 }
+    )
   }
+
+  const detectedFormat = detectFileFormat(filename, mimeType)
+  const normalizedMimeType = detectedFormat.mimeType
 
   const entitlements = await getServerUserEntitlements(user.id, user.user_metadata)
 
@@ -89,7 +97,7 @@ export async function POST(request: Request) {
 
   if (storageService.isR2Enabled()) {
     try {
-      const signedUpload = await storageService.getSignedUploadUrl(storagePath, 'application/pdf', 900)
+      const signedUpload = await storageService.getSignedUploadUrl(storagePath, normalizedMimeType, 900)
       uploadUrl = signedUpload.uploadUrl
       uploadMethod = signedUpload.method
       storageProvider = 'r2'
@@ -104,6 +112,8 @@ export async function POST(request: Request) {
     uploadUrl,
     uploadMethod,
     storageProvider,
+    fileCategory: detectedFormat.category,
+    mimeType: normalizedMimeType,
     entitlements,
   })
 }

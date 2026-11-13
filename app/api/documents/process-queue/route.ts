@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { processDocument } from '@/lib/ai/processor'
+import { processUniversalFile } from '@/lib/files/processing-engine'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
 
     after(async () => {
       try {
-        await processDocument(doc.id)
+        await processUniversalFile(doc.id)
       } catch (procErr) {
         console.error('[ProcessQueue] Background document processing error:', procErr)
       }

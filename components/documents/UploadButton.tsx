@@ -19,7 +19,6 @@ export function UploadButton({ onFileSelect }: { onFileSelect?: (file: File) => 
         type="file"
         ref={fileInputRef}
         onChange={handleChange}
-        accept="application/pdf"
         className="hidden"
       />
       <Button
@@ -27,7 +26,7 @@ export function UploadButton({ onFileSelect }: { onFileSelect?: (file: File) => 
         className="flex items-center gap-2"
       >
         <Upload className="h-4 w-4" />
-        Upload PDF
+        Upload Files
       </Button>
     </>
   )

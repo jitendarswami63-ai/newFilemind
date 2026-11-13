@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
 import { hasActiveBiometricLease } from '@/lib/auth/webauthn'
 import { TopBar } from '@/components/layout/TopBar'
-import { PDFViewer } from '@/components/pdf/PDFViewer'
+import { FileViewer } from '@/components/files/FileViewer'
 import { VaultMfaUnlockChallenge } from '@/components/auth/VaultMfaUnlockChallenge'
 import { BiometricUnlockChallenge } from '@/components/auth/BiometricUnlockChallenge'
 
@@ -43,7 +43,7 @@ export default async function DocumentViewerPage({
 
   let { data: doc, error } = await supabase
     .from('documents')
-    .select('id, filename, status, error_message, doc_category, tags, processing_locked_at, storage_path, embedding_status, is_locked')
+    .select('id, filename, mime_type, file_size, created_at, extracted_data, status, error_message, doc_category, tags, processing_locked_at, storage_path, embedding_status, is_locked')
     .eq('id', id)
     .eq('user_id', auth.user.id)
     .single()
@@ -51,7 +51,7 @@ export default async function DocumentViewerPage({
   if (error && (error.code === '42703' || error.message?.includes('is_locked'))) {
     const fallback = await supabase
       .from('documents')
-      .select('id, filename, status, error_message, doc_category, tags, processing_locked_at, storage_path, embedding_status')
+      .select('id, filename, mime_type, file_size, created_at, extracted_data, status, error_message, doc_category, tags, processing_locked_at, storage_path, embedding_status')
       .eq('id', id)
       .eq('user_id', auth.user.id)
       .single()
@@ -72,7 +72,7 @@ export default async function DocumentViewerPage({
       )
       const { data: sharedDoc } = await adminSupabase
         .from('documents')
-        .select('id, filename, status, error_message, doc_category, tags, processing_locked_at, storage_path, embedding_status, is_locked')
+        .select('id, filename, mime_type, file_size, created_at, extracted_data, status, error_message, doc_category, tags, processing_locked_at, storage_path, embedding_status, is_locked')
         .eq('id', id)
         .single()
 
@@ -120,8 +120,10 @@ export default async function DocumentViewerPage({
         isLocked={isLocked}
         isLeaseActive={isLeaseActive}
       />
-      <PDFViewer
+      <FileViewer
         documentId={doc.id}
+        filename={doc.filename}
+        mimeType={(doc as { mime_type?: string }).mime_type}
         initialStatus={doc.status}
         initialEmbeddingStatus={doc.embedding_status}
         errorMessage={doc.error_message}
@@ -131,6 +133,9 @@ export default async function DocumentViewerPage({
         initialPage={initialPage}
         storagePath={doc.storage_path}
         isLocked={isLocked}
+        fileSize={(doc as { file_size?: number }).file_size}
+        createdAt={(doc as { created_at?: string }).created_at}
+        extractedData={(doc as { extracted_data?: Record<string, unknown> }).extracted_data}
       />
     </div>
   )

@@ -25,6 +25,8 @@ import { BatchUploadManager, BatchFileItem } from '@/lib/upload/batch-upload-man
 import { useUserPlan } from '@/lib/subscription/plan'
 import { useUpgradeModal } from '@/components/subscription/UpgradeModalContext'
 import { PLAN_CONFIGS } from '@/lib/subscription/plans'
+import { detectFileFormat, isDangerousFile } from '@/lib/files/file-types'
+import { getFileIconForFilename } from '@/lib/files/file-icons'
 
 interface UploadZoneProps {
   onUploadComplete?: (documentId: string) => void
@@ -161,16 +163,17 @@ export function UploadZone({ onUploadComplete, compact = false, className = '' }
   const enqueueFiles = (newFiles: File[]) => {
     setBatchNotice(null)
 
-    const pdfOnly = newFiles.filter((f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'))
-    const nonPdfs = newFiles.length - pdfOnly.length
-
-    if (nonPdfs > 0) {
-      setBatchNotice(`${nonPdfs} non-PDF file(s) skipped. Only PDF documents are supported.`)
+    const dangerousList = newFiles.filter((f) => isDangerousFile(f.name).dangerous)
+    if (dangerousList.length > 0) {
+      setBatchNotice(
+        `Security alert: ${dangerousList.length} executable or hazardous file(s) skipped for safety (${dangerousList.map(f => f.name).slice(0, 2).join(', ')}).`
+      )
     }
 
-    if (pdfOnly.length === 0) return
+    const safeFiles = newFiles.filter((f) => !isDangerousFile(f.name).dangerous)
+    if (safeFiles.length === 0) return
 
-    const oversizeFile = pdfOnly.find((f) => f.size > allowedFileSizeBytes)
+    const oversizeFile = safeFiles.find((f) => f.size > allowedFileSizeBytes)
     if (oversizeFile) {
       const targetTier = tier === 'free' ? 'pro' : 'elite'
       const fileSizeMB = (oversizeFile.size / (1024 * 1024)).toFixed(1)
@@ -185,7 +188,7 @@ export function UploadZone({ onUploadComplete, compact = false, className = '' }
     }
 
     const remainingSlots = Math.max(0, allowedBatchFiles - items.length)
-    if (pdfOnly.length > remainingSlots) {
+    if (safeFiles.length > remainingSlots) {
       const targetTier = tier === 'free' ? 'pro' : 'elite'
       setBatchNotice(
         `Your plan limit is ${allowedBatchFiles} files per batch. Upgrade to upload more files simultaneously.`
@@ -193,12 +196,12 @@ export function UploadZone({ onUploadComplete, compact = false, className = '' }
       if (tier !== 'elite') {
         openUpgradeModal({
           targetTier,
-          featureName: `${targetTier === 'elite' ? '150' : '100'} PDFs Per Batch`,
+          featureName: `${targetTier === 'elite' ? '150' : '100'} Files Per Batch`,
         })
       }
     }
 
-    const accepted = pdfOnly.slice(0, remainingSlots)
+    const accepted = safeFiles.slice(0, remainingSlots)
     if (accepted.length > 0) {
       manager.addFiles(accepted)
     }
@@ -269,7 +272,6 @@ export function UploadZone({ onUploadComplete, compact = false, className = '' }
         type="file"
         ref={fileInputRef}
         onChange={handleFileChange}
-        accept="application/pdf"
         multiple
         className="hidden"
       />
@@ -277,7 +279,7 @@ export function UploadZone({ onUploadComplete, compact = false, className = '' }
       <div
         role="button"
         tabIndex={0}
-        aria-label="Upload PDF documents"
+        aria-label="Upload documents and files"
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
@@ -320,10 +322,10 @@ export function UploadZone({ onUploadComplete, compact = false, className = '' }
           <div className="space-y-1">
             <p className="text-sm sm:text-base font-bold text-[#292720] tracking-tight">
               {isDragOver
-                ? 'Drop PDF documents to add to batch'
+                ? 'Drop files to add to batch'
                 : items.length > 0
-                ? 'Drop more PDF files to expand batch'
-                : 'Drag and drop PDF files here'}
+                ? 'Drop more files to expand batch'
+                : 'Drag and drop any files here'}
             </p>
             <p className="text-xs text-[#777064] font-medium">
               or browse to upload from your computer
@@ -339,13 +341,13 @@ export function UploadZone({ onUploadComplete, compact = false, className = '' }
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#FFFCF5] hover:bg-[#F3EFE5] text-[#292720] text-xs font-semibold shadow-2xs border border-[#E5DED1] hover:border-[#C5A878] transition-all cursor-pointer"
           >
             <FileCheck className="h-3.5 w-3.5 text-[#9C7D47]" />
-            <span>{items.length > 0 ? 'Add more files' : 'Select PDF file'}</span>
+            <span>{items.length > 0 ? 'Add more files' : 'Select files'}</span>
           </button>
 
           <div className="pt-2 text-[11px] text-[#777064] border-t border-[#E5DED1] w-full space-y-1">
             <div className="flex flex-wrap items-center justify-between gap-1.5 font-semibold text-[#292720]">
               <span>
-                Supports PDF up to {allowedFileSizeMB} MB • Up to {allowedBatchFiles} files
+                Universal files up to {allowedFileSizeMB} MB • Up to {allowedBatchFiles} files
               </span>
               {!isElite && (
                 <button
@@ -353,7 +355,7 @@ export function UploadZone({ onUploadComplete, compact = false, className = '' }
                   onClick={() =>
                     openUpgradeModal({
                       targetTier: isPro ? 'elite' : 'pro',
-                      featureName: isPro ? '49 MB PDF Upload Limit' : '25 MB PDF Upload Limit',
+                      featureName: isPro ? '49 MB File Upload Limit' : '25 MB File Upload Limit',
                     })
                   }
                   className="inline-flex items-center gap-1 text-[10px] text-[#9C7D47] hover:text-[#856837] underline font-bold cursor-pointer transition-colors"
@@ -463,9 +465,15 @@ export function UploadZone({ onUploadComplete, compact = false, className = '' }
                 className="flex items-center justify-between p-3 rounded-2xl hover:bg-[#FAF5EC] transition-colors gap-3"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="h-9 w-9 rounded-xl bg-[#FAF5EC] border border-[#E5DED1] flex items-center justify-center flex-shrink-0 text-[#9C7D47]">
-                    <FileText className="h-4 w-4" />
-                  </div>
+                  {(() => {
+                    const theme = getFileIconForFilename(item.name)
+                    const Icon = theme.icon
+                    return (
+                      <div className={`h-9 w-9 rounded-xl ${theme.bgColor} border ${theme.borderColor} flex items-center justify-center flex-shrink-0 ${theme.textColor}`}>
+                        <Icon className="h-4 w-4" />
+                      </div>
+                    )
+                  })()}
 
                   <div className="min-w-0 flex-1">
                     <p className="text-xs sm:text-sm font-semibold text-[#292720] truncate" title={item.name}>

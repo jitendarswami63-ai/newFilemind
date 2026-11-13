@@ -6,6 +6,7 @@ import {
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { getR2Client, getR2BucketName, isR2Configured } from './r2-client'
+import { detectFileFormat } from '../files/file-types'
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
 
 function getSupabaseAdmin() {
@@ -76,6 +77,9 @@ export class StorageService {
     filename?: string,
     provider?: StorageProvider
   ): Promise<string> {
+    const format = detectFileFormat(filename || storagePath)
+    const detectedContentType = format.mimeType || 'application/octet-stream'
+
     if (provider === 'r2' || (this.isR2Enabled() && provider !== 'supabase')) {
       try {
         const client = getR2Client()
@@ -84,7 +88,7 @@ export class StorageService {
         const command = new GetObjectCommand({
           Bucket: bucket,
           Key: storagePath,
-          ResponseContentType: 'application/pdf',
+          ResponseContentType: detectedContentType,
           ResponseContentDisposition: filename
             ? `attachment; filename="${encodeURIComponent(filename)}"`
             : 'inline',
@@ -119,7 +123,7 @@ export class StorageService {
       const command = new GetObjectCommand({
         Bucket: bucket,
         Key: storagePath,
-        ResponseContentType: 'application/pdf',
+        ResponseContentType: detectedContentType,
         ResponseContentDisposition: filename
           ? `attachment; filename="${encodeURIComponent(filename)}"`
           : 'inline',
@@ -174,8 +178,10 @@ export class StorageService {
   public async uploadBuffer(
     storagePath: string,
     buffer: Buffer,
-    contentType: string = 'application/pdf'
+    contentType?: string
   ): Promise<{ success: boolean; provider: StorageProvider }> {
+    const finalContentType = contentType || detectFileFormat(storagePath).mimeType || 'application/octet-stream'
+
     if (this.isR2Enabled()) {
       const client = getR2Client()
       const bucket = getR2BucketName()
@@ -185,7 +191,7 @@ export class StorageService {
           Bucket: bucket,
           Key: storagePath,
           Body: buffer,
-          ContentType: contentType,
+          ContentType: finalContentType,
         })
       )
 
@@ -194,7 +200,7 @@ export class StorageService {
 
     const admin = getSupabaseAdmin()
     const { error } = await admin.storage.from('documents').upload(storagePath, buffer, {
-      contentType,
+      contentType: finalContentType,
       upsert: true,
     })
 

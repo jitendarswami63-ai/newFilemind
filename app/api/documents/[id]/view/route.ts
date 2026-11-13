@@ -7,12 +7,25 @@ import { storageService, StorageProvider } from '@/lib/storage/storage-service'
 
 export const dynamic = 'force-dynamic'
 
-function createPdfResponse(
+function createFileStreamResponse(
   buffer: Buffer,
   filename: string,
+  rawMimeType: string | undefined,
   cacheControl: string,
   rangeHeader?: string | null
 ): Response {
+  let safeMime = rawMimeType || 'application/octet-stream'
+  const ext = filename.split('.').pop()?.toLowerCase() || ''
+
+  if (safeMime === 'text/html' || safeMime === 'application/xhtml+xml') {
+    safeMime = 'text/plain; charset=utf-8'
+  }
+
+  const isTextOrCode = safeMime.startsWith('text/') || ['json', 'xml', 'js', 'ts', 'jsx', 'tsx', 'py', 'sql', 'yaml', 'toml', 'css'].includes(ext)
+  if (isTextOrCode && !safeMime.includes('charset')) {
+    safeMime = `${safeMime}; charset=utf-8`
+  }
+
   if (rangeHeader && rangeHeader.startsWith('bytes=')) {
     const parts = rangeHeader.replace(/bytes=/, '').split('-')
     const start = parseInt(parts[0], 10)
@@ -25,13 +38,14 @@ function createPdfResponse(
       return new Response(new Uint8Array(chunk), {
         status: 206,
         headers: {
-          'Content-Type': 'application/pdf',
+          'Content-Type': safeMime,
           'Content-Range': `bytes ${start}-${safeEnd}/${buffer.length}`,
           'Content-Length': chunk.length.toString(),
           'Accept-Ranges': 'bytes',
           'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
           'Cache-Control': cacheControl,
           'X-Frame-Options': 'SAMEORIGIN',
+          'X-Content-Type-Options': 'nosniff',
         },
       })
     }
@@ -40,12 +54,13 @@ function createPdfResponse(
   return new Response(new Uint8Array(buffer), {
     status: 200,
     headers: {
-      'Content-Type': 'application/pdf',
+      'Content-Type': safeMime,
       'Content-Length': buffer.length.toString(),
       'Accept-Ranges': 'bytes',
       'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
       'Cache-Control': cacheControl,
       'X-Frame-Options': 'SAMEORIGIN',
+      'X-Content-Type-Options': 'nosniff',
     },
   })
 }
@@ -110,7 +125,7 @@ export async function GET(
   const supabaseAdmin = getServiceRoleClient()
   let { data: doc, error: fetchError } = await supabaseAdmin
     .from('documents')
-    .select('id, user_id, filename, storage_path, storage_provider, is_locked, encrypted_dek, dek_iv, dek_tag, file_iv, file_tag, key_version')
+    .select('id, user_id, filename, mime_type, storage_path, storage_provider, is_locked, encrypted_dek, dek_iv, dek_tag, file_iv, file_tag, key_version')
     .eq('id', documentId)
     .eq('user_id', user.id)
     .single()
@@ -118,7 +133,7 @@ export async function GET(
   if (fetchError && (fetchError.code === '42703' || fetchError.message?.includes('storage_provider'))) {
     const fallback = await supabaseAdmin
       .from('documents')
-      .select('id, user_id, filename, storage_path, is_locked, encrypted_dek, dek_iv, dek_tag, file_iv, file_tag, key_version')
+      .select('id, user_id, filename, mime_type, storage_path, is_locked, encrypted_dek, dek_iv, dek_tag, file_iv, file_tag, key_version')
       .eq('id', documentId)
       .eq('user_id', user.id)
       .single()
@@ -143,7 +158,7 @@ export async function GET(
         if (!isExpired) {
           const { data: sharedDoc, error: sharedErr } = await supabaseAdmin
             .from('documents')
-            .select('id, user_id, filename, storage_path, storage_provider, is_locked, encrypted_dek, dek_iv, dek_tag, file_iv, file_tag, key_version')
+            .select('id, user_id, filename, mime_type, storage_path, storage_provider, is_locked, encrypted_dek, dek_iv, dek_tag, file_iv, file_tag, key_version')
             .eq('id', documentId)
             .single()
 
@@ -153,7 +168,7 @@ export async function GET(
           } else if (sharedErr && (sharedErr.code === '42703' || sharedErr.message?.includes('storage_provider'))) {
             const { data: sharedFallback } = await supabaseAdmin
               .from('documents')
-              .select('id, user_id, filename, storage_path, is_locked, encrypted_dek, dek_iv, dek_tag, file_iv, file_tag, key_version')
+              .select('id, user_id, filename, mime_type, storage_path, is_locked, encrypted_dek, dek_iv, dek_tag, file_iv, file_tag, key_version')
               .eq('id', documentId)
               .single()
             if (sharedFallback) {
@@ -215,9 +230,10 @@ export async function GET(
       )
     }
 
-    return createPdfResponse(
+    return createFileStreamResponse(
       plaintextBuffer,
       doc.filename,
+      (doc as { mime_type?: string }).mime_type,
       'private, no-cache, no-store, must-revalidate',
       request.headers.get('range')
     )
@@ -234,9 +250,10 @@ export async function GET(
     return NextResponse.json({ error: 'Failed to retrieve document' }, { status: 500 })
   }
 
-  return createPdfResponse(
+  return createFileStreamResponse(
     plaintextBuffer,
     doc.filename,
+    (doc as { mime_type?: string }).mime_type,
     'private, max-age=300',
     request.headers.get('range')
   )

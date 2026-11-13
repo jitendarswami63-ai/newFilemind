@@ -25,7 +25,8 @@
     "test:seo": "node tests/test_seo_verification.mjs",
     "test:razorpay": "node tests/test_razorpay_checkout_suite.mjs",
     "test:admin": "node tests/test_admin_auth_suite.mjs",
-    "test:r2": "node tests/test_r2_storage_suite.mjs"
+    "test:r2": "node tests/test_r2_storage_suite.mjs",
+    "test:universal": "node tests/test_universal_file_system.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1168.0",

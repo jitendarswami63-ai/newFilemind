@@ -8,6 +8,7 @@ import { formatDate, formatFileSize } from '@/lib/utils'
 import { FileText, ArrowUpRight, Trash2, Loader2, Zap, Lock, Share2 } from 'lucide-react'
 import { prefetchSignedUrl } from '@/lib/viewer/signed-url-cache'
 import { ShareModal } from '@/components/documents/ShareModal'
+import { getFileIconForFilename } from '@/lib/files/file-icons'
 
 interface DocumentCardProps {
   document: DocumentItem
@@ -74,9 +75,15 @@ export function DocumentCard({ document, onDeleted }: DocumentCardProps) {
     >
       <div>
         <div className="flex items-start justify-between gap-2 mb-3.5">
-          <div className="h-10 w-10 rounded-xl bg-[#FAF5EC] border border-[#E5DED1] flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-all shadow-2xs">
-            <FileText className="h-5 w-5 text-[#9C7D47] transition-colors" />
-          </div>
+          {(() => {
+            const theme = getFileIconForFilename(document.filename)
+            const Icon = theme.icon
+            return (
+              <div className={`h-10 w-10 rounded-xl ${theme.bgColor} border ${theme.borderColor} flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-all shadow-2xs ${theme.textColor}`}>
+                <Icon className="h-5 w-5 transition-colors" />
+              </div>
+            )
+          })()}
 
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <StatusBadge status={document.status} />

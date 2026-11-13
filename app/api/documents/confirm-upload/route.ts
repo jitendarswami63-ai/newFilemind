@@ -3,6 +3,8 @@ import { after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { PDF_MAGIC_BYTES } from '@/lib/constants'
 import { processDocument } from '@/lib/ai/processor'
+import { processUniversalFile } from '@/lib/files/processing-engine'
+import { detectFileFormat, isDangerousFile, validateMagicBytes } from '@/lib/files/file-types'
 import { isSameOrigin } from '@/lib/validation/origin'
 import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
 import { getServerUserEntitlements } from '@/lib/subscription/plan-server'
@@ -98,27 +100,33 @@ export async function POST(request: Request) {
     )
   }
 
+  const sanitizedFilename = segments[2]
+  const detectedFormat = detectFileFormat(sanitizedFilename)
+
   try {
-    const magicBuffer = await storageService.getByteRange(storagePath, 0, 3, storageProvider)
+    const magicBuffer = await storageService.getByteRange(storagePath, 0, 15, storageProvider)
     const bytes = new Uint8Array(magicBuffer)
 
-    const isPdf =
-      bytes.length >= 4 &&
-      bytes[0] === PDF_MAGIC_BYTES[0] &&
-      bytes[1] === PDF_MAGIC_BYTES[1] &&
-      bytes[2] === PDF_MAGIC_BYTES[2] &&
-      bytes[3] === PDF_MAGIC_BYTES[3]
-
-    if (!isPdf) {
+    const dangerCheck = isDangerousFile(sanitizedFilename, bytes)
+    if (dangerCheck.dangerous) {
       await storageService.deleteFile(storagePath, storageProvider)
-      return NextResponse.json({ error: 'The uploaded file is not a valid PDF.' }, { status: 400 })
+      return NextResponse.json({ error: dangerCheck.reason || 'Dangerous payload rejected.' }, { status: 400 })
+    }
+
+    if (detectedFormat.magicBytes && detectedFormat.magicBytes.length > 0) {
+      const isValid = validateMagicBytes(detectedFormat, bytes)
+      if (!isValid) {
+        await storageService.deleteFile(storagePath, storageProvider)
+        return NextResponse.json(
+          { error: `The uploaded file does not match the valid signature for ${detectedFormat.label}.` },
+          { status: 400 }
+        )
+      }
     }
   } catch {
     await storageService.deleteFile(storagePath, storageProvider)
     return NextResponse.json({ error: 'Upload validation failed. Please try again.' }, { status: 400 })
   }
-
-  const sanitizedFilename = segments[2]
 
   if (storageProvider === 'r2') {
     const { error: insertError } = await supabase
@@ -130,7 +138,8 @@ export async function POST(request: Request) {
         storage_path: storagePath,
         storage_provider: 'r2',
         file_size: actualSize,
-        mime_type: 'application/pdf',
+        mime_type: detectedFormat.mimeType,
+        doc_category: detectedFormat.category,
         status: 'pending',
       })
 
@@ -144,7 +153,8 @@ export async function POST(request: Request) {
             filename: sanitizedFilename,
             storage_path: storagePath,
             file_size: actualSize,
-            mime_type: 'application/pdf',
+            mime_type: detectedFormat.mimeType,
+            doc_category: detectedFormat.category,
             status: 'pending',
           })
 
@@ -257,7 +267,7 @@ export async function POST(request: Request) {
   const skipImmediate = body.skipImmediateProcessing
   if (!skipImmediate) {
     after(async () => {
-      await processDocument(documentId)
+      await processUniversalFile(documentId)
     })
   }
 

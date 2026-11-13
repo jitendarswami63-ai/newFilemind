@@ -22,8 +22,17 @@ export async function GET(request: Request) {
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
   const limit = Math.min(250, Math.max(1, parseInt(searchParams.get('limit') || (isPaginated ? '24' : '200'), 10)))
   const statusFilter = searchParams.get('status')
+  const categoryFilter = searchParams.get('category')?.toLowerCase()
+  const searchQuery = searchParams.get('q')?.trim()
+  const sortBy = searchParams.get('sort') || 'created_at'
+  const sortOrder = searchParams.get('order') === 'asc' ? true : false
+
   const from = (page - 1) * limit
   const to = from + limit - 1
+
+  const sortColumn = ['filename', 'file_size', 'created_at'].includes(sortBy)
+    ? sortBy
+    : 'created_at'
 
   let query = supabase
     .from('documents')
@@ -32,7 +41,7 @@ export async function GET(request: Request) {
       { count: isPaginated ? 'exact' : undefined }
     )
     .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
+    .order(sortColumn, { ascending: sortOrder })
 
   if (statusFilter && statusFilter !== 'all') {
     if (statusFilter === 'locked') {
@@ -40,6 +49,34 @@ export async function GET(request: Request) {
     } else {
       query = query.eq('status', statusFilter)
     }
+  }
+
+  if (categoryFilter && categoryFilter !== 'all') {
+    if (categoryFilter === 'pdfs') {
+      query = query.or('mime_type.eq.application/pdf,filename.ilike.%.pdf')
+    } else if (categoryFilter === 'documents') {
+      query = query.or('doc_category.eq.Document,filename.ilike.%.docx,filename.ilike.%.txt,filename.ilike.%.md,filename.ilike.%.rtf,filename.ilike.%.odt')
+    } else if (categoryFilter === 'images') {
+      query = query.or('doc_category.eq.Image,mime_type.ilike.image/%')
+    } else if (categoryFilter === 'spreadsheets') {
+      query = query.or('doc_category.eq.Spreadsheet,filename.ilike.%.xlsx,filename.ilike.%.xls,filename.ilike.%.csv')
+    } else if (categoryFilter === 'presentations') {
+      query = query.or('doc_category.eq.Presentation,filename.ilike.%.pptx,filename.ilike.%.ppt,filename.ilike.%.odp')
+    } else if (categoryFilter === 'videos') {
+      query = query.or('doc_category.eq.Video,mime_type.ilike.video/%')
+    } else if (categoryFilter === 'audio') {
+      query = query.or('doc_category.eq.Audio,mime_type.ilike.audio/%')
+    } else if (categoryFilter === 'archives') {
+      query = query.or('doc_category.eq.Archive,filename.ilike.%.zip,filename.ilike.%.tar,filename.ilike.%.gz,filename.ilike.%.rar,filename.ilike.%.7z')
+    } else if (categoryFilter === 'code') {
+      query = query.or('doc_category.eq.Code,filename.ilike.%.json,filename.ilike.%.js,filename.ilike.%.ts,filename.ilike.%.py,filename.ilike.%.html,filename.ilike.%.css')
+    } else if (categoryFilter === 'other') {
+      query = query.eq('doc_category', 'Other')
+    }
+  }
+
+  if (searchQuery) {
+    query = query.ilike('filename', `%${searchQuery}%`)
   }
 
   let { data: documents, error, count } = await query.range(from, to)
@@ -52,7 +89,7 @@ export async function GET(request: Request) {
         { count: isPaginated ? 'exact' : undefined }
       )
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
+      .order(sortColumn, { ascending: sortOrder })
 
     if (statusFilter && statusFilter !== 'all') {
       if (statusFilter === 'locked') {
@@ -60,6 +97,10 @@ export async function GET(request: Request) {
       } else {
         fallbackQuery = fallbackQuery.eq('status', statusFilter)
       }
+    }
+
+    if (searchQuery) {
+      fallbackQuery = fallbackQuery.ilike('filename', `%${searchQuery}%`)
     }
 
     const fallback = await fallbackQuery.range(from, to)

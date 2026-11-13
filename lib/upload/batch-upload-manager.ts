@@ -3,10 +3,9 @@ import {
   MAX_BATCH_FILES,
   MAX_CONCURRENT_UPLOADS,
   MAX_CONCURRENT_PROCESSING,
-  ALLOWED_MIME_TYPE,
-  PDF_MAGIC_BYTES,
 } from '@/lib/constants'
 import { createClient } from '@/lib/supabase/client'
+import { detectFileFormat, isDangerousFile, validateMagicBytes } from '@/lib/files/file-types'
 
 export type BatchItemStatus =
   | 'queued'
@@ -218,10 +217,11 @@ export class BatchUploadManager {
 
     this.updateItem(id, { status: 'validating', uploadProgress: 5 })
 
-    if (file.type !== ALLOWED_MIME_TYPE && !file.name.toLowerCase().endsWith('.pdf')) {
+    const dangerCheck = isDangerousFile(file.name)
+    if (dangerCheck.dangerous) {
       this.updateItem(id, {
         status: 'failed',
-        error: 'Only standard PDF files are supported.',
+        error: dangerCheck.reason || 'This file type is not permitted for security reasons.',
       })
       return
     }
@@ -234,29 +234,37 @@ export class BatchUploadManager {
       return
     }
 
-    try {
-      const headerSlice = await file.slice(0, 4).arrayBuffer()
-      const arr = new Uint8Array(headerSlice)
-      const isPdf =
-        arr.length === 4 &&
-        arr[0] === PDF_MAGIC_BYTES[0] &&
-        arr[1] === PDF_MAGIC_BYTES[1] &&
-        arr[2] === PDF_MAGIC_BYTES[2] &&
-        arr[3] === PDF_MAGIC_BYTES[3]
+    const detectedFormat = detectFileFormat(file.name, file.type)
 
-      if (!isPdf) {
+    if (detectedFormat.magicBytes && detectedFormat.magicBytes.length > 0) {
+      try {
+        const headerSlice = await file.slice(0, 16).arrayBuffer()
+        const arr = new Uint8Array(headerSlice)
+
+        const binaryDanger = isDangerousFile(file.name, arr)
+        if (binaryDanger.dangerous) {
+          this.updateItem(id, {
+            status: 'failed',
+            error: binaryDanger.reason || 'Dangerous disguised binary rejected.',
+          })
+          return
+        }
+
+        const isValid = validateMagicBytes(detectedFormat, arr)
+        if (!isValid) {
+          this.updateItem(id, {
+            status: 'failed',
+            error: `Corrupt header: signature does not match ${detectedFormat.label}.`,
+          })
+          return
+        }
+      } catch {
         this.updateItem(id, {
           status: 'failed',
-          error: 'Corrupt header (not a valid PDF).',
+          error: 'Failed to read file header signature.',
         })
         return
       }
-    } catch {
-      this.updateItem(id, {
-        status: 'failed',
-        error: 'Failed to read file header.',
-      })
-      return
     }
 
     this.updateItem(id, { status: 'preparing', uploadProgress: 15 })
@@ -273,7 +281,7 @@ export class BatchUploadManager {
         body: JSON.stringify({
           filename: file.name,
           fileSize: file.size,
-          mimeType: 'application/pdf',
+          mimeType: detectedFormat.mimeType,
         }),
       })
 
@@ -307,7 +315,7 @@ export class BatchUploadManager {
 
           if (targetUrl) {
             xhr.open(targetMethod, targetUrl)
-            xhr.setRequestHeader('Content-Type', 'application/pdf')
+            xhr.setRequestHeader('Content-Type', detectedFormat.mimeType)
           } else {
             const supabase = createClient()
             const { data: sessionData } = await supabase.auth.getSession()
@@ -322,7 +330,7 @@ export class BatchUploadManager {
             const storageEndpoint = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/documents/${storagePath}`
             xhr.open('POST', storageEndpoint)
             xhr.setRequestHeader('Authorization', `Bearer ${jwt}`)
-            xhr.setRequestHeader('Content-Type', 'application/pdf')
+            xhr.setRequestHeader('Content-Type', detectedFormat.mimeType)
             xhr.setRequestHeader('x-upsert', 'false')
           }
 
