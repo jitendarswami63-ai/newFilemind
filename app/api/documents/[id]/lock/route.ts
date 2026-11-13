@@ -4,6 +4,7 @@ import { isSameOrigin } from '@/lib/validation/origin'
 import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
 import { envelopeEncryptDocument, envelopeDecryptDocument } from '@/lib/crypto/document-encryption'
 import { getServiceRoleClient, listUserBiometricCredentials } from '@/lib/auth/webauthn'
+import { storageService, StorageProvider } from '@/lib/storage/storage-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +40,7 @@ export async function POST(
 
   const { data: doc, error: fetchError } = await supabaseAdmin
     .from('documents')
-    .select('id, user_id, filename, storage_path, is_locked')
+    .select('id, user_id, filename, storage_path, storage_provider, is_locked')
     .eq('id', documentId)
     .eq('user_id', user.id)
     .single()
@@ -52,15 +53,16 @@ export async function POST(
     return NextResponse.json({ success: true, message: 'Document is already locked', is_locked: true })
   }
 
-  const { data: fileData, error: downloadError } = await supabaseAdmin.storage
-    .from('documents')
-    .download(doc.storage_path)
-
-  if (downloadError || !fileData) {
+  let plaintextBuffer: Buffer
+  try {
+    const { buffer } = await storageService.downloadBuffer(
+      doc.storage_path,
+      (doc.storage_provider as StorageProvider) || undefined
+    )
+    plaintextBuffer = buffer
+  } catch {
     return NextResponse.json({ error: 'Failed to retrieve document from storage' }, { status: 500 })
   }
-
-  const plaintextBuffer = Buffer.from(await fileData.arrayBuffer())
 
   const envelope = envelopeEncryptDocument(plaintextBuffer, user.id, documentId, 1)
 
@@ -85,28 +87,15 @@ export async function POST(
 
   const encryptedStoragePath = `${doc.storage_path}.enc`
 
-  let uploadError = (
-    await supabaseAdmin.storage
-      .from('documents')
-      .upload(encryptedStoragePath, envelope.ciphertextBuffer, {
-        contentType: 'application/octet-stream',
-        upsert: true,
-      })
-  ).error
-
-  if (uploadError) {
-    const fallbackUpload = await supabaseAdmin.storage
-      .from('documents')
-      .upload(encryptedStoragePath, envelope.ciphertextBuffer, {
-        contentType: 'application/pdf',
-        upsert: true,
-      })
-    uploadError = fallbackUpload.error
-  }
-
-  if (uploadError) {
+  try {
+    await storageService.uploadBuffer(
+      encryptedStoragePath,
+      envelope.ciphertextBuffer,
+      'application/octet-stream'
+    )
+  } catch (uploadErr) {
     return NextResponse.json(
-      { error: `Failed to save encrypted document to vault: ${uploadError.message}` },
+      { error: `Failed to save encrypted document to vault: ${uploadErr instanceof Error ? uploadErr.message : String(uploadErr)}` },
       { status: 500 }
     )
   }
@@ -128,11 +117,11 @@ export async function POST(
     .eq('user_id', user.id)
 
   if (updateError) {
-    await supabaseAdmin.storage.from('documents').remove([encryptedStoragePath])
+    await storageService.deleteFile(encryptedStoragePath, (doc.storage_provider as StorageProvider) || undefined)
     return NextResponse.json({ error: `Failed to update document security status: ${updateError.message}` }, { status: 500 })
   }
 
-  await supabaseAdmin.storage.from('documents').remove([doc.storage_path])
+  await storageService.deleteFile(doc.storage_path, (doc.storage_provider as StorageProvider) || undefined)
 
   return NextResponse.json({
     success: true,

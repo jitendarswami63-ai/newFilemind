@@ -9,6 +9,7 @@ import { getServerUserEntitlements } from '@/lib/subscription/plan-server'
 import { formatBytes } from '@/lib/subscription/plans'
 import { PDFDocument } from 'pdf-lib'
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
+import { storageService } from '@/lib/storage/storage-service'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -64,24 +65,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, documentId: existingDoc.id, alreadyConfirmed: true })
   }
 
-  const folderPath = `${user.id}/${documentId}`
-  const { data: listData, error: listError } = await supabase.storage
-    .from('documents')
-    .list(folderPath)
+  const headResult = await storageService.headObject(storagePath)
 
-  const sanitizedFilename = segments[2]
-  const matchedFile = listData?.find((f) => f.name === sanitizedFilename)
-
-  if (listError || !matchedFile) {
+  if (!headResult) {
     return NextResponse.json({ error: 'Upload not found in storage. Please try again.' }, { status: 400 })
   }
 
-  const actualSize = matchedFile.metadata?.size || 0
+  const actualSize = headResult.size
+  const storageProvider = headResult.provider
 
   const entitlements = await getServerUserEntitlements(user.id, user.user_metadata)
 
   if (actualSize > entitlements.maxFileSizeBytes) {
-    await supabase.storage.from('documents').remove([storagePath])
+    await storageService.deleteFile(storagePath, storageProvider)
     return NextResponse.json(
       {
         error: `File size (${formatBytes(actualSize)}) exceeds the ${entitlements.maxFileSizeMB} MB limit for ${entitlements.plan.name}. Upgrade your plan to upload larger files.`,
@@ -92,7 +88,7 @@ export async function POST(request: Request) {
   }
 
   if (entitlements.usedStorageBytes + actualSize > entitlements.totalStorageBytes) {
-    await supabase.storage.from('documents').remove([storagePath])
+    await storageService.deleteFile(storagePath, storageProvider)
     return NextResponse.json(
       {
         error: `Storage quota exceeded (${formatBytes(entitlements.totalStorageBytes)} limit, ${formatBytes(entitlements.availableStorageBytes)} remaining). Please delete old documents or purchase additional storage.`,
@@ -102,38 +98,27 @@ export async function POST(request: Request) {
     )
   }
 
-  const { data: sessionData } = await supabase.auth.getSession()
-  const userJwt = sessionData.session?.access_token
+  try {
+    const magicBuffer = await storageService.getByteRange(storagePath, 0, 3, storageProvider)
+    const bytes = new Uint8Array(magicBuffer)
 
-  if (userJwt) {
-    const storageUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/documents/${storagePath}`
-    try {
-      const rangeRes = await fetch(storageUrl, {
-        headers: {
-          Authorization: `Bearer ${userJwt}`,
-          Range: 'bytes=0-3',
-        },
-      })
-      const buffer = await rangeRes.arrayBuffer()
-      const bytes = new Uint8Array(buffer)
+    const isPdf =
+      bytes.length >= 4 &&
+      bytes[0] === PDF_MAGIC_BYTES[0] &&
+      bytes[1] === PDF_MAGIC_BYTES[1] &&
+      bytes[2] === PDF_MAGIC_BYTES[2] &&
+      bytes[3] === PDF_MAGIC_BYTES[3]
 
-      const isPdf =
-        bytes.length >= 4 &&
-        bytes[0] === PDF_MAGIC_BYTES[0] &&
-        bytes[1] === PDF_MAGIC_BYTES[1] &&
-        bytes[2] === PDF_MAGIC_BYTES[2] &&
-        bytes[3] === PDF_MAGIC_BYTES[3]
-
-      if (!isPdf) {
-        await supabase.storage.from('documents').remove([storagePath])
-        return NextResponse.json({ error: 'The uploaded file is not a valid PDF.' }, { status: 400 })
-      }
-    } catch {
-      await supabase.storage.from('documents').remove([storagePath])
-      return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 400 })
+    if (!isPdf) {
+      await storageService.deleteFile(storagePath, storageProvider)
+      return NextResponse.json({ error: 'The uploaded file is not a valid PDF.' }, { status: 400 })
     }
+  } catch {
+    await storageService.deleteFile(storagePath, storageProvider)
+    return NextResponse.json({ error: 'Upload validation failed. Please try again.' }, { status: 400 })
   }
 
+  const sanitizedFilename = segments[2]
   const { data: rpcData, error: rpcError } = await supabase.rpc('create_document_with_quota', {
     p_id: documentId,
     p_user_id: user.id,
@@ -154,23 +139,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, documentId: alreadyCreated.id, alreadyConfirmed: true })
     }
 
-    await supabase.storage.from('documents').remove([storagePath])
+    await storageService.deleteFile(storagePath, storageProvider)
     return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 500 })
   }
 
   const resultStatus = Array.isArray(rpcData) && rpcData.length > 0 ? rpcData[0].result : rpcData
 
   if (resultStatus === 'rate_limited') {
-    await supabase.storage.from('documents').remove([storagePath])
+    await storageService.deleteFile(storagePath, storageProvider)
     return NextResponse.json({ error: 'Upload rate limit reached. Try again later.' }, { status: 429 })
   }
 
   if (resultStatus === 'storage_quota_exceeded') {
-    await supabase.storage.from('documents').remove([storagePath])
+    await storageService.deleteFile(storagePath, storageProvider)
     return NextResponse.json(
       { error: `Storage quota exceeded (${formatBytes(entitlements.totalStorageBytes)} limit). Please delete old documents or upgrade your storage.` },
       { status: 403 }
     )
+  }
+
+  if (storageProvider === 'r2') {
+    await supabase
+      .from('documents')
+      .update({ storage_provider: 'r2' })
+      .eq('id', documentId)
   }
 
   if (!entitlements.hasAiFeatures) {
@@ -180,12 +172,11 @@ export async function POST(request: Request) {
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
           process.env.SUPABASE_SERVICE_ROLE_KEY!
         )
-        const { data: fileData } = await admin.storage.from('documents').download(storagePath)
+        const { buffer: fileBuf } = await storageService.downloadBuffer(storagePath, storageProvider)
         let pageCount = 1
-        if (fileData) {
+        if (fileBuf) {
           try {
-            const buf = await fileData.arrayBuffer()
-            const pdfDoc = await PDFDocument.load(buf, { ignoreEncryption: true })
+            const pdfDoc = await PDFDocument.load(fileBuf, { ignoreEncryption: true })
             pageCount = pdfDoc.getPageCount()
           } catch {}
         }
@@ -195,6 +186,7 @@ export async function POST(request: Request) {
           .update({
             status: 'completed',
             page_count: pageCount,
+            storage_provider: storageProvider,
             doc_category: 'Standard Document',
             tags: ['Free Tier'],
             extracted_data: { notice: 'Free Tier storage - AI document understanding available on Pro & Elite' },

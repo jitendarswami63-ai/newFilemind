@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { validatePublicShareToken } from '@/lib/sharing/share-service'
+import { storageService, StorageProvider } from '@/lib/storage/storage-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,35 +42,26 @@ export async function GET(request: NextRequest, context: RouteContext) {
       )
     }
 
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      return new Response('Server storage configuration error.', { status: 500 })
-    }
-
-    const { createClient } = await import('@supabase/supabase-js')
-    const admin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-
-    const { data: fileData, error: downloadError } = await admin.storage
-      .from('documents')
-      .download(doc.storage_path)
-
-    if (downloadError || !fileData) {
+    let fileBuffer: Buffer
+    try {
+      const { buffer } = await storageService.downloadBuffer(
+        doc.storage_path,
+        (doc.storage_provider as StorageProvider) || undefined
+      )
+      fileBuffer = buffer
+    } catch (downloadError) {
       console.error('[Public Share Content API] Storage download error:', downloadError)
       return new Response('Unable to load document content from storage.', { status: 500 })
     }
-
-    const arrayBuffer = await fileData.arrayBuffer()
     const dispositionType = isDownload ? 'attachment' : 'inline'
     const safeFilename = doc.filename.replace(/["\r\n]/g, '_')
 
-    return new Response(new Uint8Array(arrayBuffer), {
+    return new Response(new Uint8Array(fileBuffer), {
       status: 200,
       headers: {
         'Content-Type': doc.mime_type || 'application/pdf',
         'Content-Disposition': `${dispositionType}; filename="${safeFilename}"`,
-        'Content-Length': arrayBuffer.byteLength.toString(),
+        'Content-Length': fileBuffer.length.toString(),
         'Cache-Control': 'private, max-age=300',
       },
     })

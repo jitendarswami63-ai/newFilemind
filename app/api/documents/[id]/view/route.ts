@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
 import { envelopeDecryptDocument } from '@/lib/crypto/document-encryption'
 import { getServiceRoleClient, hasActiveBiometricLease } from '@/lib/auth/webauthn'
+import { storageService, StorageProvider } from '@/lib/storage/storage-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,7 +67,7 @@ export async function GET(
   const supabaseAdmin = getServiceRoleClient()
   const { data: doc, error: fetchError } = await supabaseAdmin
     .from('documents')
-    .select('id, user_id, filename, storage_path, is_locked, encrypted_dek, dek_iv, dek_tag, file_iv, file_tag, key_version')
+    .select('id, user_id, filename, storage_path, storage_provider, is_locked, encrypted_dek, dek_iv, dek_tag, file_iv, file_tag, key_version')
     .eq('id', documentId)
     .eq('user_id', user.id)
     .single()
@@ -89,15 +90,16 @@ export async function GET(
       )
     }
 
-    const { data: fileData, error: downloadError } = await supabaseAdmin.storage
-      .from('documents')
-      .download(doc.storage_path)
-
-    if (downloadError || !fileData) {
+    let ciphertextBuffer: Buffer
+    try {
+      const { buffer } = await storageService.downloadBuffer(
+        doc.storage_path,
+        (doc.storage_provider as StorageProvider) || undefined
+      )
+      ciphertextBuffer = buffer
+    } catch {
       return NextResponse.json({ error: 'Failed to retrieve encrypted document' }, { status: 500 })
     }
-
-    const ciphertextBuffer = Buffer.from(await fileData.arrayBuffer())
 
     let plaintextBuffer: Buffer
     try {
@@ -132,15 +134,16 @@ export async function GET(
     })
   }
 
-  const { data: fileData, error: downloadError } = await supabaseAdmin.storage
-    .from('documents')
-    .download(doc.storage_path)
-
-  if (downloadError || !fileData) {
+  let plaintextBuffer: Buffer
+  try {
+    const { buffer } = await storageService.downloadBuffer(
+      doc.storage_path,
+      (doc.storage_provider as StorageProvider) || undefined
+    )
+    plaintextBuffer = buffer
+  } catch {
     return NextResponse.json({ error: 'Failed to retrieve document' }, { status: 500 })
   }
-
-  const plaintextBuffer = Buffer.from(await fileData.arrayBuffer())
 
   return new Response(new Uint8Array(plaintextBuffer), {
     status: 200,

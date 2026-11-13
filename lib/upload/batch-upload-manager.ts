@@ -262,6 +262,9 @@ export class BatchUploadManager {
     this.updateItem(id, { status: 'preparing', uploadProgress: 15 })
     let documentId: string
     let storagePath: string
+    let uploadUrl: string | null = null
+    let uploadMethod: string = 'POST'
+    let storageProvider: 'r2' | 'supabase' = 'supabase'
 
     try {
       const prepRes = await fetch('/api/documents/prepare-upload', {
@@ -282,6 +285,9 @@ export class BatchUploadManager {
       const prepData = await prepRes.json()
       documentId = prepData.documentId
       storagePath = prepData.storagePath
+      uploadUrl = prepData.uploadUrl || null
+      uploadMethod = prepData.uploadMethod || 'PUT'
+      storageProvider = prepData.storageProvider || 'supabase'
       this.updateItem(id, { documentId, storagePath })
     } catch (prepErr) {
       this.updateItem(id, {
@@ -294,24 +300,30 @@ export class BatchUploadManager {
     this.updateItem(id, { status: 'uploading', uploadProgress: 20 })
 
     try {
-      const supabase = createClient()
-      const { data: sessionData } = await supabase.auth.getSession()
-      const jwt = sessionData.session?.access_token
-
-      if (!jwt) {
-        throw new Error('User session expired. Please sign in again.')
-      }
-
-      const storageEndpoint = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/documents/${storagePath}`
-
-      await new Promise<void>((resolve, reject) => {
+      await new Promise<void>(async (resolve, reject) => {
         const xhr = new XMLHttpRequest()
         this.activeXhrs.set(id, xhr)
 
-        xhr.open('POST', storageEndpoint)
-        xhr.setRequestHeader('Authorization', `Bearer ${jwt}`)
-        xhr.setRequestHeader('Content-Type', 'application/pdf')
-        xhr.setRequestHeader('x-upsert', 'false')
+        if (uploadUrl) {
+          xhr.open(uploadMethod, uploadUrl)
+          xhr.setRequestHeader('Content-Type', 'application/pdf')
+        } else {
+          const supabase = createClient()
+          const { data: sessionData } = await supabase.auth.getSession()
+          const jwt = sessionData.session?.access_token
+
+          if (!jwt) {
+            this.activeXhrs.delete(id)
+            reject(new Error('User session expired. Please sign in again.'))
+            return
+          }
+
+          const storageEndpoint = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/documents/${storagePath}`
+          xhr.open('POST', storageEndpoint)
+          xhr.setRequestHeader('Authorization', `Bearer ${jwt}`)
+          xhr.setRequestHeader('Content-Type', 'application/pdf')
+          xhr.setRequestHeader('x-upsert', 'false')
+        }
 
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
@@ -366,6 +378,7 @@ export class BatchUploadManager {
           documentId,
           storagePath,
           fileSize: file.size,
+          storageProvider,
           skipImmediateProcessing: true,
         }),
       })

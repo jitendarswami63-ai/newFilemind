@@ -4,6 +4,7 @@ import { isSameOrigin } from '@/lib/validation/origin'
 import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
 import { envelopeDecryptDocument } from '@/lib/crypto/document-encryption'
 import { getServiceRoleClient, hasActiveBiometricLease } from '@/lib/auth/webauthn'
+import { storageService, StorageProvider } from '@/lib/storage/storage-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +40,7 @@ export async function POST(
 
   const { data: doc, error: fetchError } = await supabaseAdmin
     .from('documents')
-    .select('id, user_id, filename, storage_path, is_locked, encrypted_dek, dek_iv, dek_tag, file_iv, file_tag, key_version')
+    .select('id, user_id, filename, storage_path, storage_provider, is_locked, encrypted_dek, dek_iv, dek_tag, file_iv, file_tag, key_version')
     .eq('id', documentId)
     .eq('user_id', user.id)
     .single()
@@ -52,15 +53,16 @@ export async function POST(
     return NextResponse.json({ success: true, message: 'Document is not locked', is_locked: false })
   }
 
-  const { data: fileData, error: downloadError } = await supabaseAdmin.storage
-    .from('documents')
-    .download(doc.storage_path)
-
-  if (downloadError || !fileData) {
+  let ciphertextBuffer: Buffer
+  try {
+    const { buffer } = await storageService.downloadBuffer(
+      doc.storage_path,
+      (doc.storage_provider as StorageProvider) || undefined
+    )
+    ciphertextBuffer = buffer
+  } catch {
     return NextResponse.json({ error: 'Failed to retrieve encrypted document from vault' }, { status: 500 })
   }
-
-  const ciphertextBuffer = Buffer.from(await fileData.arrayBuffer())
 
   let plaintextBuffer: Buffer
   try {
@@ -83,15 +85,17 @@ export async function POST(
     ? doc.storage_path.slice(0, -4)
     : `${doc.storage_path}.pdf`
 
-  const { error: uploadError } = await supabaseAdmin.storage
-    .from('documents')
-    .upload(plaintextStoragePath, plaintextBuffer, {
-      contentType: 'application/pdf',
-      upsert: true,
-    })
-
-  if (uploadError) {
-    return NextResponse.json({ error: `Failed to restore plaintext document: ${uploadError.message}` }, { status: 500 })
+  try {
+    await storageService.uploadBuffer(
+      plaintextStoragePath,
+      plaintextBuffer,
+      'application/pdf'
+    )
+  } catch (uploadErr) {
+    return NextResponse.json(
+      { error: `Failed to restore plaintext document: ${uploadErr instanceof Error ? uploadErr.message : String(uploadErr)}` },
+      { status: 500 }
+    )
   }
 
   const { error: updateError } = await supabaseAdmin
@@ -113,7 +117,7 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to update document status' }, { status: 500 })
   }
 
-  await supabaseAdmin.storage.from('documents').remove([doc.storage_path])
+  await storageService.deleteFile(doc.storage_path, (doc.storage_provider as StorageProvider) || undefined)
 
   return NextResponse.json({
     success: true,

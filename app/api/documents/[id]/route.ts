@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { isSameOrigin } from '@/lib/validation/origin'
 import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
 import { hasActiveBiometricLease, revokeBiometricLease } from '@/lib/auth/webauthn'
+import { storageService, StorageProvider } from '@/lib/storage/storage-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -119,7 +120,7 @@ export async function DELETE(
 
   const { data: doc, error: fetchError } = await supabase
     .from('documents')
-    .select('storage_path, is_locked')
+    .select('storage_path, storage_provider, is_locked')
     .eq('id', id)
     .eq('user_id', user.id)
     .single()
@@ -139,7 +140,7 @@ export async function DELETE(
   }
 
   if (doc.storage_path) {
-    await supabase.storage.from('documents').remove([doc.storage_path])
+    await storageService.deleteFile(doc.storage_path, (doc.storage_provider as StorageProvider) || undefined)
   }
 
   const { error: deleteError } = await supabase

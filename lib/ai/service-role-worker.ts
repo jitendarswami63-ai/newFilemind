@@ -269,19 +269,11 @@ export async function getCompletedPageNumbers(documentId: string): Promise<Set<n
   return completed
 }
 
+import { storageService } from '@/lib/storage/storage-service'
+
 export async function downloadDocumentBuffer(storagePath: string): Promise<Buffer> {
-  const client = getServiceRoleClient()
-
-  const { data, error } = await client.storage
-    .from(STORAGE_BUCKET)
-    .download(storagePath)
-
-  if (error || !data) {
-    throw new Error(`Failed to download document from storage: ${error?.message || 'Empty response'}`)
-  }
-
-  const arrayBuffer = await data.arrayBuffer()
-  return Buffer.from(arrayBuffer)
+  const { buffer } = await storageService.downloadBuffer(storagePath)
+  return buffer
 }
 
 export interface PageRecord {
@@ -412,42 +404,21 @@ export async function storeOptimizedDocument(
   storagePath: string,
   buffer: Buffer
 ): Promise<boolean> {
-  const client = getServiceRoleClient()
-  const { error } = await client.storage
-    .from(STORAGE_BUCKET)
-    .upload(storagePath, buffer, {
-      contentType: 'application/pdf',
-      upsert: false,
-    })
-
-  if (error) {
-    console.error(`[ServiceWorker] Failed to upload optimized PDF to ${storagePath}:`, error)
+  try {
+    const res = await storageService.uploadBuffer(storagePath, buffer, 'application/pdf')
+    return res.success
+  } catch (err) {
+    console.error(`[ServiceWorker] Failed to upload optimized PDF to ${storagePath}:`, err)
     return false
   }
-  return true
 }
 
 export async function verifyStorageObject(
   storagePath: string
 ): Promise<{ size: number } | null> {
-  const client = getServiceRoleClient()
-  const segments = storagePath.split('/')
-  if (segments.length < 2) return null
-
-  const folder = segments.slice(0, -1).join('/')
-  const filename = segments[segments.length - 1]
-
-  const { data, error } = await client.storage
-    .from(STORAGE_BUCKET)
-    .list(folder)
-
-  if (error || !data) return null
-
-  const matched = data.find((f) => f.name === filename)
-  if (!matched) return null
-
-  const size = matched.metadata?.size || 0
-  return { size }
+  const head = await storageService.headObject(storagePath)
+  if (!head) return null
+  return { size: head.size }
 }
 
 export async function updateDocumentOptimizedSize(
@@ -475,14 +446,5 @@ export async function updateDocumentOptimizedSize(
 }
 
 export async function deleteStorageObject(storagePath: string): Promise<boolean> {
-  const client = getServiceRoleClient()
-  const { error } = await client.storage
-    .from(STORAGE_BUCKET)
-    .remove([storagePath])
-
-  if (error) {
-    console.warn(`[ServiceWorker] deleteStorageObject failed for ${storagePath}:`, error)
-    return false
-  }
-  return true
+  return await storageService.deleteFile(storagePath)
 }

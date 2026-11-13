@@ -28,6 +28,7 @@ export interface PublicShareValidationResult {
     file_size: number | null
     mime_type: string | null
     storage_path: string
+    storage_provider?: string | null
     created_at: string
   }
 }
@@ -319,7 +320,7 @@ export async function validatePublicShareToken(
   // Fetch document details securely without exposing sensitive fields
   const { data: doc, error: docError } = await admin
     .from('documents')
-    .select('id, filename, file_size, mime_type, storage_path, created_at')
+    .select('id, filename, file_size, mime_type, storage_path, storage_provider, created_at')
     .eq('id', share.document_id)
     .single()
 

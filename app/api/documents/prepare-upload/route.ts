@@ -6,6 +6,7 @@ import { isSameOrigin } from '@/lib/validation/origin'
 import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
 import { getServerUserEntitlements } from '@/lib/subscription/plan-server'
 import { formatBytes } from '@/lib/subscription/plans'
+import { storageService } from '@/lib/storage/storage-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -82,5 +83,27 @@ export async function POST(request: Request) {
   const documentId = crypto.randomUUID()
   const storagePath = `${user.id}/${documentId}/${sanitized}`
 
-  return NextResponse.json({ documentId, storagePath, entitlements })
+  let uploadUrl: string | null = null
+  let uploadMethod = 'POST'
+  let storageProvider: 'r2' | 'supabase' = 'supabase'
+
+  if (storageService.isR2Enabled()) {
+    try {
+      const signedUpload = await storageService.getSignedUploadUrl(storagePath, 'application/pdf', 900)
+      uploadUrl = signedUpload.uploadUrl
+      uploadMethod = signedUpload.method
+      storageProvider = 'r2'
+    } catch (e) {
+      console.warn('[PrepareUpload] R2 presigned upload URL error, falling back to Supabase:', e)
+    }
+  }
+
+  return NextResponse.json({
+    documentId,
+    storagePath,
+    uploadUrl,
+    uploadMethod,
+    storageProvider,
+    entitlements,
+  })
 }

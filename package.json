@@ -24,9 +24,12 @@
     "test:redirect": "node tests/test_redirect_verification.mjs",
     "test:seo": "node tests/test_seo_verification.mjs",
     "test:razorpay": "node tests/test_razorpay_checkout_suite.mjs",
-    "test:admin": "node tests/test_admin_auth_suite.mjs"
+    "test:admin": "node tests/test_admin_auth_suite.mjs",
+    "test:r2": "node tests/test_r2_storage_suite.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1168.0",
+    "@aws-sdk/s3-request-presigner": "^3.1168.0",
     "@deepgram/sdk": "^5.17.0",
     "@google/genai": "^2.22.0",
     "@simplewebauthn/browser": "^14.0.0",

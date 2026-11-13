@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { VIEWER_SIGNED_URL_EXPIRY, DOWNLOAD_SIGNED_URL_EXPIRY } from '@/lib/constants'
 import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
 import { hasActiveBiometricLease } from '@/lib/auth/webauthn'
+import { storageService, StorageProvider } from '@/lib/storage/storage-service'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,19 +29,19 @@ export async function GET(
 
     let { data: doc, error } = await supabase
       .from('documents')
-      .select('storage_path, is_locked')
+      .select('filename, storage_path, storage_provider, is_locked')
       .eq('id', id)
       .eq('user_id', user.id)
       .single()
 
-    if (error && (error.code === '42703' || error.message?.includes('is_locked'))) {
+    if (error && (error.code === '42703' || error.message?.includes('is_locked') || error.message?.includes('storage_provider'))) {
       const fallback = await supabase
         .from('documents')
-        .select('storage_path')
+        .select('filename, storage_path')
         .eq('id', id)
         .eq('user_id', user.id)
         .single()
-      doc = fallback.data ? { ...fallback.data, is_locked: false } : null
+      doc = fallback.data ? { ...fallback.data, is_locked: false, storage_provider: 'supabase' } : null
       error = fallback.error
     }
 
@@ -72,7 +73,7 @@ export async function GET(
         )
         const { data: sharedDoc } = await adminSupabase
           .from('documents')
-          .select('storage_path, is_locked')
+          .select('filename, storage_path, storage_provider, is_locked')
           .eq('id', id)
           .single()
 
@@ -109,43 +110,24 @@ export async function GET(
     }
 
     const expiry = type === 'download' ? DOWNLOAD_SIGNED_URL_EXPIRY : VIEWER_SIGNED_URL_EXPIRY
-    let { data: signedData, error: signError } = await supabase.storage
-      .from('documents')
-      .createSignedUrl(doc.storage_path, expiry, {
-        download: type === 'download',
-      })
+    let signedUrl: string
 
-    if (signError || !signedData?.signedUrl) {
-      if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-        try {
-          const { createClient: createAdmin } = await import('@supabase/supabase-js')
-          const adminSupabase = createAdmin(
-            process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.SUPABASE_SERVICE_ROLE_KEY!
-          )
-          const { data: adminSigned, error: adminSignErr } = await adminSupabase.storage
-            .from('documents')
-            .createSignedUrl(doc.storage_path, expiry, {
-              download: type === 'download',
-            })
-          if (!adminSignErr && adminSigned?.signedUrl) {
-            signedData = adminSigned
-            signError = null
-          }
-        } catch (adminErr) {
-          console.error('[Download API] Fallback signing error:', adminErr)
-        }
-      }
-    }
-
-    if (signError || !signedData?.signedUrl) {
+    try {
+      signedUrl = await storageService.getSignedDownloadUrl(
+        doc.storage_path,
+        expiry,
+        type === 'download' ? (doc.filename as string) || 'document.pdf' : undefined,
+        (doc.storage_provider as StorageProvider) || undefined
+      )
+    } catch (signErr) {
+      console.error('[Download API] Storage signing error:', signErr)
       return NextResponse.json({ error: 'Could not generate URL for document' }, { status: 500 })
     }
 
     const expiresAt = new Date(Date.now() + expiry * 1000).toISOString()
 
     return NextResponse.json({
-      signedUrl: signedData.signedUrl,
+      signedUrl,
       expiresAt,
       storagePath: doc.storage_path,
     })
