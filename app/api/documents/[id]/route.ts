@@ -118,12 +118,25 @@ export async function DELETE(
   }
   const user = auth.user!
 
-  const { data: doc, error: fetchError } = await supabase
+  let { data: doc, error: fetchError } = await supabase
     .from('documents')
     .select('storage_path, storage_provider, is_locked')
     .eq('id', id)
     .eq('user_id', user.id)
     .single()
+
+  if (fetchError && (fetchError.code === '42703' || fetchError.message?.includes('storage_provider'))) {
+    const fallback = await supabase
+      .from('documents')
+      .select('storage_path, is_locked')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single()
+    if (fallback.data) {
+      doc = { ...fallback.data, storage_provider: undefined }
+      fetchError = null
+    }
+  }
 
   if (fetchError || !doc) {
     return NextResponse.json({ error: 'Document not found' }, { status: 404 })

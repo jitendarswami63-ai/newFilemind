@@ -65,12 +65,25 @@ export async function GET(
   const user = auth.user
 
   const supabaseAdmin = getServiceRoleClient()
-  const { data: doc, error: fetchError } = await supabaseAdmin
+  let { data: doc, error: fetchError } = await supabaseAdmin
     .from('documents')
     .select('id, user_id, filename, storage_path, storage_provider, is_locked, encrypted_dek, dek_iv, dek_tag, file_iv, file_tag, key_version')
     .eq('id', documentId)
     .eq('user_id', user.id)
     .single()
+
+  if (fetchError && (fetchError.code === '42703' || fetchError.message?.includes('storage_provider'))) {
+    const fallback = await supabaseAdmin
+      .from('documents')
+      .select('id, user_id, filename, storage_path, is_locked, encrypted_dek, dek_iv, dek_tag, file_iv, file_tag, key_version')
+      .eq('id', documentId)
+      .eq('user_id', user.id)
+      .single()
+    if (fallback.data) {
+      doc = { ...fallback.data, storage_provider: undefined }
+      fetchError = null
+    }
+  }
 
   if (fetchError || !doc) {
     return NextResponse.json({ error: 'Document not found' }, { status: 404 })

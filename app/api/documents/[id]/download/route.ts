@@ -41,7 +41,7 @@ export async function GET(
         .eq('id', id)
         .eq('user_id', user.id)
         .single()
-      doc = fallback.data ? { ...fallback.data, is_locked: false, storage_provider: 'supabase' } : null
+      doc = fallback.data ? { ...fallback.data, is_locked: false, storage_provider: undefined } : null
       error = fallback.error
     }
 
@@ -71,7 +71,7 @@ export async function GET(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
           process.env.SUPABASE_SERVICE_ROLE_KEY!
         )
-        const { data: sharedDoc } = await adminSupabase
+        const { data: sharedDoc, error: sharedErr } = await adminSupabase
           .from('documents')
           .select('filename, storage_path, storage_provider, is_locked')
           .eq('id', id)
@@ -80,6 +80,16 @@ export async function GET(
         if (sharedDoc) {
           doc = sharedDoc
           error = null
+        } else if (sharedErr && (sharedErr.code === '42703' || sharedErr.message?.includes('storage_provider'))) {
+          const { data: sharedFallback } = await adminSupabase
+            .from('documents')
+            .select('filename, storage_path')
+            .eq('id', id)
+            .single()
+          if (sharedFallback) {
+            doc = { ...sharedFallback, is_locked: false, storage_provider: undefined }
+            error = null
+          }
         }
       }
     }

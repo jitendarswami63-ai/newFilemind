@@ -97,18 +97,38 @@ export class StorageService {
       }
     }
 
-    const admin = getSupabaseAdmin()
-    const { data, error } = await admin.storage
-      .from('documents')
-      .createSignedUrl(storagePath, expiresInSeconds, {
-        download: Boolean(filename),
+    try {
+      const admin = getSupabaseAdmin()
+      const { data, error } = await admin.storage
+        .from('documents')
+        .createSignedUrl(storagePath, expiresInSeconds, {
+          download: Boolean(filename),
+        })
+
+      if (!error && data?.signedUrl) {
+        return data.signedUrl
+      }
+    } catch {}
+
+    // Fallback: If Supabase signing failed, try R2 if enabled
+    if (this.isR2Enabled()) {
+      const client = getR2Client()
+      const bucket = getR2BucketName()
+
+      const command = new GetObjectCommand({
+        Bucket: bucket,
+        Key: storagePath,
+        ResponseContentDisposition: filename
+          ? `attachment; filename="${encodeURIComponent(filename)}"`
+          : undefined,
       })
 
-    if (error || !data?.signedUrl) {
-      throw new Error(`Failed to generate signed download URL: ${error?.message || 'Unknown error'}`)
+      return await getSignedUrl(client, command, {
+        expiresIn: expiresInSeconds,
+      })
     }
 
-    return data.signedUrl
+    throw new Error('Failed to generate signed download URL from both R2 and Supabase')
   }
 
   public async downloadBuffer(
