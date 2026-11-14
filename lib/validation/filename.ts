@@ -39,6 +39,13 @@ export function sanitizeFilename(filename: string | undefined | null): string {
 
   ext = ext.replace(/[^a-z0-9.]/gi, '')
 
+  // Normalize storage key to safe characters: alphanumeric, dot, hyphen, underscore
+  // This guarantees compatibility with S3, Cloudflare R2, and Supabase Storage (which rejects characters like 》, «, quotes, emojis)
+  baseName = baseName.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '')
+  if (!baseName) {
+    baseName = 'document'
+  }
+
   const maxBaseLength = MAX_FILENAME_LENGTH - ext.length
   if (baseName.length > maxBaseLength) {
     baseName = baseName.slice(0, maxBaseLength)

@@ -20,6 +20,7 @@ interface ConfirmUploadBody {
   documentId?: string
   storagePath?: string
   fileSize?: number
+  filename?: string
   skipImmediateProcessing?: boolean
 }
 
@@ -101,13 +102,14 @@ export async function POST(request: Request) {
   }
 
   const sanitizedFilename = segments[2]
-  const detectedFormat = detectFileFormat(sanitizedFilename)
+  const displayFilename = typeof body.filename === 'string' && body.filename.trim() ? body.filename.trim().slice(0, 200) : sanitizedFilename
+  const detectedFormat = detectFileFormat(displayFilename)
 
   try {
     const magicBuffer = await storageService.getByteRange(storagePath, 0, 15, storageProvider)
     const bytes = new Uint8Array(magicBuffer)
 
-    const dangerCheck = isDangerousFile(sanitizedFilename, bytes)
+    const dangerCheck = isDangerousFile(displayFilename, bytes)
     if (dangerCheck.dangerous) {
       await storageService.deleteFile(storagePath, storageProvider)
       return NextResponse.json({ error: dangerCheck.reason || 'Dangerous payload rejected.' }, { status: 400 })
@@ -134,7 +136,7 @@ export async function POST(request: Request) {
       .insert({
         id: documentId,
         user_id: user.id,
-        filename: sanitizedFilename,
+        filename: displayFilename,
         storage_path: storagePath,
         storage_provider: 'r2',
         file_size: actualSize,
@@ -150,7 +152,7 @@ export async function POST(request: Request) {
           .insert({
             id: documentId,
             user_id: user.id,
-            filename: sanitizedFilename,
+            filename: displayFilename,
             storage_path: storagePath,
             file_size: actualSize,
             mime_type: detectedFormat.mimeType,
@@ -193,7 +195,7 @@ export async function POST(request: Request) {
     const { data: rpcData, error: rpcError } = await supabase.rpc('create_document_with_quota', {
       p_id: documentId,
       p_user_id: user.id,
-      p_filename: sanitizedFilename,
+      p_filename: displayFilename,
       p_storage_path: storagePath,
       p_file_size: actualSize,
     })

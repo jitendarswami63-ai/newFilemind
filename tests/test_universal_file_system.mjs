@@ -296,9 +296,10 @@ console.log('Testing FileMind Universal File Storage & Multi-Format Document Man
 // -----------------------------------------------------------------------------
 {
   const { sanitizeFilename } = await import('../lib/validation/filename.ts')
-  assert.strictEqual(sanitizeFilename('Screen Recording 2026-07-23 234232.mp4'), 'Screen Recording 2026-07-23 234232.mp4')
+  assert.strictEqual(sanitizeFilename('Screen Recording 2026-07-23 234232.mp4'), 'Screen_Recording_2026-07-23_234232.mp4')
   assert.strictEqual(sanitizeFilename('WIN_20260828_15_09_57_Pro.jpg'), 'WIN_20260828_15_09_57_Pro.jpg')
-  assert.strictEqual(sanitizeFilename('budget.xlsx'), 'budget.xlsx')
+  assert.strictEqual(sanitizeFilename('budget (Q3).xlsx'), 'budget_Q3.xlsx')
+  assert.strictEqual(sanitizeFilename('DSA file》.pdf'), 'DSA_file.pdf')
   assert.strictEqual(sanitizeFilename('notes.txt'), 'notes.txt')
   assert.strictEqual(sanitizeFilename('thesis.pdf'), 'thesis.pdf')
   assert.strictEqual(sanitizeFilename('archive.tar.gz'), 'archive.tar.gz')

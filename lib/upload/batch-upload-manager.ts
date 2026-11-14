@@ -400,6 +400,7 @@ export class BatchUploadManager {
           documentId,
           storagePath,
           fileSize: file.size,
+          filename: file.name,
           storageProvider,
           skipImmediateProcessing: true,
         }),
