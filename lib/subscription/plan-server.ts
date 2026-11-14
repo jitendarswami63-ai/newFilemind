@@ -42,22 +42,24 @@ export async function getServerUserTier(
 
 export async function getServerUserEntitlements(
   userId: string,
-  userMetadata?: Record<string, any> | null
+  userMetadata?: Record<string, any> | null,
+  includeStorage: boolean = true
 ): Promise<UserEntitlements> {
-  const admin = getAdminClient()
-
   let totalUsedBytes = 0
-  try {
-    const { data, error } = await admin
-      .from('documents')
-      .select('file_size')
-      .eq('user_id', userId)
+  if (includeStorage) {
+    try {
+      const admin = getAdminClient()
+      const { data, error } = await admin
+        .from('documents')
+        .select('file_size')
+        .eq('user_id', userId)
 
-    if (!error && Array.isArray(data)) {
-      totalUsedBytes = data.reduce((acc, row) => acc + (Number(row.file_size) || 0), 0)
+      if (!error && Array.isArray(data)) {
+        totalUsedBytes = data.reduce((acc, row) => acc + (Number(row.file_size) || 0), 0)
+      }
+    } catch (err) {
+      console.error('[getServerUserEntitlements] Error computing used storage:', err)
     }
-  } catch (err) {
-    console.error('[getServerUserEntitlements] Error computing used storage:', err)
   }
 
   return calculateUserEntitlements({ user_metadata: userMetadata }, totalUsedBytes)

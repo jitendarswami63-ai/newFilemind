@@ -9,7 +9,7 @@ interface StatusBadgeProps {
   embeddingStatus?: 'pending' | 'processing' | 'completed' | 'failed' | null
 }
 
-export function StatusBadge({ status, embeddingStatus }: StatusBadgeProps) {
+export const StatusBadge = React.memo(function StatusBadge({ status, embeddingStatus }: StatusBadgeProps) {
   const isIndexingFailed = status === 'completed' && embeddingStatus === 'failed'
   const isIndexingProcessing = status === 'completed' && (embeddingStatus === 'processing' || embeddingStatus === 'pending')
 
@@ -73,4 +73,4 @@ export function StatusBadge({ status, embeddingStatus }: StatusBadgeProps) {
       <span>{current.label}</span>
     </span>
   )
-}
+})

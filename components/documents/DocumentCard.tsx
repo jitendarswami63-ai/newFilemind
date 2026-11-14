@@ -15,7 +15,7 @@ interface DocumentCardProps {
   onDeleted?: (id: string) => void
 }
 
-export function DocumentCard({ document, onDeleted }: DocumentCardProps) {
+export const DocumentCard = React.memo(function DocumentCard({ document, onDeleted }: DocumentCardProps) {
   const [deleting, setDeleting] = useState(false)
   const [showShareModal, setShowShareModal] = useState(false)
   const hoverTimerRef = useRef<NodeJS.Timeout | null>(null)
@@ -178,4 +178,4 @@ export function DocumentCard({ document, onDeleted }: DocumentCardProps) {
       />
     </Link>
   )
-}
+})

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useCallback, useTransition } from 'react'
+import React, { useEffect, useState, useCallback, useRef, useTransition } from 'react'
 import { DocumentCard } from './DocumentCard'
 import type { DocumentItem, PaginationMeta, FilterStatus } from '@/types'
 import {
@@ -66,7 +66,8 @@ export function DocumentList() {
     return () => clearTimeout(handler)
   }, [searchTerm])
 
-  const fetchDocuments = useCallback(async () => {
+  const fetchDocuments = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true)
     try {
       const queryParams = new URLSearchParams({
         page: page.toString(),
@@ -108,9 +109,13 @@ export function DocumentList() {
         setError(null)
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'An error occurred loading documents.')
+      if (!isSilent) {
+        setError(err instanceof Error ? err.message : 'An error occurred loading documents.')
+      }
     } finally {
-      setLoading(false)
+      if (!isSilent) {
+        setLoading(false)
+      }
     }
   }, [page, statusFilter, categoryFilter, debouncedSearch, sortBy, sortOrder, limit])
 
@@ -118,7 +123,7 @@ export function DocumentList() {
     let ignore = false
     setLoading(true)
 
-    fetchDocuments().then(() => {
+    fetchDocuments(false).then(() => {
       if (ignore) return
     })
 
@@ -130,7 +135,7 @@ export function DocumentList() {
   const handleManualRefresh = useCallback(async () => {
     setLoading(true)
     setError(null)
-    await fetchDocuments()
+    await fetchDocuments(false)
   }, [fetchDocuments])
 
   useEffect(() => {
@@ -144,18 +149,30 @@ export function DocumentList() {
     }
   }, [handleManualRefresh])
 
+  const fetchRef = useRef(fetchDocuments)
   useEffect(() => {
-    const hasActiveJobs = documents.some(
-      (d) => d.status === 'pending' || d.status === 'processing'
-    )
+    fetchRef.current = fetchDocuments
+  }, [fetchDocuments])
+
+  const hasActiveJobs = documents.some(
+    (d) => d.status === 'pending' || d.status === 'processing'
+  )
+  const hasActiveJobsRef = useRef(hasActiveJobs)
+  useEffect(() => {
+    hasActiveJobsRef.current = hasActiveJobs
+  }, [hasActiveJobs])
+
+  useEffect(() => {
     if (!hasActiveJobs) return
 
     const timer = setInterval(() => {
-      fetchDocuments()
+      if (hasActiveJobsRef.current) {
+        fetchRef.current(true)
+      }
     }, 3000)
 
     return () => clearInterval(timer)
-  }, [documents, fetchDocuments])
+  }, [hasActiveJobs])
 
   const handleDeleted = (id: string) => {
     setDocuments((prev) => prev.filter((doc) => doc.id !== id))

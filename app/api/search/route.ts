@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     }
 
     const user = auth.user!
-    const entitlements = await getServerUserEntitlements(user.id, user.user_metadata)
+    const entitlements = await getServerUserEntitlements(user.id, user.user_metadata, false)
 
     const searchParams = request.nextUrl.searchParams
     const rawQuery = searchParams.get('q')

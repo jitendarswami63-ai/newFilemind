@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     const user = auth.user!
 
-    const entitlements = await getServerUserEntitlements(user.id, user.user_metadata)
+    const entitlements = await getServerUserEntitlements(user.id, user.user_metadata, false)
     if (!entitlements.hasAiFeatures) {
       return NextResponse.json(
         {

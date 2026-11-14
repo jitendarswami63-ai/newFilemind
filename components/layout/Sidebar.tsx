@@ -11,6 +11,7 @@ import { useSidebar } from './SidebarContext'
 import { ProBadge } from '@/components/ui/ProBadge'
 import { useUserPlan, clearLegacyCookies } from '@/lib/subscription/plan'
 import { useUpgradeModal } from '@/components/subscription/UpgradeModalContext'
+import { checkIsAdminClient } from '@/lib/admin/admin-client'
 
 export function Sidebar({ user }: { user: { email?: string; user_metadata?: Record<string, any> } | null }) {
   const pathname = usePathname()
@@ -26,12 +27,9 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
   useEffect(() => {
     if (!user?.email) return
     let isMounted = true
-    fetch('/api/admin/check')
-      .then((r) => r.json())
-      .then((d) => {
-        if (isMounted && d?.isAdmin) setIsAdmin(true)
-      })
-      .catch(() => {})
+    checkIsAdminClient(user.email).then((adminStatus) => {
+      if (isMounted) setIsAdmin(adminStatus)
+    })
     return () => {
       isMounted = false
     }
