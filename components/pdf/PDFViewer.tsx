@@ -177,7 +177,7 @@ export function PDFViewer({
     setRetryMessage(null)
 
     try {
-      const res = await fetch(`/api/documents/${documentId}/process`, {
+      const res = await fetch(`/api/documents/${documentId}/retry`, {
         method: 'POST',
       })
 

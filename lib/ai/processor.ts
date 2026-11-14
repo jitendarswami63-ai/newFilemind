@@ -180,9 +180,9 @@ async function extractStructuredDataWithGemini({
       new Set(
         [
           process.env.GEMINI_MODEL,
-          'gemini-flash-latest',
           'gemini-flash-lite-latest',
           'gemini-3.5-flash',
+          'gemini-flash-latest',
           'gemini-3.1-flash-lite',
           'gemini-3.8-flash',
           'gemini-3.7-flash',
@@ -203,7 +203,7 @@ async function extractStructuredDataWithGemini({
           console.log(
             `[DocumentAI] docId=${documentId} stage=generate attempt=${activeAttempt} model=${modelName} retry=${attempt + 1} status=started`
           )
-          response = await geminiClient.models.generateContent({
+          const generatePromise = geminiClient.models.generateContent({
             model: modelName,
             contents: [
               {
@@ -222,6 +222,17 @@ async function extractStructuredDataWithGemini({
               responseSchema: GEMINI_RESPONSE_SCHEMA,
             },
           })
+
+          let timer: NodeJS.Timeout | null = null
+          const timeoutPromise = new Promise<{ text?: string }>((_, reject) => {
+            timer = setTimeout(() => reject(new Error(`Gemini generateContent timeout after 45s on ${modelName}`)), 45000)
+          })
+
+          try {
+            response = await Promise.race([generatePromise, timeoutPromise])
+          } finally {
+            if (timer) clearTimeout(timer)
+          }
 
           if (response && response.text) {
             console.log(
@@ -621,9 +632,9 @@ export async function processDocument(
           new Set(
             [
               process.env.GEMINI_MODEL,
-              'gemini-flash-latest',
               'gemini-flash-lite-latest',
               'gemini-3.5-flash',
+              'gemini-flash-latest',
               'gemini-3.1-flash-lite',
               'gemini-3.8-flash',
               'gemini-3.7-flash',
