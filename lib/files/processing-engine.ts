@@ -415,15 +415,40 @@ export async function processUniversalFile(
 ): Promise<boolean> {
   const admin = createAdminClient()
 
-  const { data: doc, error } = await admin
+  let doc: {
+    id: string
+    user_id: string
+    filename: string
+    storage_path: string
+    storage_provider?: string | null
+    file_size: number | null
+    mime_type: string
+    status: string
+  } | null = null
+
+  const { data, error } = await admin
     .from('documents')
     .select('id, user_id, filename, storage_path, storage_provider, file_size, mime_type, status')
     .eq('id', documentId)
-    .single()
+    .maybeSingle()
 
-  if (error || !doc) {
+  if (error && (error.code === '42703' || error.message?.includes('storage_provider'))) {
+    const { data: fallbackDoc, error: fallbackErr } = await admin
+      .from('documents')
+      .select('id, user_id, filename, storage_path, file_size, mime_type, status')
+      .eq('id', documentId)
+      .maybeSingle()
+
+    if (fallbackErr || !fallbackDoc) {
+      console.warn(`[UniversalProcessing] Document not found: ${documentId}`)
+      return false
+    }
+    doc = { ...fallbackDoc, storage_provider: undefined }
+  } else if (error || !data) {
     console.warn(`[UniversalProcessing] Document not found: ${documentId}`)
     return false
+  } else {
+    doc = data
   }
 
   const format = detectFileFormat(doc.filename, doc.mime_type)
