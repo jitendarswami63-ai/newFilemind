@@ -16,6 +16,7 @@ import {
   saveSegmentPagesCheckpoint,
   getCompletedPageNumbers,
   getDocumentPages,
+  getServiceRoleClient,
 } from './service-role-worker'
 import { DocumentAiOutputSchema, validatePageIntegrity, DocumentAiOutput, NormalizedMetadataItem } from './schema'
 import { indexDocument } from './index-document'
@@ -597,6 +598,8 @@ export async function processDocument(
     let accumulatedTags: string[] = doc.tags || []
     let accumulatedMetadata: NormalizedMetadataItem[] = []
     let isScannedDoc = false
+    let smartTitle = doc.filename.replace(/\.pdf$/i, '').replace(/[-_]/g, ' ')
+    let summaryText = `PDF document "${doc.filename}" processed with ${validatedPageCount} pages.`
 
     console.log(
       `[DocumentAI] docId=${documentId} stage=segmentation segments=${segmentPlan.totalSegments} segmentSize=${segmentPlan.segmentSize} totalPages=${validatedPageCount} cachedPages=${alreadyCompletedPages.size}`
@@ -657,6 +660,8 @@ export async function processDocument(
         docCategory = metaResult.doc_category
         accumulatedTags = metaResult.tags
         accumulatedMetadata = metaResult.metadata
+        if (metaResult.smart_title) smartTitle = metaResult.smart_title
+        if (metaResult.summary) summaryText = metaResult.summary
         isScannedDoc = false
       }
     }
@@ -761,6 +766,21 @@ export async function processDocument(
     }
 
     console.log(`[DocumentAI] docId=${documentId} stage=finalize attempt=${activeAttempt} status=completed`)
+
+    try {
+      const adminClient = getServiceRoleClient()
+      await adminClient
+        .from('documents')
+        .update({
+          extracted_data: {
+            smart_title: smartTitle,
+            summary: summaryText,
+            metadata: accumulatedMetadata,
+            page_count: validatedPageCount,
+          },
+        })
+        .eq('id', documentId)
+    } catch {}
 
     try {
       indexDocument(documentId).catch((idxErr) => {

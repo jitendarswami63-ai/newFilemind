@@ -93,7 +93,7 @@ export function UploadZone({ onUploadComplete, compact = false, className = '' }
           break
         case 'failed':
           failed++
-          progressSum += 100
+          progressSum += 0
           break
         case 'secured':
           active++
@@ -232,18 +232,24 @@ export function UploadZone({ onUploadComplete, compact = false, className = '' }
           </span>
         )
       case 'confirming':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FAF5EC] border border-[#E5DED1] text-[11px] text-[#856837] font-medium">
+            <Loader2 className="h-3 w-3 animate-spin text-[#856837]" />
+            Confirming...
+          </span>
+        )
       case 'secured':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#EBF7EE] border border-[#C3E6CB] text-[11px] text-[#1E7E34] font-medium">
-            <ShieldCheck className="h-3 w-3 text-[#1E7E34]" />
-            Secured
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FEF8EC] border border-[#FDE68A] text-[11px] text-[#B45309] font-medium">
+            <Loader2 className="h-3 w-3 animate-spin text-[#B45309]" />
+            Queued for AI...
           </span>
         )
       case 'processing':
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[#FAF5EC] border border-[#E5DED1] text-[11px] text-[#9C7D47] font-medium">
             <Loader2 className="h-3 w-3 animate-spin text-[#9C7D47]" />
-            AI Indexing...
+            AI Analyzing...
           </span>
         )
       case 'completed':
@@ -444,6 +450,8 @@ export function UploadZone({ onUploadComplete, compact = false, className = '' }
               <span className="text-[#777064]">
                 {activeCount > 0
                   ? `Active transfers & analysis in progress (${activeCount} active)`
+                  : failedCount > 0 && completedCount === 0
+                  ? `${failedCount} file${failedCount > 1 ? 's' : ''} failed (retry available)`
                   : completedCount === totalCount
                   ? 'All documents processed successfully'
                   : 'Batch idle'}

@@ -91,7 +91,11 @@ export const DocumentCard = React.memo(function DocumentCard({ document, onDelet
           })()}
 
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            <StatusBadge status={document.status} />
+            <StatusBadge
+              status={document.status}
+              embeddingStatus={document.embedding_status}
+              processingStage={document.processing_stage}
+            />
 
             <button
               onClick={(e) => {
@@ -128,6 +132,21 @@ export const DocumentCard = React.memo(function DocumentCard({ document, onDelet
         >
           {document.filename}
         </h3>
+
+        {typeof document.extracted_data?.smart_title === 'string' &&
+          document.extracted_data.smart_title.trim() &&
+          document.extracted_data.smart_title.trim() !== document.filename && (
+            <p className="text-xs text-[#9C7D47] font-medium line-clamp-1 mb-1">
+              {document.extracted_data.smart_title}
+            </p>
+          )}
+
+        {typeof document.extracted_data?.summary === 'string' &&
+          document.extracted_data.summary.trim() && (
+            <p className="text-[11px] text-[#777064] line-clamp-2 leading-relaxed mb-1.5">
+              {document.extracted_data.summary}
+            </p>
+          )}
 
         {(document.is_locked || document.doc_category || (document.tags && document.tags.length > 0) || (isOptimized && savingsPercent >= 1)) && (
           <div className="flex flex-wrap items-center gap-1.5 mt-2.5">

@@ -26,7 +26,7 @@ export async function GET(
   let { data: doc, error } = await supabase
     .from('documents')
     .select(
-      'id, filename, mime_type, file_size, original_file_size, storage_path, status, doc_category, tags, page_count, is_locked, locked_at, error_message, processing_locked_at, embedding_status, embedding_error, created_at, updated_at'
+      'id, filename, mime_type, file_size, original_file_size, storage_path, status, processing_stage, doc_category, tags, extracted_data, page_count, is_locked, locked_at, error_message, processing_locked_at, embedding_status, embedding_error, created_at, updated_at'
     )
     .eq('id', id)
     .eq('user_id', user.id)
@@ -36,7 +36,7 @@ export async function GET(
     const fallback = await supabase
       .from('documents')
       .select(
-        'id, filename, mime_type, file_size, storage_path, status, doc_category, tags, page_count, error_message, processing_locked_at, embedding_status, embedding_error, created_at, updated_at'
+        'id, filename, mime_type, file_size, storage_path, status, processing_stage, doc_category, tags, extracted_data, page_count, error_message, processing_locked_at, embedding_status, embedding_error, created_at, updated_at'
       )
       .eq('id', id)
       .eq('user_id', user.id)
@@ -64,7 +64,7 @@ export async function GET(
       const { data: sharedDoc } = await adminSupabase
         .from('documents')
         .select(
-          'id, filename, mime_type, file_size, storage_path, status, doc_category, tags, page_count, error_message, processing_locked_at, embedding_status, embedding_error, created_at, updated_at'
+          'id, filename, mime_type, file_size, storage_path, status, processing_stage, doc_category, tags, extracted_data, page_count, error_message, processing_locked_at, embedding_status, embedding_error, created_at, updated_at'
         )
         .eq('id', id)
         .single()

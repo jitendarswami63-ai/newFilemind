@@ -80,7 +80,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: true, processed: false, reason: 'empty_queue' })
     }
 
-    const processed = await processDocument(fallbackDoc.id)
+    const processed = await processUniversalFile(fallbackDoc.id)
     return NextResponse.json({
       success: processed,
       documentId: fallbackDoc.id,
@@ -95,7 +95,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const processed = await processDocument(claimedDoc.document_id, claimedDoc.processing_token)
+    const processed = await processUniversalFile(claimedDoc.document_id, claimedDoc.processing_token)
     return NextResponse.json({
       success: processed,
       documentId: claimedDoc.document_id,

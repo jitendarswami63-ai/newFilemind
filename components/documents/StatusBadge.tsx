@@ -7,21 +7,31 @@ export type { DocumentStatus }
 interface StatusBadgeProps {
   status: DocumentStatus
   embeddingStatus?: 'pending' | 'processing' | 'completed' | 'failed' | null
+  processingStage?: string | null
 }
 
-export const StatusBadge = React.memo(function StatusBadge({ status, embeddingStatus }: StatusBadgeProps) {
+export const StatusBadge = React.memo(function StatusBadge({ status, embeddingStatus, processingStage }: StatusBadgeProps) {
   const isIndexingFailed = status === 'completed' && embeddingStatus === 'failed'
   const isIndexingProcessing = status === 'completed' && (embeddingStatus === 'processing' || embeddingStatus === 'pending')
 
+  let processingLabel = 'Analyzing document...'
+  if (processingStage === 'extracting') {
+    processingLabel = 'Extracting content...'
+  } else if (processingStage === 'analyzing' || processingStage?.includes('segment')) {
+    processingLabel = 'AI analyzing document...'
+  } else if (processingStage === 'finalizing') {
+    processingLabel = 'Finalizing...'
+  }
+
   const configs = {
     pending: {
-      label: 'Pending',
+      label: 'Queued',
       className: 'bg-[#FEF8EC] text-[#B45309] border-[#FDE68A]',
       dotColor: 'bg-[#D97706] animate-pulse',
       isSpinning: false,
     },
     processing: {
-      label: 'Analyzing document...',
+      label: processingLabel,
       className: 'bg-[#FAF5EC] text-[#9C7D47] border-[#E5DED1]',
       dotColor: '',
       isSpinning: true,
@@ -33,7 +43,7 @@ export const StatusBadge = React.memo(function StatusBadge({ status, embeddingSt
       isSpinning: false,
     },
     indexing_processing: {
-      label: 'Indexing search...',
+      label: 'Generating embeddings...',
       className: 'bg-[#FAF5EC] text-[#856837] border-[#E5DED1]',
       dotColor: '',
       isSpinning: true,

@@ -18,6 +18,7 @@ interface PDFViewerProps {
   initialPage?: number
   storagePath?: string
   isLocked?: boolean
+  extractedData?: Record<string, unknown> | null
 }
 
 export function PDFViewer({
@@ -31,6 +32,7 @@ export function PDFViewer({
   initialPage,
   storagePath,
   isLocked = false,
+  extractedData,
 }: PDFViewerProps) {
   const [status, setStatus] = useState<DocumentStatus>(initialStatus)
   const [embeddingStatus, setEmbeddingStatus] = useState<string | null>(initialEmbeddingStatus || null)
@@ -468,6 +470,13 @@ export function PDFViewer({
           </button>
         </div>
       </div>
+
+      {typeof extractedData?.summary === 'string' && extractedData.summary.trim() && (
+        <div className="px-5 py-3 bg-[#FAF5EC] border-b border-[#E5DED1] flex items-start gap-2.5 text-xs text-[#777064]">
+          <span className="font-semibold text-[#292720] whitespace-nowrap">AI Summary:</span>
+          <span className="line-clamp-2 leading-relaxed">{extractedData.summary}</span>
+        </div>
+      )}
 
       {status === 'completed' && embeddingStatus === 'failed' && (
         <div className="px-5 py-2.5 bg-[#FEF8EC] border-b border-[#FDE68A] flex flex-wrap items-center justify-between gap-3 text-xs text-[#B45309]">

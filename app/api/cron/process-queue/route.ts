@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getServiceRoleClient } from '@/lib/ai/service-role-worker'
-import { processDocument } from '@/lib/ai/processor'
+import { processUniversalFile } from '@/lib/files/processing-engine'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -69,7 +69,7 @@ async function handleCronWorker(request: Request) {
       const docStartTime = Date.now()
       console.log(`[CronWorker] Claimed document ${claimedDoc.document_id} for user ${claimedDoc.user_id}`)
 
-      const processed = await processDocument(claimedDoc.document_id, claimedDoc.processing_token)
+      const processed = await processUniversalFile(claimedDoc.document_id, claimedDoc.processing_token)
       results.push({
         documentId: claimedDoc.document_id,
         success: processed,

@@ -375,10 +375,10 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                   <Layers className="h-5 w-5" />
                 </div>
                 <h3 className="text-base font-bold text-[#292720] mb-2">
-                  Large PDF Support (49 MB / 150 Files)
+                  Universal Format Support (50+ Types)
                 </h3>
                 <p className="text-sm text-[#777064] leading-relaxed">
-                  Upload documents up to 49 MB each. Add single files or batch upload up to 150 PDFs at once with automatic indexing and organization.
+                  Seamlessly analyze PDFs, Word documents, Excel spreadsheets, PowerPoint decks, source code, visual images with OCR, and media. Single files up to 49 MB and batches up to 150 files.
                 </p>
               </div>
 

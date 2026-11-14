@@ -39,7 +39,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from('documents')
     .select(
-      'id, filename, mime_type, file_size, original_file_size, storage_path, status, doc_category, tags, page_count, is_locked, locked_at, error_message, embedding_status, created_at, updated_at',
+      'id, filename, mime_type, file_size, original_file_size, storage_path, status, processing_stage, doc_category, tags, extracted_data, page_count, is_locked, locked_at, error_message, embedding_status, created_at, updated_at',
       { count: needCount ? 'exact' : undefined }
     )
     .eq('user_id', user.id)
@@ -87,7 +87,7 @@ export async function GET(request: Request) {
     let fallbackQuery = supabase
       .from('documents')
       .select(
-        'id, filename, mime_type, file_size, storage_path, status, doc_category, tags, page_count, error_message, embedding_status, created_at, updated_at',
+        'id, filename, mime_type, file_size, storage_path, status, processing_stage, doc_category, tags, extracted_data, page_count, error_message, embedding_status, created_at, updated_at',
         { count: needCount ? 'exact' : undefined }
       )
       .eq('user_id', user.id)

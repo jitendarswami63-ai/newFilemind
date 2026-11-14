@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { processDocument } from '@/lib/ai/processor'
+import { processUniversalFile } from '@/lib/files/processing-engine'
 
 export const maxDuration = 60
 export const dynamic = 'force-dynamic'
@@ -71,7 +71,7 @@ export async function POST(
   }
 
   after(async () => {
-    await processDocument(id)
+    await processUniversalFile(id)
   })
 
   return NextResponse.json({

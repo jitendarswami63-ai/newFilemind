@@ -29,6 +29,9 @@ export interface DocumentItem {
   id: string
   filename: string
   status: DocumentStatus
+  processing_stage?: string | null
+  embedding_status?: 'pending' | 'processing' | 'completed' | 'failed' | null
+  extracted_data?: Record<string, unknown> | null
   created_at: string
   file_size: number | null
   original_file_size?: number | null

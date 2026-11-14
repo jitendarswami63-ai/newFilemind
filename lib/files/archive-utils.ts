@@ -280,3 +280,76 @@ export function extractXlsxText(buffer: Buffer): { text: string; rowCount: numbe
     return { text: '', rowCount: 0, columnCount: 0 }
   }
 }
+
+export function extractPptxText(buffer: Buffer): { text: string; slideCount: number; slides: { slideNumber: number; text: string }[] } {
+  try {
+    const slides: { slideNumber: number; text: string }[] = []
+    let slideIndex = 1
+    const maxSlides = 250
+
+    while (slideIndex <= maxSlides) {
+      const slideXmlBuf = extractZipEntry(buffer, `ppt/slides/slide${slideIndex}.xml`)
+      if (!slideXmlBuf) {
+        if (slideIndex === 1) {
+          const altSlide = extractZipEntry(buffer, 'ppt/slides/slide.xml')
+          if (altSlide) {
+            const matches = altSlide.toString('utf8').match(/<a:t[^>]*>([^<]*)<\/a:t>/g)
+            if (matches) {
+              const slideText = matches.map((m) => m.replace(/<[^>]+>/g, '')).join(' ').trim()
+              slides.push({ slideNumber: 1, text: slideText })
+            }
+          }
+        }
+        break
+      }
+
+      const slideXml = slideXmlBuf.toString('utf8')
+      const matches = slideXml.match(/<a:t[^>]*>([^<]*)<\/a:t>/g)
+      let slideText = ''
+      if (matches && matches.length > 0) {
+        slideText = matches
+          .map((m) => m.replace(/<[^>]+>/g, ''))
+          .join(' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+      }
+
+      if (slideText) {
+        slides.push({ slideNumber: slideIndex, text: slideText })
+      } else {
+        slides.push({ slideNumber: slideIndex, text: `Slide ${slideIndex}` })
+      }
+
+      slideIndex++
+    }
+
+    const fullText = slides.map((s) => `[Slide ${s.slideNumber}]\n${s.text}`).join('\n\n')
+    return {
+      text: fullText,
+      slideCount: slides.length,
+      slides,
+    }
+  } catch {
+    return { text: '', slideCount: 0, slides: [] }
+  }
+}
+
+export function extractDocText(buffer: Buffer): string {
+  try {
+    const raw = buffer.toString('latin1')
+    const chunks: string[] = []
+    const regex = /[\x20-\x7E\xA0-\xFF]{4,}/g
+    let match: RegExpExecArray | null
+
+    while ((match = regex.exec(raw)) !== null) {
+      const segment = match[0].trim()
+      if (segment.length > 4 && !/^[0-9a-fA-F\s.,_-]+$/.test(segment)) {
+        chunks.push(segment)
+      }
+    }
+
+    return chunks.join('\n').slice(0, 50000)
+  } catch {
+    return ''
+  }
+}

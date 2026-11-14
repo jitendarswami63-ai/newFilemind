@@ -27,6 +27,7 @@ import {
   Video as VideoIcon,
   Archive as ArchiveIcon,
   File as GenericFileIcon,
+  Sparkles,
 } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { detectFileFormat, FileFormatDefinition } from '@/lib/files/file-types'
@@ -98,6 +99,7 @@ export function FileViewer(props: FileViewerProps) {
         initialPage={initialPage}
         storagePath={storagePath}
         isLocked={isLocked}
+        extractedData={extractedData}
       />
     )
   }
@@ -152,6 +154,16 @@ export function FileViewer(props: FileViewerProps) {
         </div>
       </div>
 
+      {typeof extractedData?.summary === 'string' && extractedData.summary.trim() && (
+        <div className="px-5 py-3.5 bg-[#FAF5EC] border-b border-[#E5DED1] flex items-start gap-3 text-xs select-text">
+          <Sparkles className="h-4 w-4 text-[#9C7D47] flex-shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <span className="font-bold text-[#292720] tracking-tight">AI Document Intelligence</span>
+            <p className="text-[#777064] leading-relaxed">{extractedData.summary}</p>
+          </div>
+        </div>
+      )}
+
       {/* Body Viewer */}
       <div className="p-4 sm:p-6 min-h-[55vh] flex flex-col items-center justify-center bg-[#FDFBF7]">
         {format.previewType === 'image' ? (
@@ -173,6 +185,7 @@ export function FileViewer(props: FileViewerProps) {
             format={format}
             fileSize={fileSize}
             createdAt={createdAt}
+            extractedData={extractedData}
           />
         )}
       </div>
@@ -627,12 +640,14 @@ function GenericFileViewer({
   format,
   fileSize,
   createdAt,
+  extractedData,
 }: {
   documentId: string
   filename: string
   format: FileFormatDefinition
   fileSize?: number | null
   createdAt?: string
+  extractedData?: Record<string, unknown> | null
 }) {
   const theme = getFileIconForFilename(filename, format.mimeType)
   const Icon = theme.icon
@@ -651,6 +666,16 @@ function GenericFileViewer({
           {format.label} • Stored securely in Cloudflare R2
         </p>
       </div>
+
+      {typeof extractedData?.summary === 'string' && extractedData.summary.trim() && (
+        <div className="w-full bg-[#FAF5EC] p-4 rounded-2xl border border-[#E5DED1] text-xs space-y-1.5 text-left font-medium select-text">
+          <span className="flex items-center gap-1.5 font-bold text-[#292720]">
+            <Sparkles className="h-3.5 w-3.5 text-[#9C7D47]" />
+            AI Summary
+          </span>
+          <p className="text-[#777064] leading-relaxed">{extractedData.summary}</p>
+        </div>
+      )}
 
       <div className="w-full bg-[#FAF5EC] p-4 rounded-2xl border border-[#E5DED1] text-xs space-y-2 text-left font-medium">
         <div className="flex justify-between">
