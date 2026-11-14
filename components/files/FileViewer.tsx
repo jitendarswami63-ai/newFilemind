@@ -28,11 +28,22 @@ import {
   Archive as ArchiveIcon,
   File as GenericFileIcon,
 } from 'lucide-react'
-import { PDFViewer } from '@/components/pdf/PDFViewer'
+import dynamic from 'next/dynamic'
 import { detectFileFormat, FileFormatDefinition } from '@/lib/files/file-types'
 import { getFileIconForFilename } from '@/lib/files/file-icons'
 import { formatFileSize, formatDate } from '@/lib/utils'
 import type { DocumentStatus } from '@/types'
+
+const PDFViewer = dynamic(
+  () => import('@/components/pdf/PDFViewer').then((m) => m.PDFViewer),
+  {
+    loading: () => (
+      <div className="flex items-center justify-center min-h-[500px] text-[#777064]">
+        <Loader2 className="h-6 w-6 animate-spin text-[#9C7D47]" />
+      </div>
+    ),
+  }
+)
 
 interface FileViewerProps {
   documentId: string

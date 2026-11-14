@@ -2,13 +2,18 @@
 
 import React, { useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import { StatusBadge } from './StatusBadge'
 import type { DocumentItem } from '@/types'
 import { formatDate, formatFileSize } from '@/lib/utils'
 import { FileText, ArrowUpRight, Trash2, Loader2, Zap, Lock, Share2 } from 'lucide-react'
 import { prefetchSignedUrl } from '@/lib/viewer/signed-url-cache'
-import { ShareModal } from '@/components/documents/ShareModal'
 import { getFileIconForFilename } from '@/lib/files/file-icons'
+
+const ShareModal = dynamic(
+  () => import('@/components/documents/ShareModal').then((m) => m.ShareModal),
+  { ssr: false }
+)
 
 interface DocumentCardProps {
   document: DocumentItem
@@ -170,12 +175,14 @@ export const DocumentCard = React.memo(function DocumentCard({ document, onDelet
         </span>
       </div>
 
-      <ShareModal
-        isOpen={showShareModal}
-        onClose={() => setShowShareModal(false)}
-        documentId={document.id}
-        filename={document.filename}
-      />
+      {showShareModal && (
+        <ShareModal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          documentId={document.id}
+          filename={document.filename}
+        />
+      )}
     </Link>
   )
 })

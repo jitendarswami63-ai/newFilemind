@@ -3,7 +3,7 @@ import { cookies } from 'next/headers'
 import { cache } from 'react'
 import type { User } from '@supabase/supabase-js'
 
-export async function createClient() {
+export const createClient = cache(async () => {
   const cookieStore = await cookies()
 
   return createServerClient(
@@ -26,7 +26,7 @@ export async function createClient() {
       },
     }
   )
-}
+})
 
 /**
  * Request-scoped memoized authentication lookup.

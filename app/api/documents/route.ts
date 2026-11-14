@@ -34,11 +34,13 @@ export async function GET(request: Request) {
     ? sortBy
     : 'created_at'
 
+  const needCount = isPaginated && searchParams.get('count') !== 'false'
+
   let query = supabase
     .from('documents')
     .select(
       'id, filename, mime_type, file_size, original_file_size, storage_path, status, doc_category, tags, page_count, is_locked, locked_at, error_message, embedding_status, created_at, updated_at',
-      { count: isPaginated ? 'exact' : undefined }
+      { count: needCount ? 'exact' : undefined }
     )
     .eq('user_id', user.id)
     .order(sortColumn, { ascending: sortOrder })
@@ -86,7 +88,7 @@ export async function GET(request: Request) {
       .from('documents')
       .select(
         'id, filename, mime_type, file_size, storage_path, status, doc_category, tags, page_count, error_message, embedding_status, created_at, updated_at',
-        { count: isPaginated ? 'exact' : undefined }
+        { count: needCount ? 'exact' : undefined }
       )
       .eq('user_id', user.id)
       .order(sortColumn, { ascending: sortOrder })
@@ -116,12 +118,14 @@ export async function GET(request: Request) {
   if (isPaginated) {
     return NextResponse.json({
       documents: documents || [],
-      pagination: {
-        page,
-        limit,
-        total: count || 0,
-        totalPages: Math.ceil((count || 0) / limit),
-      },
+      pagination: needCount
+        ? {
+            page,
+            limit,
+            total: count || 0,
+            totalPages: Math.ceil((count || 0) / limit),
+          }
+        : undefined,
     })
   }
 

@@ -176,7 +176,6 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
               <div key={item.name} className="relative group">
                 <Link
                   href={item.href}
-                  prefetch={false}
                   className={`flex items-center gap-2.5 py-2.5 text-xs font-medium transition-all ${
                     isCollapsed ? 'justify-center px-2 rounded-xl' : 'px-3 rounded-xl'
                   } ${
@@ -201,7 +200,6 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
             <div className="pt-2 mt-2 border-t border-[#2E3036]/60">
               <Link
                 href="/admin"
-                prefetch={false}
                 className={`flex items-center gap-2.5 py-2 text-xs font-semibold transition-all ${
                   isCollapsed ? 'justify-center px-2 rounded-xl' : 'px-3 rounded-xl'
                 } bg-[#9C7D47]/15 text-[#D4AF37] hover:bg-[#9C7D47]/25 border border-[#D4AF37]/30 shadow-xs`}

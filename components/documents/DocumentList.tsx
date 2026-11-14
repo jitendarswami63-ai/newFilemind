@@ -85,6 +85,9 @@ export function DocumentList() {
       if (debouncedSearch.trim()) {
         queryParams.set('q', debouncedSearch.trim())
       }
+      if (isSilent) {
+        queryParams.set('count', 'false')
+      }
 
       const response = await fetch(`/api/documents?${queryParams.toString()}`)
       if (!response.ok) {
@@ -95,7 +98,9 @@ export function DocumentList() {
 
       if (data && typeof data === 'object' && Array.isArray(data.documents)) {
         setDocuments(data.documents)
-        setPagination(data.pagination || null)
+        if (data.pagination) {
+          setPagination(data.pagination)
+        }
         setError(null)
       } else if (Array.isArray(data)) {
         setDocuments(data)

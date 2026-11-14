@@ -18,6 +18,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { ProBadge } from '@/components/ui/ProBadge'
 import { useUserPlan } from '@/lib/subscription/plan'
+import { checkIsAdminClient } from '@/lib/admin/admin-client'
 
 interface LandingNavbarProps {
   user?: { email?: string; user_metadata?: Record<string, any> } | null
@@ -33,12 +34,9 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
   useEffect(() => {
     if (!user?.email) return
     let isMounted = true
-    fetch('/api/admin/check')
-      .then((r) => r.json())
-      .then((d) => {
-        if (isMounted && d?.isAdmin) setIsAdmin(true)
-      })
-      .catch(() => {})
+    checkIsAdminClient(user.email).then((adminStatus) => {
+      if (isMounted) setIsAdmin(adminStatus)
+    })
     return () => {
       isMounted = false
     }
