@@ -363,7 +363,7 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
                   <div className="flex items-center justify-between p-2.5 rounded-2xl bg-[#FAF5EC] border border-[#E5DED1]">
                     <div className="min-w-0">
                       <span className="text-xs font-bold text-[#292720] block truncate">
-                        {user.user_metadata?.full_name || 'Active User'}
+                        {(user.user_metadata?.full_name as string) || 'Active User'}
                       </span>
                       <span className="text-[10px] text-[#777064] block truncate">
                         {user.email}

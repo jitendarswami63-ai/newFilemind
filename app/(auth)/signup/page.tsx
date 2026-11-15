@@ -4,7 +4,7 @@ import { SignupForm } from '@/components/auth/SignupForm'
 
 export const metadata: Metadata = {
   title: 'Create Your Free Account',
-  description: 'Join FileMind free to analyze dense PDF documents with AI-powered hybrid search, exact page citations, and military-grade biometric encryption.',
+  description: 'Join FileMind free to store, organize, search, and understand your documents and files with AI-powered search, verified citations, and biometric encryption.',
   alternates: {
     canonical: 'https://www.filemindhub.xyz/signup',
   },

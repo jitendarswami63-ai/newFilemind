@@ -4,7 +4,7 @@ import { LoginForm } from '@/components/auth/LoginForm'
 
 export const metadata: Metadata = {
   title: 'Sign In to Your Workspace',
-  description: 'Sign in to FileMind to access your intelligent PDF document library, hybrid semantic search, and private biometric vault.',
+  description: 'Sign in to FileMind to access your intelligent document and file workspace, semantic search, and private biometric vault.',
   alternates: {
     canonical: 'https://www.filemindhub.xyz/login',
   },
