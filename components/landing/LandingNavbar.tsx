@@ -21,14 +21,14 @@ import { useUserPlan } from '@/lib/subscription/plan'
 import { checkIsAdminClient } from '@/lib/admin/admin-client'
 
 interface LandingNavbarProps {
-  user?: { email?: string; user_metadata?: Record<string, any> } | null
+  user?: { email?: string; user_metadata?: Record<string, unknown> } | null
 }
 
 export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [user, setUser] = useState(initialUser)
   const [isAdmin, setIsAdmin] = useState(false)
-  const { isPro, isElite, tier } = useUserPlan(user)
+  const { isPro, isElite } = useUserPlan(user)
   const drawerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -47,7 +47,7 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
     let isMounted = true
     try {
       const supabase = createClient()
-      supabase.auth.getUser().then((res: any) => {
+      supabase.auth.getUser().then((res: { data?: { user?: { email?: string; user_metadata?: Record<string, unknown> } | null } }) => {
         if (isMounted && res?.data?.user) setUser(res.data.user)
       }).catch(() => {})
     } catch {}
@@ -80,13 +80,13 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
       name: 'Features',
       href: '/#features',
       icon: Sparkles,
-      description: 'AI extraction, vector indexing & hybrid search',
+      description: 'AI document understanding, vector indexing & smart search',
     },
     {
       name: 'How It Works',
       href: '/#how-it-works',
       icon: Layers,
-      description: 'End-to-end pipeline from upload to synthesis',
+      description: 'End-to-end pipeline from file upload to synthesis',
     },
     {
       name: 'Security',
@@ -127,7 +127,7 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
               <div className="h-9 w-9 rounded-xl border border-[#D8D0C2] flex items-center justify-center flex-shrink-0 bg-[#FFFCF5] shadow-xs p-1.5">
                 <Image
                   src="/filemind-ai-pdf-manager-logo.png"
-                  alt="FileMind AI PDF Manager and Document Search Platform Logo"
+                  alt="FileMind AI-Powered Document and File Management Platform Logo"
                   width={26}
                   height={26}
                   className="h-full w-full object-contain"
@@ -140,7 +140,7 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
                   FileMind
                 </span>
                 <span className="text-[10px] font-semibold text-[#9C7D47] uppercase tracking-wider mt-0.5 hidden xs:inline">
-                  Document Intelligence
+                  Intelligent Document & File Management
                 </span>
               </div>
             </Link>
@@ -246,7 +246,7 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
                   <div className="h-9 w-9 rounded-xl border border-[#D8D0C2] flex items-center justify-center bg-[#FAF5EC] shadow-2xs p-1.5">
                     <Image
                       src="/filemind-ai-pdf-manager-logo.png"
-                      alt="FileMind AI Logo"
+                      alt="FileMind AI-Powered Document and File Management Platform Logo"
                       width={26}
                       height={26}
                       className="h-full w-full object-contain"

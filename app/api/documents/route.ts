@@ -116,10 +116,10 @@ export async function GET(request: Request) {
   }
 
   const now = Date.now()
-  const stalledDoc = documents?.find(
+  const stalledDoc = (documents as unknown as Array<{ id: string; status?: string; processing_locked_at?: string | null; created_at?: string }>)?.find(
     (d) =>
       (d.status === 'processing' && d.processing_locked_at && now - new Date(d.processing_locked_at).getTime() > 120_000) ||
-      (d.status === 'pending' && now - new Date(d.created_at).getTime() > 45_000)
+      (d.status === 'pending' && d.created_at && now - new Date(d.created_at).getTime() > 45_000)
   )
 
   if (stalledDoc) {

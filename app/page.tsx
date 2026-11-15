@@ -5,9 +5,9 @@ import { createClient } from '@/lib/supabase/server'
 const siteUrl = 'https://www.filemindhub.xyz'
 
 export const metadata: Metadata = {
-  title: 'FileMind – AI PDF Manager, Document Search & Understanding',
+  title: 'FileMind — AI-Powered Document and File Management Platform',
   description:
-    'FileMind is an AI-powered PDF manager that helps you organize documents, understand content, and find information with AI-powered semantic search.',
+    'FileMind is an AI-powered document and file management platform to store, organize, search, and understand your files with semantic search, smart summaries, and private biometric security.',
   alternates: {
     canonical: siteUrl,
   },

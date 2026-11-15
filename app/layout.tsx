@@ -27,20 +27,21 @@ const siteUrl = 'https://www.filemindhub.xyz'
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'FileMind – AI PDF Manager, Document Search & Understanding',
+    default: 'FileMind — AI-Powered Document and File Management Platform',
     template: '%s | FileMind',
   },
   description:
-    'FileMind is an AI-powered PDF manager that helps you organize documents, understand content, and find information with AI-powered semantic search.',
+    'FileMind is an AI-powered document and file management platform to store, organize, search, and understand your files with semantic search, smart summaries, and private biometric security.',
   keywords: [
-    'AI PDF manager',
     'AI document management',
-    'AI PDF search',
-    'Semantic document search',
-    'Document intelligence',
-    'Document intelligence platform',
+    'Intelligent file management',
+    'Centralized file workspace',
+    'AI-powered document assistant',
     'AI-powered PDF assistant',
-    'PDF search engine',
+    'Semantic document search',
+    'AI PDF search',
+    'Smart file search',
+    'Document intelligence platform',
     'Biometric document vault',
   ],
   authors: [{ name: 'FileMind' }],
@@ -64,16 +65,16 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: siteUrl,
     siteName: 'FileMind',
-    title: 'FileMind – AI PDF Manager, Document Search & Understanding',
+    title: 'FileMind — AI-Powered Document and File Management Platform',
     description:
-      'FileMind is an AI-powered PDF manager that helps you organize documents, understand content, and find information with AI-powered semantic search.',
+      'FileMind is an AI-powered document and file management platform to store, organize, search, and understand your files with semantic search, smart summaries, and private biometric security.',
     images: [`${siteUrl}/filemind-ai-pdf-manager-logo.png`],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'FileMind – AI PDF Manager, Document Search & Understanding',
+    title: 'FileMind — AI-Powered Document and File Management Platform',
     description:
-      'FileMind is an AI-powered PDF manager that helps you organize documents, understand content, and find information with AI-powered semantic search.',
+      'FileMind is an AI-powered document and file management platform to store, organize, search, and understand your files with semantic search, smart summaries, and private biometric security.',
     images: [`${siteUrl}/filemind-ai-pdf-manager-logo.png`],
   },
   robots: {
@@ -92,9 +93,9 @@ export const metadata: Metadata = {
   },
 }
 
-const siteTitle = 'FileMind – AI PDF Manager, Document Search & Understanding'
+const siteTitle = 'FileMind — AI-Powered Document and File Management Platform'
 const siteDescription =
-  'FileMind is an AI-powered PDF manager that helps you organize documents, understand content, and find information with AI-powered semantic search.'
+  'FileMind is an AI-powered document and file management platform to store, organize, search, and understand your files with semantic search, smart summaries, and private biometric security.'
 const siteImage = `${siteUrl}/filemind-ai-pdf-manager-logo.png`
 const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || 'G-FLMND9PDF1'
 
@@ -130,7 +131,8 @@ export default function RootLayout({
                   '@type': 'WebSite',
                   '@id': `${siteUrl}/#website`,
                   url: siteUrl,
-                  name: 'FileMind',
+                  name: siteTitle,
+                  alternateName: 'FileMind',
                   description: siteDescription,
                   publisher: {
                     '@id': `${siteUrl}/#organization`,
@@ -155,7 +157,7 @@ export default function RootLayout({
                     height: 512,
                   },
                   description:
-                    'FileMind is an AI-powered PDF manager providing semantic search, document understanding, and hardware-grade biometric encryption.',
+                    'FileMind is an AI-powered document and file management platform providing semantic search, document understanding, and hardware-grade biometric encryption.',
                   foundingDate: '2024',
                   contactPoint: [
                     {
@@ -177,7 +179,7 @@ export default function RootLayout({
                   ],
                   knowsAbout: [
                     'Artificial Intelligence',
-                    'PDF Document Processing',
+                    'Document and File Management',
                     'Semantic Search',
                     'Vector Embeddings',
                     'WebAuthn Biometric Security',
@@ -188,7 +190,7 @@ export default function RootLayout({
                   '@type': 'SoftwareApplication',
                   '@id': `${siteUrl}/#software`,
                   name: 'FileMind',
-                  applicationCategory: 'BusinessApplication',
+                  applicationCategory: 'Document and File Management Application',
                   operatingSystem: 'Web Browser, Windows, macOS, Linux, iOS, Android',
                   url: siteUrl,
                   description: siteDescription,
@@ -211,10 +213,10 @@ export default function RootLayout({
                   mainEntity: [
                     {
                       '@type': 'Question',
-                      name: 'What is FileMind and how does it help manage PDFs?',
+                      name: 'What is FileMind and how does it help manage files and documents?',
                       acceptedAnswer: {
                         '@type': 'Answer',
-                        text: 'FileMind is an AI PDF manager and document search platform that helps you organize, search, and understand complex documents with exact page citations.',
+                        text: 'FileMind is an AI-powered document and file management platform that helps you store, organize, search, and understand your files in one centralized workspace with verified citations.',
                       },
                     },
                     {
@@ -222,12 +224,12 @@ export default function RootLayout({
                       name: 'How does AI semantic search find answers inside documents?',
                       acceptedAnswer: {
                         '@type': 'Answer',
-                        text: 'FileMind indexes both conceptual meaning and exact keywords to match the most relevant passages across hundreds of PDF pages in milliseconds.',
+                        text: 'FileMind indexes both semantic meaning and exact keywords to match the most relevant passages across your files and documents in milliseconds.',
                       },
                     },
                     {
                       '@type': 'Question',
-                      name: 'Are my uploaded documents private and secure?',
+                      name: 'Are my uploaded files and documents private and secure?',
                       acceptedAnswer: {
                         '@type': 'Answer',
                         text: 'Yes. Files are stored in private cloud storage with strict row-level security and can be locked with hardware-grade biometric encryption.',
@@ -235,10 +237,10 @@ export default function RootLayout({
                     },
                     {
                       '@type': 'Question',
-                      name: 'Does FileMind train AI models on my private documents?',
+                      name: 'Does FileMind train AI models on my private files?',
                       acceptedAnswer: {
                         '@type': 'Answer',
-                        text: 'No. FileMind strictly adheres to a zero-training privacy policy. Your private files and questions are never used to train external LLM models.',
+                        text: 'No. FileMind strictly adheres to a zero-training privacy policy. Your private files and questions are never used to train external AI models.',
                       },
                     },
                   ],

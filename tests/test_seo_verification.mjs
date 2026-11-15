@@ -37,11 +37,16 @@ async function run() {
   const layoutSrc = fs.readFileSync(path.join(process.cwd(), 'app/layout.tsx'), 'utf8')
   assert.ok(
     layoutSrc.includes("FileMind — AI-Powered PDF Search & Document Intelligence") ||
-    layoutSrc.includes("FileMind – AI PDF Manager"),
+    layoutSrc.includes("FileMind – AI PDF Manager") ||
+    layoutSrc.includes("FileMind — AI-Powered Document and File Management Platform"),
     'Root metadata must have descriptive homepage title'
   )
   assert.ok(layoutSrc.includes("'https://www.filemindhub.xyz'"), 'Root metadata must specify production canonical domain')
-  assert.ok(layoutSrc.includes("AI document management"), 'Keywords must include AI document management')
+  assert.ok(
+    layoutSrc.includes("AI document management") ||
+    layoutSrc.includes("Intelligent file management"),
+    'Keywords must include document or file management'
+  )
   assert.ok(layoutSrc.includes("AI PDF search"), 'Keywords must include AI PDF search')
   assert.ok(layoutSrc.includes("Semantic document search"), 'Keywords must include Semantic document search')
   assert.ok(layoutSrc.includes("AI-powered PDF assistant"), 'Keywords must include AI-powered PDF assistant')
@@ -71,8 +76,16 @@ async function run() {
   console.log('PASS: Security & Private Route Protection - Workspace noindex directive verified')
 
   const landingSrc = fs.readFileSync(path.join(process.cwd(), 'components/landing/LandingPage.tsx'), 'utf8')
-  assert.ok(landingSrc.includes("AI Document Management"), 'Landing page copy must contain AI document management')
-  assert.ok(landingSrc.includes("AI PDF Search"), 'Landing page copy must contain AI PDF search')
+  assert.ok(
+    landingSrc.includes("AI Document Management") ||
+    landingSrc.includes("AI-Powered Document & File Management"),
+    'Landing page copy must contain AI document or file management'
+  )
+  assert.ok(
+    landingSrc.includes("AI PDF Search") ||
+    landingSrc.includes("Semantic & Keyword Search"),
+    'Landing page copy must contain search capability'
+  )
   assert.ok(
     landingSrc.toLowerCase().includes("semantic search") ||
     landingSrc.toLowerCase().includes("semantic document search"),
@@ -87,6 +100,7 @@ async function run() {
   assert.ok(
     landingSrc.includes("alt=\"FileMind AI Document Management Logo\"") ||
     landingSrc.includes("alt=\"FileMind AI PDF Manager and Document Search Platform Logo\"") ||
+    landingSrc.includes("alt=\"FileMind AI-Powered Document and File Management Platform Logo\"") ||
     landingSrc.includes("alt=\"FileMind Document Workspace Icon\""),
     'Landing page image alt must be descriptive'
   )
