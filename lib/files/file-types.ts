@@ -638,8 +638,8 @@ export function validateMagicBytes(format: FileFormatDefinition, bytes: Uint8Arr
   // Special offset check for ISO BMFF (MP4, M4A, MOV) where box type starts at index 4
   if (['mp4', 'm4a', 'mov'].includes(format.extension)) {
     if (bytes.length >= 8) {
-      const tag = String.fromCharCode(bytes[4], bytes[5], bytes[6], bytes[7])
-      if (['ftyp', 'moov', 'mdat', 'wide', 'free', 'skip'].includes(tag)) {
+      const tag = String.fromCharCode(bytes[4], bytes[5], bytes[6], bytes[7]).toLowerCase()
+      if (['ftyp', 'moov', 'mdat', 'wide', 'free', 'skip', 'isom', 'mp41', 'mp42'].includes(tag)) {
         return true
       }
     }

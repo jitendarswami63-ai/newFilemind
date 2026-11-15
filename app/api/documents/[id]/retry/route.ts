@@ -24,7 +24,7 @@ export async function POST(
 
   const { data: doc, error } = await supabase
     .from('documents')
-    .select('id, user_id, status, processing_locked_at')
+    .select('id, user_id, status, processing_locked_at, embedding_status, embedding_locked_at')
     .eq('id', id)
     .eq('user_id', user.id)
     .single()
@@ -50,8 +50,34 @@ export async function POST(
   }
 
   if (doc.status === 'completed') {
+    if (doc.embedding_status !== 'completed') {
+      after(async () => {
+        const { getServiceRoleClient } = await import('@/lib/ai/service-role-worker')
+        const adminClient = getServiceRoleClient()
+        await adminClient
+          .from('documents')
+          .update({
+            embedding_status: 'pending',
+            embedding_token: null,
+            embedding_attempts: 0,
+            embedding_error: null,
+          })
+          .eq('id', id)
+          .eq('user_id', user.id)
+
+        const { indexDocument } = await import('@/lib/ai/index-document')
+        await indexDocument(id)
+      })
+
+      return NextResponse.json({
+        success: true,
+        message: 'Document indexing retry scheduled.',
+        documentId: id,
+      })
+    }
+
     return NextResponse.json(
-      { error: 'Document processing has already completed successfully.' },
+      { error: 'Document processing and indexing have already completed successfully.' },
       { status: 409 }
     )
   }

@@ -3,8 +3,19 @@ import { GoogleGenAI } from '@google/genai'
 import crypto from 'crypto'
 import { EMBEDDING_BATCH_SIZE } from '../constants.ts'
 
-export const EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL || 'gemini-embedding-2'
-export const FALLBACK_EMBEDDING_MODELS = [EMBEDDING_MODEL]
+const rawEnvModel = process.env.GEMINI_EMBEDDING_MODEL
+const effectiveDefaultModel = (!rawEnvModel || rawEnvModel === 'text-embedding-004') ? 'gemini-embedding-2' : rawEnvModel
+export const EMBEDDING_MODEL = effectiveDefaultModel
+export const FALLBACK_EMBEDDING_MODELS = Array.from(
+  new Set(
+    [
+      EMBEDDING_MODEL,
+      'gemini-embedding-2',
+      'gemini-embedding-001',
+      'gemini-embedding-2-preview',
+    ].filter((m) => m && m !== 'text-embedding-004')
+  )
+)
 export const EMBEDDING_DIMENSION = 768
 export const CACHE_CAPACITY = 500
 export const CACHE_TTL_MS = 60 * 60 * 1000

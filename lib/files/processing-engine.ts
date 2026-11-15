@@ -189,9 +189,11 @@ const documentProcessor: FileProcessor = async (documentId, doc, buffer, format)
     .eq('id', documentId)
 
   // Trigger semantic embedding index
-  indexDocument(documentId).catch((err) => {
+  try {
+    await indexDocument(documentId)
+  } catch (err) {
     console.warn(`[ProcessingEngine] Semantic indexing warning for ${doc.filename}:`, err)
-  })
+  }
 
   return {
     success: true,
@@ -276,7 +278,11 @@ const presentationProcessor: FileProcessor = async (documentId, doc, buffer, for
     })
     .eq('id', documentId)
 
-  indexDocument(documentId).catch(() => {})
+  try {
+    await indexDocument(documentId)
+  } catch (idxErr) {
+    console.warn(`[ProcessingEngine] Indexing warning for presentation ${doc.filename}:`, idxErr)
+  }
 
   return {
     success: true,
@@ -368,7 +374,11 @@ const spreadsheetProcessor: FileProcessor = async (documentId, doc, buffer, form
     })
     .eq('id', documentId)
 
-  indexDocument(documentId).catch(() => {})
+  try {
+    await indexDocument(documentId)
+  } catch (idxErr) {
+    console.warn(`[ProcessingEngine] Indexing warning for presentation ${doc.filename}:`, idxErr)
+  }
 
   return {
     success: true,
@@ -450,7 +460,11 @@ const codeProcessor: FileProcessor = async (documentId, doc, buffer, format) => 
     })
     .eq('id', documentId)
 
-  indexDocument(documentId).catch(() => {})
+  try {
+    await indexDocument(documentId)
+  } catch (idxErr) {
+    console.warn(`[ProcessingEngine] Indexing warning for presentation ${doc.filename}:`, idxErr)
+  }
 
   return {
     success: true,
@@ -524,7 +538,11 @@ const imageProcessor: FileProcessor = async (documentId, doc, buffer, format) =>
     .eq('id', documentId)
 
   // Trigger semantic embedding so images are searchable via OCR and visual description
-  indexDocument(documentId).catch(() => {})
+  try {
+    await indexDocument(documentId)
+  } catch (idxErr) {
+    console.warn(`[ProcessingEngine] Indexing warning for presentation ${doc.filename}:`, idxErr)
+  }
 
   return {
     success: true,

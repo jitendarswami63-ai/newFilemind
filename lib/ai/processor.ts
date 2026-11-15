@@ -783,10 +783,10 @@ export async function processDocument(
     } catch {}
 
     try {
-      indexDocument(documentId).catch((idxErr) => {
-        console.error(`[DocumentIndex] Background indexing failed for doc ${documentId}:`, idxErr)
-      })
-    } catch {}
+      await indexDocument(documentId)
+    } catch (idxErr) {
+      console.error(`[DocumentIndex] Indexing failed for doc ${documentId}:`, idxErr)
+    }
     return true
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error during AI document processing'
