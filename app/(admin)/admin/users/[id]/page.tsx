@@ -14,8 +14,16 @@ import {
   Loader2,
   UserCheck,
   UserX,
+  Receipt,
+  CreditCard,
+  Copy,
+  Check,
+  Sparkles,
+  ExternalLink,
 } from 'lucide-react'
 import type { AdminUserDetail } from '@/lib/admin/types'
+import { PaymentDetailsModal, PaymentItem } from '@/components/settings/PaymentDetailsModal'
+import { formatINR } from '@/lib/subscription/plans'
 
 export default function AdminUserDetailPage() {
   const routeParams = useParams()
@@ -24,6 +32,15 @@ export default function AdminUserDetailPage() {
   const [isLoading, setIsLoading] = useState(Boolean(id))
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
+  const [selectedInvoice, setSelectedInvoice] = useState<PaymentItem | null>(null)
+  const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  const handleCopy = (text: string, field: string) => {
+    if (!text) return
+    navigator.clipboard.writeText(text)
+    setCopiedField(field)
+    setTimeout(() => setCopiedField(null), 2000)
+  }
 
   useEffect(() => {
     let ignore = false
@@ -218,7 +235,15 @@ export default function AdminUserDetailPage() {
             <HardDrive className="h-4 w-4 text-[#9C7D47]" />
           </div>
           <div className="text-lg font-extrabold text-[#292720]">{user.storageFormatted || '0 B'}</div>
-          <div className="text-[11px] text-[#777064]">Quota: {user.storageLimitFormatted || '100 MB'}</div>
+          <div className="text-[11px] text-[#777064]">
+            Quota: <span className="font-bold text-[#292720]">{user.storageLimitFormatted || '100 MB'}</span>
+          </div>
+          {Boolean(user.additionalStorageBytes) && (
+            <div className="text-[10px] font-bold text-[#10B981] pt-0.5 flex items-center gap-1">
+              <Sparkles className="h-2.5 w-2.5 flex-shrink-0" />
+              <span>+{user.additionalStorageFormatted} Add-on active ({user.includedStorageFormatted || '10 GB'} base)</span>
+            </div>
+          )}
         </div>
 
         <div className="bg-[#FFFCF5] border border-[#E5DED1] rounded-2xl p-4 space-y-1 shadow-2xs">
@@ -319,6 +344,155 @@ export default function AdminUserDetailPage() {
           )}
         </div>
       </div>
+
+      <div className="bg-[#FFFCF5] border border-[#E5DED1] rounded-2xl p-5 shadow-2xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[#E5DED1]">
+          <div className="flex items-center gap-2">
+            <Receipt className="h-4 w-4 text-[#9C7D47]" />
+            <h2 className="text-sm font-bold text-[#292720]">
+              Customer Invoices & Payment Transactions ({(user.billingHistory || []).length})
+            </h2>
+          </div>
+          {(user.billingHistory || []).length > 0 && (
+            <span className="text-[11px] text-[#777064]">
+              Click &quot;View Invoice&quot; to inspect full breakdown and generate PDF receipt
+            </span>
+          )}
+        </div>
+
+        {(user.billingHistory || []).length === 0 ? (
+          <div className="p-8 text-center bg-[#FAF5EC] rounded-xl border border-dashed border-[#E5DED1]">
+            <CreditCard className="h-6 w-6 text-[#777064] mx-auto mb-2 opacity-50" />
+            <p className="text-xs font-semibold text-[#292720]">No billing transactions recorded</p>
+            <p className="text-[11px] text-[#777064] mt-0.5">This user has not completed any paid checkout orders yet.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs text-left">
+              <thead>
+                <tr className="border-b border-[#E5DED1] text-[#777064]">
+                  <th className="py-2.5 font-semibold">Date & Time</th>
+                  <th className="py-2.5 font-semibold">Purchased Item</th>
+                  <th className="py-2.5 font-semibold">Category</th>
+                  <th className="py-2.5 font-semibold">Amount</th>
+                  <th className="py-2.5 font-semibold">Payment ID</th>
+                  <th className="py-2.5 font-semibold">Order ID</th>
+                  <th className="py-2.5 font-semibold">Status</th>
+                  <th className="py-2.5 font-semibold text-right pr-2">Tax Invoice</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E5DED1]/60">
+                {(user.billingHistory || []).map((item, idx) => (
+                  <tr key={item.id || idx} className="hover:bg-[#FAF5EC] transition-colors">
+                    <td className="py-3 text-[#777064] whitespace-nowrap">
+                      {item.date ? new Date(item.date).toLocaleString('en-IN', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      }) : 'N/A'}
+                    </td>
+                    <td className="py-3 font-bold text-[#292720] whitespace-nowrap">
+                      {item.packName || item.planName || (item.type === 'subscription' ? 'Plan Subscription' : 'Storage Pack')}
+                    </td>
+                    <td className="py-3 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-[#FAF5EC] border border-[#E5DED1] text-[#777064]">
+                        {item.type === 'subscription' ? 'Subscription' : 'Vault Storage Add-on'}
+                      </span>
+                    </td>
+                    <td className="py-3 font-extrabold text-[#292720] whitespace-nowrap">
+                      {formatINR(Number(item.amountINR || item.priceINR) || 0)}
+                    </td>
+                    <td className="py-3 font-mono text-[11px] text-[#9C7D47] whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1">
+                        <span>{item.paymentId || 'N/A'}</span>
+                        {item.paymentId && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(item.paymentId || '', `pay_${idx}`)}
+                            title="Copy payment ID"
+                            className="p-1 hover:text-[#292720] cursor-pointer"
+                          >
+                            {copiedField === `pay_${idx}` ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3 opacity-60" />}
+                          </button>
+                        )}
+                      </span>
+                    </td>
+                    <td className="py-3 font-mono text-[11px] text-[#777064] whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1">
+                        <span>{item.orderId || 'N/A'}</span>
+                        {item.orderId && (
+                          <button
+                            type="button"
+                            onClick={() => handleCopy(item.orderId || '', `ord_${idx}`)}
+                            title="Copy order reference"
+                            className="p-1 hover:text-[#292720] cursor-pointer"
+                          >
+                            {copiedField === `ord_${idx}` ? <Check className="h-3 w-3 text-emerald-600" /> : <Copy className="h-3 w-3 opacity-60" />}
+                          </button>
+                        )}
+                      </span>
+                    </td>
+                    <td className="py-3 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#EBF7EE] text-[#1E7E34] border border-[#C3E6CB]">
+                        <Check className="h-2.5 w-2.5" />
+                        <span className="capitalize">{item.status || 'Paid'}</span>
+                      </span>
+                    </td>
+                    <td className="py-3 text-right pr-2 whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedInvoice(item)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] shadow-2xs transition-colors cursor-pointer"
+                      >
+                        <Receipt className="h-3 w-3" />
+                        <span>View Invoice</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {(user.purchasedStoragePacks || []).length > 0 && (
+        <div className="bg-[#FFFCF5] border border-[#E5DED1] rounded-2xl p-5 shadow-2xs space-y-3">
+          <div className="flex items-center gap-2 pb-2 border-b border-[#E5DED1]">
+            <HardDrive className="h-4 w-4 text-[#9C7D47]" />
+            <h2 className="text-sm font-bold text-[#292720]">Active Vault Storage Add-on Packs</h2>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {(user.purchasedStoragePacks || []).map((pack, pIdx) => (
+              <div key={pIdx} className="p-3.5 rounded-xl bg-[#FAF5EC] border border-[#E5DED1] space-y-1.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-[#292720]">{pack.packName || 'Storage Pack'}</span>
+                  <span className="font-extrabold text-[#9C7D47]">{formatINR(Number(pack.priceINR) || 49)}</span>
+                </div>
+                <div className="text-[11px] text-[#10B981] font-semibold flex items-center gap-1">
+                  <Check className="h-3 w-3" />
+                  <span>+{user.additionalStorageFormatted || '1 GB'} Quota Added to Vault</span>
+                </div>
+                <div className="text-[10px] text-[#777064] pt-1 border-t border-[#E5DED1]/60 flex justify-between">
+                  <span>Purchased:</span>
+                  <span>{pack.purchasedAt ? new Date(pack.purchasedAt).toLocaleDateString() : 'N/A'}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {selectedInvoice && (
+        <PaymentDetailsModal
+          payment={selectedInvoice}
+          onClose={() => setSelectedInvoice(null)}
+          userEmail={user.email}
+          userName={user.fullName}
+        />
+      )}
     </div>
   )
 }

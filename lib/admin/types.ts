@@ -102,9 +102,37 @@ export interface AdminUserDetail {
   storageFormatted: string
   storageLimitBytes: number
   storageLimitFormatted: string
+  includedStorageBytes?: number
+  includedStorageFormatted?: string
+  additionalStorageBytes?: number
+  additionalStorageFormatted?: string
   documentsCount: number
   aiUsageCount: number
   manualGrant: Record<string, any> | null
+  billingHistory?: Array<{
+    id?: string
+    date?: string
+    amountINR?: number
+    type?: string
+    packId?: string
+    packName?: string
+    planName?: string
+    planTier?: string
+    orderId?: string
+    paymentId?: string
+    status?: string
+    [key: string]: any
+  }>
+  purchasedStoragePacks?: Array<{
+    packId?: string
+    packName?: string
+    storageBytes?: number
+    priceINR?: number
+    orderId?: string
+    paymentId?: string
+    purchasedAt?: string
+    [key: string]: any
+  }>
   metadata: Record<string, any>
   documents: Array<{
     id: string
@@ -114,6 +142,25 @@ export interface AdminUserDetail {
     processing_status: string
     created_at: string
   }>
+}
+
+export interface AdminPaymentTransaction {
+  id: string
+  userId: string
+  userEmail: string
+  userName: string
+  date: string
+  amountINR: number
+  type: 'subscription' | 'storage_pack' | string
+  planName?: string
+  planTier?: string
+  packId?: string
+  packName?: string
+  orderId?: string
+  paymentId?: string
+  status: string
+  storageBytes?: number
+  storageFormatted?: string
 }
 
 export interface GrantRecord {

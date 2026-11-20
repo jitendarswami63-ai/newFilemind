@@ -38,7 +38,7 @@ const navItems = [
     badge: null,
   },
   {
-    name: 'Subscriptions & Grants',
+    name: 'Subscriptions & Invoices',
     href: '/admin/subscriptions',
     icon: Crown,
     badge: null,

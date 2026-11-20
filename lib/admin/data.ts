@@ -1,6 +1,7 @@
 import 'server-only'
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
 import { PLAN_CONFIGS, PlanTier, formatBytes } from '@/lib/subscription/plans'
+import type { AdminPaymentTransaction } from './types'
 
 export function getAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -299,8 +300,12 @@ export async function getAdminUserDetail(userId: string) {
   } catch {}
 
   const plan = PLAN_CONFIGS[tier]
-  const storageLimitBytes = plan.includedStorageBytes
+  const additionalStorageBytes = Number(meta.additional_storage_bytes) || 0
+  const includedStorageBytes = plan.includedStorageBytes
+  const storageLimitBytes = includedStorageBytes + additionalStorageBytes
   const storageLimitFormatted = formatBytes(storageLimitBytes)
+  const includedStorageFormatted = formatBytes(includedStorageBytes)
+  const additionalStorageFormatted = formatBytes(additionalStorageBytes)
 
   return {
     id: u.id,
@@ -315,7 +320,12 @@ export async function getAdminUserDetail(userId: string) {
     plan,
     planName: plan.name,
     manualGrant: meta.manual_grant || null,
-    billingHistory: meta.billing_history || [],
+    billingHistory: Array.isArray(meta.billing_history) ? meta.billing_history : [],
+    purchasedStoragePacks: Array.isArray(meta.purchased_storage_packs) ? meta.purchased_storage_packs : [],
+    additionalStorageBytes,
+    additionalStorageFormatted,
+    includedStorageBytes,
+    includedStorageFormatted,
     aiQueriesCount: Number(meta.ai_usage?.count) || 0,
     aiUsageCount: Number(meta.ai_usage?.count) || 0,
     totalDocuments: totalDocs,
@@ -332,6 +342,44 @@ export async function getAdminUserDetail(userId: string) {
     userMetadata: meta,
     metadata: meta,
   }
+}
+
+export async function getAllAdminPayments(): Promise<AdminPaymentTransaction[]> {
+  const admin = getAdminClient()
+  const { data: usersData, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+  if (error || !usersData?.users) return []
+
+  const transactions: AdminPaymentTransaction[] = []
+
+  for (const u of usersData.users) {
+    const meta = u.user_metadata || {}
+    const email = u.email || 'N/A'
+    const name = meta.full_name || meta.name || 'Anonymous User'
+    const history = Array.isArray(meta.billing_history) ? meta.billing_history : []
+
+    for (const item of history) {
+      transactions.push({
+        id: item.id || `tx_${item.paymentId || Math.random().toString(36).slice(2)}`,
+        userId: u.id,
+        userEmail: email,
+        userName: name,
+        date: item.date || item.purchasedAt || u.created_at,
+        amountINR: Number(item.amountINR || item.priceINR) || 0,
+        type: item.type || (item.packId ? 'storage_pack' : 'subscription'),
+        planName: item.planName,
+        planTier: item.planTier,
+        packId: item.packId,
+        packName: item.packName,
+        orderId: item.orderId,
+        paymentId: item.paymentId,
+        status: item.status || 'paid',
+        storageBytes: item.storageBytes,
+        storageFormatted: item.storageBytes ? formatBytes(item.storageBytes) : undefined,
+      })
+    }
+  }
+
+  return transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 }
 
 export async function updateUserAccountStatus(params: {
