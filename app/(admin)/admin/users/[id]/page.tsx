@@ -6,20 +6,14 @@ import Link from 'next/link'
 import {
   ArrowLeft,
   User,
-  Shield,
   Crown,
   FileText,
   HardDrive,
-  Calendar,
-  Clock,
   CheckCircle2,
-  XCircle,
   AlertTriangle,
   Loader2,
   UserCheck,
   UserX,
-  CreditCard,
-  Lock,
 } from 'lucide-react'
 import type { AdminUserDetail } from '@/lib/admin/types'
 
@@ -27,32 +21,46 @@ export default function AdminUserDetailPage() {
   const routeParams = useParams()
   const id = typeof routeParams?.id === 'string' ? routeParams.id : Array.isArray(routeParams?.id) ? routeParams.id[0] : ''
   const [user, setUser] = useState<AdminUserDetail | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(Boolean(id))
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
   useEffect(() => {
-    if (id) {
-      fetchDetail()
+    let ignore = false
+    if (!id) return
+
+    fetch(`/api/admin/users/${id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (ignore) return
+        if (data && !data.error) {
+          setUser(data)
+        } else {
+          setMessage({ text: data?.error || 'User not found', type: 'error' })
+        }
+      })
+      .catch(() => {
+        if (ignore) return
+        setMessage({ text: 'Failed to load user details', type: 'error' })
+      })
+      .finally(() => {
+        if (!ignore) setIsLoading(false)
+      })
+
+    return () => {
+      ignore = true
     }
   }, [id])
 
-  const fetchDetail = async () => {
+  const reloadData = async () => {
     if (!id) return
-    setIsLoading(true)
     try {
       const res = await fetch(`/api/admin/users/${id}`)
       const data = await res.json()
       if (data && !data.error) {
         setUser(data)
-      } else {
-        setMessage({ text: data.error || 'User not found', type: 'error' })
       }
-    } catch {
-      setMessage({ text: 'Failed to load user details', type: 'error' })
-    } finally {
-      setIsLoading(false)
-    }
+    } catch {}
   }
 
   const handleToggleSuspend = async () => {
@@ -81,7 +89,7 @@ export default function AdminUserDetailPage() {
           text: user.isSuspended ? 'Account reactivated successfully' : 'Account suspended successfully',
           type: 'success',
         })
-        await fetchDetail()
+        await reloadData()
       } else {
         setMessage({ text: result.error || 'Failed to update account status', type: 'error' })
       }
@@ -120,7 +128,6 @@ export default function AdminUserDetailPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header with Back Button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#E5DED1]">
         <div className="flex items-center gap-3">
           <Link
@@ -193,14 +200,13 @@ export default function AdminUserDetailPage() {
         </div>
       )}
 
-      {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-[#FFFCF5] border border-[#E5DED1] rounded-2xl p-4 space-y-1 shadow-2xs">
           <div className="flex items-center justify-between text-[#777064]">
             <span className="text-xs font-semibold">Active Plan</span>
             <Crown className="h-4 w-4 text-[#9C7D47]" />
           </div>
-          <div className="text-lg font-extrabold text-[#292720]">{user.planName}</div>
+          <div className="text-lg font-extrabold text-[#292720]">{user.planName || 'Free Tier'}</div>
           <div className="text-[11px] text-[#777064]">
             {user.manualGrant ? `Manual Grant (${user.manualGrant.durationDays ? user.manualGrant.durationDays + 'd' : 'Lifetime'})` : 'Standard Organic Entitlement'}
           </div>
@@ -211,8 +217,8 @@ export default function AdminUserDetailPage() {
             <span className="text-xs font-semibold">Vault Storage</span>
             <HardDrive className="h-4 w-4 text-[#9C7D47]" />
           </div>
-          <div className="text-lg font-extrabold text-[#292720]">{user.storageFormatted}</div>
-          <div className="text-[11px] text-[#777064]">Quota: {user.storageLimitFormatted}</div>
+          <div className="text-lg font-extrabold text-[#292720]">{user.storageFormatted || '0 B'}</div>
+          <div className="text-[11px] text-[#777064]">Quota: {user.storageLimitFormatted || '100 MB'}</div>
         </div>
 
         <div className="bg-[#FFFCF5] border border-[#E5DED1] rounded-2xl p-4 space-y-1 shadow-2xs">
@@ -220,8 +226,8 @@ export default function AdminUserDetailPage() {
             <span className="text-xs font-semibold">Documents Vault</span>
             <FileText className="h-4 w-4 text-[#9C7D47]" />
           </div>
-          <div className="text-lg font-extrabold text-[#292720]">{user.documentsCount} Files</div>
-          <div className="text-[11px] text-[#777064]">AI Queries: {user.aiUsageCount} used</div>
+          <div className="text-lg font-extrabold text-[#292720]">{user.documentsCount ?? 0} Files</div>
+          <div className="text-[11px] text-[#777064]">AI Queries: {user.aiUsageCount ?? 0} used</div>
         </div>
 
         <div className="bg-[#FFFCF5] border border-[#E5DED1] rounded-2xl p-4 space-y-1 shadow-2xs">
@@ -233,12 +239,11 @@ export default function AdminUserDetailPage() {
             {user.emailConfirmed ? 'Verified' : 'Unconfirmed'}
           </div>
           <div className="text-[11px] text-[#777064]">
-            Registered: {new Date(user.createdAt).toLocaleDateString()}
+            Registered: {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'N/A'}
           </div>
         </div>
       </div>
 
-      {/* Account Info Details Card */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-[#FFFCF5] border border-[#E5DED1] rounded-2xl p-5 shadow-2xs space-y-4">
           <h2 className="text-sm font-bold text-[#292720] flex items-center gap-2">
@@ -280,7 +285,6 @@ export default function AdminUserDetailPage() {
           </div>
         </div>
 
-        {/* Uploaded Documents List */}
         <div className="bg-[#FFFCF5] border border-[#E5DED1] rounded-2xl p-5 shadow-2xs space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold text-[#292720] flex items-center gap-2">

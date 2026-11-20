@@ -253,7 +253,16 @@ export async function getAdminUserDetail(userId: string) {
 
   let totalDocs = 0
   let totalStorageBytes = 0
-  let recentDocuments: any[] = []
+  let recentDocuments: Array<{
+    id: string
+    title: string | null
+    file_name: string
+    filename: string
+    file_size: number
+    processing_status: string
+    status: string
+    created_at: string
+  }> = []
 
   try {
     const { data: docs } = await admin
@@ -278,7 +287,7 @@ export async function getAdminUserDetail(userId: string) {
     }
   } catch {}
 
-  let grantHistory: any[] = []
+  let grantHistory: Array<Record<string, unknown>> = []
   try {
     const { data: grants } = await admin
       .from('admin_subscription_grants')
@@ -290,7 +299,7 @@ export async function getAdminUserDetail(userId: string) {
   } catch {}
 
   const plan = PLAN_CONFIGS[tier]
-  const storageLimitBytes = plan.storageLimitBytes
+  const storageLimitBytes = plan.includedStorageBytes
   const storageLimitFormatted = formatBytes(storageLimitBytes)
 
   return {
