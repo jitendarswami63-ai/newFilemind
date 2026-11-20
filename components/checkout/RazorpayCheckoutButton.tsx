@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Sparkles, Loader2, CheckCircle2, Crown, ArrowRight } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 declare global {
   interface Window {
@@ -38,6 +39,33 @@ export function RazorpayCheckoutButton({
   const [loading, setLoading] = useState(false)
   const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const [resolvedEmail, setResolvedEmail] = useState<string>(userEmail || '')
+  const [resolvedName, setResolvedName] = useState<string>(userName || '')
+
+  useEffect(() => {
+    if (userEmail) setResolvedEmail(userEmail)
+    if (userName) setResolvedName(userName)
+  }, [userEmail, userName])
+
+  useEffect(() => {
+    if (!resolvedEmail) {
+      try {
+        const supabase = createClient()
+        supabase.auth
+          .getUser()
+          .then((response: any) => {
+            const user = response?.data?.user
+            if (user?.email) {
+              setResolvedEmail(user.email)
+              if (user.user_metadata?.full_name) {
+                setResolvedName(user.user_metadata.full_name)
+              }
+            }
+          })
+          .catch(() => {})
+      } catch {}
+    }
+  }, [resolvedEmail])
 
   const defaultAmount = planTier === 'elite' ? 499 : 249
   const effectiveAmount = amount ?? defaultAmount
@@ -76,6 +104,8 @@ export function RazorpayCheckoutButton({
           amount: effectiveAmount,
           currency,
           planName: effectivePlanName,
+          userEmail: resolvedEmail || userEmail || undefined,
+          userName: resolvedName || userName || undefined,
         }),
       })
 
@@ -126,8 +156,8 @@ export function RazorpayCheckoutButton({
           }
         },
         prefill: {
-          name: userName || 'FileMind User',
-          email: userEmail || 'contact@filemindhub.xyz',
+          name: resolvedName || userName || undefined,
+          email: resolvedEmail || userEmail || undefined,
         },
         theme: {
           color: '#9C7D47',

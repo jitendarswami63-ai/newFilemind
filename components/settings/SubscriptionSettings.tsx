@@ -442,6 +442,8 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
                   planName={pack.name}
                   buttonText={`Buy ${pack.priceDisplay}/mo`}
                   className="w-full py-2 text-xs font-semibold rounded-lg bg-[#FAF5EC] hover:bg-[#F3EFE5] text-[#292720] border border-[#D8D0C2] transition-colors cursor-pointer text-center"
+                  userEmail={initialUser?.email}
+                  userName={initialUser?.user_metadata?.full_name}
                   onSuccess={() => refreshPlan()}
                 />
               </div>

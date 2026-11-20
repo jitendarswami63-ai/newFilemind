@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getRazorpayClient } from '@/lib/payments/razorpay'
 import { PLAN_CONFIGS, STORAGE_PACKS } from '@/lib/subscription/plans'
+import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,7 +43,22 @@ export async function POST(req: Request) {
       )
     }
 
-    const receipt = body.receipt || `rcpt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+    try {
+      const supabase = await createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      const customerEmail = body.userEmail || user?.email
+      const customerName = body.userName || user?.user_metadata?.full_name
+
+      if (customerEmail) notes.customerEmail = customerEmail
+      if (customerName) notes.customerName = customerName
+      if (user?.id) notes.userId = user.id
+    } catch {}
+
+    const receipt =
+      body.receipt || `rcpt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
     const razorpay = getRazorpayClient()
 
     const order = await razorpay.orders.create({
@@ -55,7 +71,13 @@ export async function POST(req: Request) {
       },
     })
 
-    const keyId = (process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || '').replace(/^["']|["']$/g, '').trim()
+    const keyId = (
+      process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ||
+      process.env.RAZORPAY_KEY_ID ||
+      ''
+    )
+      .replace(/^["']|["']$/g, '')
+      .trim()
 
     return NextResponse.json({
       order_id: order.id,
@@ -68,7 +90,6 @@ export async function POST(req: Request) {
       description: orderDescription,
     })
   } catch (error: any) {
-    console.error('[Razorpay Create Order Error]:', error)
     if (error?.statusCode === 401 || error?.error?.code === 'BAD_REQUEST_ERROR') {
       return NextResponse.json(
         { error: error.error?.description || 'Razorpay authentication failed' },
