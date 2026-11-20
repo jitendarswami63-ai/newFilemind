@@ -213,20 +213,67 @@ export async function listManualGrants(filter: { page?: number; limit?: number; 
     }
 
     const { data, error, count } = await query
-    if (error) {
-      return { grants: [], total: 0, page, limit, totalPages: 0 }
+    if (!error && Array.isArray(data) && data.length > 0) {
+      const total = count || data.length
+      return {
+        grants: data,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      }
     }
 
-    const total = count || 0
+    const { data: usersData } = await admin.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    })
+
+    const allGrants: any[] = []
+    if (usersData?.users) {
+      for (const u of usersData.users) {
+        const meta = u.user_metadata || {}
+        if (meta.manual_grant) {
+          const mg = meta.manual_grant
+          const expiresAt = mg.expires_at ? new Date(mg.expires_at) : null
+          const isExpired = expiresAt ? expiresAt.getTime() < Date.now() : false
+          const isRevoked = meta.tier === 'free' && !meta.is_pro
+          const grantStatus = isRevoked ? 'revoked' : isExpired ? 'expired' : 'active'
+
+          if (filter.status && filter.status !== grantStatus) {
+            continue
+          }
+
+          allGrants.push({
+            id: `grant_${u.id}`,
+            user_id: u.id,
+            user_email: u.email || 'N/A',
+            granted_by_id: mg.granted_by_id || null,
+            granted_by_email: mg.granted_by_email || 'Admin',
+            tier: mg.tier || meta.tier || 'pro',
+            duration_days: typeof mg.duration_days === 'number' ? mg.duration_days : null,
+            starts_at: mg.granted_at || u.created_at,
+            expires_at: mg.expires_at || null,
+            reason: mg.reason || 'Manual grant from Admin Control Center',
+            status: grantStatus,
+            created_at: mg.granted_at || u.created_at,
+          })
+        }
+      }
+    }
+
+    allGrants.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    const total = allGrants.length
+    const paginated = allGrants.slice(from, to + 1)
+
     return {
-      grants: data || [],
+      grants: paginated,
       total,
       page,
       limit,
       totalPages: Math.ceil(total / limit),
     }
   } catch (err) {
-    console.error('[listManualGrants] Error:', err)
     return { grants: [], total: 0, page, limit, totalPages: 0 }
   }
 }

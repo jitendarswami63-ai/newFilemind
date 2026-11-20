@@ -296,8 +296,27 @@ export async function getAdminUserDetail(userId: string) {
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
 
-    if (grants) grantHistory = grants
+    if (grants && grants.length > 0) grantHistory = grants
   } catch {}
+
+  if (grantHistory.length === 0 && meta.manual_grant) {
+    const mg = meta.manual_grant
+    grantHistory = [
+      {
+        id: `grant_${userId}`,
+        user_id: userId,
+        user_email: u.email,
+        tier: mg.tier || tier,
+        duration_days: mg.duration_days || null,
+        starts_at: mg.granted_at || u.created_at,
+        expires_at: mg.expires_at || null,
+        reason: mg.reason || 'Manual administrative access grant',
+        status:
+          mg.expires_at && new Date(mg.expires_at).getTime() < Date.now() ? 'expired' : 'active',
+        created_at: mg.granted_at || u.created_at,
+      },
+    ]
+  }
 
   const plan = PLAN_CONFIGS[tier]
   const additionalStorageBytes = Number(meta.additional_storage_bytes) || 0
