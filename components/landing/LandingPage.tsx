@@ -609,7 +609,7 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                   <p className="text-xs text-[#777064] mt-1 mb-4">For professionals and teams needing AI document understanding and smart search.</p>
                   <div className="flex items-baseline gap-1 mb-6">
                     <span className="text-4xl font-extrabold text-[#292720]">₹249</span>
-                    <span className="text-xs text-[#777064]">/ month (incl. GST)</span>
+                    <span className="text-xs text-[#777064]">/ month</span>
                   </div>
                   <ul className="space-y-3 text-xs text-[#292720] mb-8">
                     <li className="flex items-center gap-2">
@@ -693,7 +693,7 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                   <p className="text-xs text-[#A8A49B] mt-1 mb-4">High-volume file workflows, 10 GB storage, and hardware biometric vault.</p>
                   <div className="flex items-baseline gap-1 mb-6">
                     <span className="text-4xl font-extrabold text-[#F5F1E9]">₹499</span>
-                    <span className="text-xs text-[#A8A49B]">/ month (incl. GST)</span>
+                    <span className="text-xs text-[#A8A49B]">/ month</span>
                   </div>
                   <ul className="space-y-3 text-xs text-[#DDD8CE] mb-8">
                     <li className="flex items-center gap-2">

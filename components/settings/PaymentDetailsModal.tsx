@@ -109,8 +109,6 @@ export function PaymentDetailsModal({
         ? 499
         : 249
       : 49)
-  const baseAmount = Math.round((amount / 1.18) * 100) / 100
-  const gstAmount = Math.round((amount - baseAmount) * 100) / 100
 
   const itemName =
     payment.packName ||
@@ -121,7 +119,7 @@ export function PaymentDetailsModal({
         : 'Pro Intelligence Subscription'
       : 'Additional 1 GB Storage Pack')
 
-  const invoiceNumber = `INV-${paymentDate.getFullYear()}${String(paymentDate.getMonth() + 1).padStart(2, '0')}-${(payment.paymentId || payment.id || 'TX').slice(-6).toUpperCase()}`
+  const invoiceNumber = `RCPT-${paymentDate.getFullYear()}${String(paymentDate.getMonth() + 1).padStart(2, '0')}-${(payment.paymentId || payment.id || 'TX').slice(-6).toUpperCase()}`
 
   const handlePrint = () => {
     const printWindow = window.open('', '_blank', 'width=750,height=850')
@@ -160,7 +158,7 @@ export function PaymentDetailsModal({
     </div>
     <div style="text-align: right;">
       <div class="badge">Payment Paid & Verified</div>
-      <div style="font-size: 12px; color: #777064; margin-top: 6px; font-weight: 600;">Invoice: ${invoiceNumber}</div>
+      <div style="font-size: 12px; color: #777064; margin-top: 6px; font-weight: 600;">Receipt Ref: ${invoiceNumber}</div>
       <div style="font-size: 11px; color: #777064; margin-top: 2px;">Date: ${formattedDate} ${formattedTime}</div>
     </div>
   </div>
@@ -198,12 +196,7 @@ export function PaymentDetailsModal({
       <tr>
         <td style="font-weight: 600;">${itemName}</td>
         <td>${payment.type === 'subscription' ? 'Plan Tier Entitlement' : 'Vault Storage Capacity'}</td>
-        <td style="text-align: right; font-weight: 700;">₹${baseAmount.toFixed(2)}</td>
-      </tr>
-      <tr>
-        <td style="color: #777064;">GST / Taxes (18% inclusive)</td>
-        <td style="color: #777064;">Statutory Tax</td>
-        <td style="text-align: right; color: #777064;">₹${gstAmount.toFixed(2)}</td>
+        <td style="text-align: right; font-weight: 700;">₹${amount.toFixed(2)}</td>
       </tr>
       <tr class="total-row">
         <td>Total Paid</td>
@@ -214,7 +207,7 @@ export function PaymentDetailsModal({
   </table>
 
   <div class="footer">
-    Thank you for choosing FileMind. This is a computer-generated tax invoice for digital services.
+    Thank you for choosing FileMind. This is a computer-generated payment receipt for your records.
   </div>
 </body>
 </html>`
@@ -229,7 +222,7 @@ export function PaymentDetailsModal({
 
   const handleCopyFullReceipt = () => {
     const text = `FILEMIND PAYMENT RECEIPT
-Invoice: ${invoiceNumber}
+Receipt Ref: ${invoiceNumber}
 Date: ${formattedDate} ${formattedTime}
 Status: Paid & Verified
 Item: ${itemName}
@@ -423,12 +416,8 @@ Payment Gateway: Razorpay Secure`
 
         <div className="p-3.5 rounded-xl bg-[#FFFCF5] border border-[#E5DED1] space-y-1.5 text-xs">
           <div className="flex justify-between text-[#777064]">
-            <span>Subtotal (Excl. Tax)</span>
-            <span>₹{baseAmount.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between text-[#777064]">
-            <span>GST / Taxes (18% inclusive)</span>
-            <span>₹{gstAmount.toFixed(2)}</span>
+            <span>Item Price</span>
+            <span>₹{amount.toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm font-bold text-[#292720] pt-1.5 border-t border-[#E5DED1]">
             <span>Total Paid</span>

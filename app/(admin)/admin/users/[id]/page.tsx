@@ -378,7 +378,7 @@ export default function AdminUserDetailPage() {
                   <th className="py-2.5 font-semibold">Payment ID</th>
                   <th className="py-2.5 font-semibold">Order ID</th>
                   <th className="py-2.5 font-semibold">Status</th>
-                  <th className="py-2.5 font-semibold text-right pr-2">Tax Invoice</th>
+                  <th className="py-2.5 font-semibold text-right pr-2">Receipt</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E5DED1]/60">

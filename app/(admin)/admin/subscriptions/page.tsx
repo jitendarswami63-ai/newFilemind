@@ -212,7 +212,7 @@ export default function AdminSubscriptionsPage() {
             </h1>
           </div>
           <p className="text-xs text-[#777064] mt-1">
-            Track user payments, view official tax receipts, and manage VIP customer entitlements.
+            Track user payments, view official payment receipts, and manage VIP customer entitlements.
           </p>
         </div>
 
@@ -465,7 +465,7 @@ export default function AdminSubscriptionsPage() {
                       <th className="py-3 px-4">Payment ID</th>
                       <th className="py-3 px-4">Order ID</th>
                       <th className="py-3 px-4">Status</th>
-                      <th className="py-3 px-4 text-right">Tax Invoice</th>
+                      <th className="py-3 px-4 text-right">Receipt</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#E5DED1]">
