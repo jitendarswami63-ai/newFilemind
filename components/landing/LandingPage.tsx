@@ -74,7 +74,7 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
             <div className="max-w-3xl mx-auto text-center">
               <div className="inline-flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-full border border-[#D8D0C2] bg-[#FFFCF5] text-[11px] sm:text-xs font-semibold text-[#9C7D47] shadow-xs mb-6 sm:mb-8 max-w-full text-center leading-snug">
                 <Sparkles className="h-3.5 w-3.5 flex-shrink-0" />
-                <span>AI-Powered Document & File Management Platform</span>
+                <span>AI Document Management • AI-Powered Search Platform</span>
               </div>
 
               <h1 className="text-[clamp(2rem,6.5vw,3.75rem)] font-extrabold tracking-tight text-[#292720] leading-[1.12] mb-4 sm:mb-6 max-w-3xl mx-auto">
@@ -83,7 +83,7 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
               </h1>
 
               <p className="text-[16px] sm:text-lg md:text-xl text-[#777064] leading-relaxed mb-8 sm:mb-10 max-w-2xl mx-auto">
-                Transform how your documents and files are stored, organized, and understood. FileMind is an AI-powered document and file management platform that centralizes your workspace, answers complex questions with verified citations across supported formats, and protects your private files with hardware-grade biometric vault encryption.
+                FileMind is an AI-powered platform that helps you store, organize, manage and understand your documents in one place. Upload different types of files, search for information easily, generate AI-powered summaries and get answers from your documents.
               </p>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-10 sm:mb-14 w-full max-w-sm sm:max-w-none mx-auto">
@@ -718,7 +718,7 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                     </li>
                     <li className="flex items-center gap-2">
                       <Check className="h-3.5 w-3.5 text-[#C5A878] flex-shrink-0" />
-                      <span>Large-PDF adaptive bisection & splitting</span>
+                      <span>Large-document adaptive bisection & splitting</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <Check className="h-3.5 w-3.5 text-[#C5A878] flex-shrink-0" />
