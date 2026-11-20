@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useState, useEffect, use } from 'react'
+import React, { useState, useEffect } from 'react'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   ArrowLeft,
@@ -22,22 +23,22 @@ import {
 } from 'lucide-react'
 import type { AdminUserDetail } from '@/lib/admin/types'
 
-export default function AdminUserDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
-  const { id } = use(params)
+export default function AdminUserDetailPage() {
+  const routeParams = useParams()
+  const id = typeof routeParams?.id === 'string' ? routeParams.id : Array.isArray(routeParams?.id) ? routeParams.id[0] : ''
   const [user, setUser] = useState<AdminUserDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
   useEffect(() => {
-    fetchDetail()
+    if (id) {
+      fetchDetail()
+    }
   }, [id])
 
   const fetchDetail = async () => {
+    if (!id) return
     setIsLoading(true)
     try {
       const res = await fetch(`/api/admin/users/${id}`)
@@ -284,15 +285,15 @@ export default function AdminUserDetailPage({
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold text-[#292720] flex items-center gap-2">
               <FileText className="h-4 w-4 text-[#9C7D47]" />
-              Uploaded PDF Documents ({user.documents.length})
+              Uploaded Documents ({(user.documents || []).length})
             </h2>
           </div>
 
-          {user.documents.length === 0 ? (
+          {(user.documents || []).length === 0 ? (
             <p className="text-xs text-[#777064] py-6 text-center">No documents uploaded by this user.</p>
           ) : (
             <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-              {user.documents.map((doc) => (
+              {(user.documents || []).map((doc) => (
                 <div
                   key={doc.id}
                   className="p-2.5 rounded-xl bg-[#FAF5EC] border border-[#E5DED1] flex items-center justify-between text-xs"

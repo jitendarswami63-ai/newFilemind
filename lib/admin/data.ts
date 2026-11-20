@@ -87,13 +87,13 @@ export async function getAdminOverviewStats(): Promise<AdminOverviewStats> {
   try {
     const { data: docs, error: docsErr } = await admin
       .from('documents')
-      .select('id, file_size, processing_status')
+      .select('id, file_size, status')
 
     if (!docsErr && Array.isArray(docs)) {
       totalDocuments = docs.length
       for (const doc of docs) {
         totalStorageBytes += Number(doc.file_size) || 0
-        const status = doc.processing_status
+        const status = doc.status
         if (status === 'completed' || status === 'indexed' || status === 'ready') {
           processingSuccessCount++
         } else if (status === 'failed' || status === 'error') {
@@ -258,14 +258,23 @@ export async function getAdminUserDetail(userId: string) {
   try {
     const { data: docs } = await admin
       .from('documents')
-      .select('id, file_name, file_size, processing_status, created_at')
+      .select('id, filename, file_size, status, created_at')
       .eq('user_id', userId)
       .order('created_at', { ascending: false })
 
     if (docs) {
       totalDocs = docs.length
       totalStorageBytes = docs.reduce((acc, d) => acc + (Number(d.file_size) || 0), 0)
-      recentDocuments = docs.slice(0, 10)
+      recentDocuments = docs.slice(0, 10).map((d) => ({
+        id: d.id,
+        title: d.filename,
+        file_name: d.filename,
+        filename: d.filename,
+        file_size: Number(d.file_size) || 0,
+        processing_status: d.status || 'completed',
+        status: d.status || 'completed',
+        created_at: d.created_at,
+      }))
     }
   } catch {}
 
@@ -280,6 +289,10 @@ export async function getAdminUserDetail(userId: string) {
     if (grants) grantHistory = grants
   } catch {}
 
+  const plan = PLAN_CONFIGS[tier]
+  const storageLimitBytes = plan.storageLimitBytes
+  const storageLimitFormatted = formatBytes(storageLimitBytes)
+
   return {
     id: u.id,
     email: u.email || 'No email',
@@ -290,16 +303,25 @@ export async function getAdminUserDetail(userId: string) {
     isSuspended: Boolean(meta.is_suspended),
     suspensionReason: meta.suspension_reason || null,
     tier,
-    plan: PLAN_CONFIGS[tier],
+    plan,
+    planName: plan.name,
     manualGrant: meta.manual_grant || null,
     billingHistory: meta.billing_history || [],
     aiQueriesCount: Number(meta.ai_usage?.count) || 0,
+    aiUsageCount: Number(meta.ai_usage?.count) || 0,
     totalDocuments: totalDocs,
+    documentsCount: totalDocs,
     totalStorageBytes,
+    storageBytes: totalStorageBytes,
     totalStorageFormatted: formatBytes(totalStorageBytes),
+    storageFormatted: formatBytes(totalStorageBytes),
+    storageLimitBytes,
+    storageLimitFormatted,
     recentDocuments,
+    documents: recentDocuments,
     grantHistory,
     userMetadata: meta,
+    metadata: meta,
   }
 }
 

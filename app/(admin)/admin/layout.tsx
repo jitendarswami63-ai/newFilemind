@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import React, { Suspense } from 'react'
 import Link from 'next/link'
 import { getAuthorizedAdmin } from '@/lib/admin/auth'
 import { AdminSidebar } from '@/components/admin/AdminSidebar'
@@ -103,7 +104,9 @@ export default async function AdminLayout({
         </header>
 
         <main className="flex-1 p-4 sm:p-8 max-w-7xl w-full mx-auto">
-          {children}
+          <Suspense fallback={null}>
+            {children}
+          </Suspense>
         </main>
       </div>
     </div>
