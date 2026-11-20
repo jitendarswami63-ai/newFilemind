@@ -21,12 +21,15 @@ import {
   Cpu,
   Loader2,
   Trash2,
+  Receipt,
+  ExternalLink,
 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card'
 import { ProBadge } from '@/components/ui/ProBadge'
 import { useUserPlan } from '@/lib/subscription/plan'
 import { PLAN_CONFIGS, STORAGE_PACKS, formatBytes, formatINR } from '@/lib/subscription/plans'
 import { RazorpayCheckoutButton } from '@/components/checkout/RazorpayCheckoutButton'
+import { PaymentDetailsModal, PaymentItem } from './PaymentDetailsModal'
 
 interface SubscriptionSettingsProps {
   initialUser?: {
@@ -72,6 +75,26 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
   const billingHistory = Array.isArray(initialUser?.user_metadata?.billing_history)
     ? initialUser.user_metadata.billing_history
     : []
+
+  const [historyList, setHistoryList] = useState<PaymentItem[]>(billingHistory)
+  const [selectedPayment, setSelectedPayment] = useState<PaymentItem | null>(null)
+
+  useEffect(() => {
+    if (Array.isArray(initialUser?.user_metadata?.billing_history)) {
+      setHistoryList(initialUser.user_metadata.billing_history)
+    }
+  }, [initialUser])
+
+  useEffect(() => {
+    fetch('/api/subscription')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.success && Array.isArray(data?.billing_history) && data.billing_history.length > 0) {
+          setHistoryList(data.billing_history)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   const purchasedPacks = Array.isArray(initialUser?.user_metadata?.purchased_storage_packs)
     ? initialUser.user_metadata.purchased_storage_packs
@@ -203,7 +226,6 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
       </CardHeader>
 
       <CardContent className="space-y-6">
-        {/* Tier Overview & Renewal Banner */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="p-4 rounded-xl bg-[#F8F4EA] border border-[#E5DED1] space-y-1">
             <span className="block text-[11px] font-bold text-[#777064] uppercase tracking-wider">
@@ -242,7 +264,6 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
           </div>
         </div>
 
-        {/* Real-time Storage Usage Meter */}
         <div className="p-5 rounded-2xl bg-[#FAF5EC] border border-[#E5DED1] space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -255,7 +276,6 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
             </div>
           </div>
 
-          {/* Progress Bar */}
           <div className="w-full h-3 bg-[#E5DED1] rounded-full overflow-hidden">
             <div
               className={`h-full transition-all duration-500 rounded-full ${
@@ -269,7 +289,6 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
             />
           </div>
 
-          {/* Storage Warnings */}
           {usagePercent >= 100 && (
             <div className="flex items-center gap-2.5 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-medium">
               <AlertCircle className="h-4 w-4 flex-shrink-0 text-rose-600" />
@@ -295,7 +314,6 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
           </div>
         </div>
 
-        {/* AI Usage Allowance Meter */}
         <div className="p-5 rounded-2xl bg-[#FAF5EC] border border-[#E5DED1] space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -338,7 +356,6 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
           )}
         </div>
 
-        {/* Bring Your Own Key (BYOK) Section for Free users */}
         <div className="p-5 rounded-2xl bg-[#FFFCF5] border border-[#E5DED1] space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -391,7 +408,6 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
           {byokError && <p className="text-xs text-rose-600 font-medium">{byokError}</p>}
         </div>
 
-        {/* Extra Storage Marketplace */}
         <div className="p-5 rounded-2xl bg-[#FAF5EC] border border-[#E5DED1] space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -449,7 +465,6 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
           )}
         </div>
 
-        {/* Upgrade / Downgrade Plan Options */}
         <div className="p-5 rounded-2xl bg-[#FFFCF5] border border-[#E5DED1] space-y-4">
           <div className="flex items-center justify-between">
             <div>
@@ -512,7 +527,6 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
           )}
         </div>
 
-        {/* Downgrade Confirmation Modal */}
         {showDowngradeModal && (
           <div className="fixed inset-0 z-50 bg-[#1B1D21]/60 backdrop-blur-xs flex items-center justify-center p-4">
             <div className="w-full max-w-md bg-[#FFFCF5] border border-[#E5DED1] rounded-2xl p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
@@ -556,14 +570,20 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
           </div>
         )}
 
-        {/* Billing & Payment History */}
         <div className="p-5 rounded-2xl bg-[#FFFCF5] border border-[#E5DED1] space-y-3">
-          <div className="flex items-center gap-2">
-            <History className="h-4 w-4 text-[#9C7D47]" />
-            <h4 className="text-sm font-bold text-[#292720]">Billing & Transaction History</h4>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-[#9C7D47]" />
+              <h4 className="text-sm font-bold text-[#292720]">Billing & Transaction History</h4>
+            </div>
+            {historyList.length > 0 && (
+              <span className="text-[11px] text-[#777064]">
+                Click any transaction to view complete receipt & payment details
+              </span>
+            )}
           </div>
 
-          {billingHistory.length > 0 ? (
+          {historyList.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead>
@@ -573,11 +593,17 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
                     <th className="py-2 font-semibold">Amount</th>
                     <th className="py-2 font-semibold">Payment ID</th>
                     <th className="py-2 font-semibold">Status</th>
+                    <th className="py-2 font-semibold text-right pr-2">Receipt</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E5DED1]/60">
-                  {billingHistory.map((item: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-[#FAF5EC]/50 transition-colors">
+                  {historyList.map((item: any, idx: number) => (
+                    <tr
+                      key={idx}
+                      onClick={() => setSelectedPayment(item)}
+                      className="hover:bg-[#FAF5EC] cursor-pointer transition-colors group"
+                      title="Click to view payment receipt and details"
+                    >
                       <td className="py-2.5 text-[#777064]">
                         {new Date(item.date).toLocaleDateString('en-IN', {
                           day: 'numeric',
@@ -591,14 +617,30 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
                       <td className="py-2.5 font-bold text-[#292720]">
                         {formatINR(item.amountINR || 249)}
                       </td>
-                      <td className="py-2.5 font-mono text-[11px] text-[#777064]">
-                        {item.paymentId || 'N/A'}
+                      <td className="py-2.5 font-mono text-[11px] text-[#9C7D47] group-hover:underline">
+                        <span className="inline-flex items-center gap-1">
+                          <span>{item.paymentId || 'N/A'}</span>
+                          <ExternalLink className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </span>
                       </td>
                       <td className="py-2.5">
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-[#EBF7EE] text-[#1E7E34] border border-[#C3E6CB]">
                           <Check className="h-2.5 w-2.5" />
                           <span>Paid</span>
                         </span>
+                      </td>
+                      <td className="py-2.5 text-right pr-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedPayment(item)
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold text-[#9C7D47] bg-[#FAF5EC] group-hover:bg-[#F3EFE5] border border-[#E5DED1] group-hover:border-[#9C7D47]/40 transition-colors cursor-pointer"
+                        >
+                          <Receipt className="h-3 w-3" />
+                          <span>View</span>
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -611,6 +653,15 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
             </div>
           )}
         </div>
+
+        {selectedPayment && (
+          <PaymentDetailsModal
+            payment={selectedPayment}
+            onClose={() => setSelectedPayment(null)}
+            userEmail={initialUser?.email}
+            userName={initialUser?.user_metadata?.full_name}
+          />
+        )}
       </CardContent>
     </Card>
   )
