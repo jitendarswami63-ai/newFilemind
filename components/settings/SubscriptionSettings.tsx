@@ -78,6 +78,18 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
 
   const [historyList, setHistoryList] = useState<PaymentItem[]>(billingHistory)
   const [selectedPayment, setSelectedPayment] = useState<PaymentItem | null>(null)
+  const [livePlans, setLivePlans] = useState<Record<string, any>>(PLAN_CONFIGS)
+  const [livePacks, setLivePacks] = useState<Record<string, any>>(STORAGE_PACKS)
+
+  useEffect(() => {
+    fetch('/api/plans')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.plans) setLivePlans(data.plans)
+        if (data?.storagePacks) setLivePacks(data.storagePacks)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (Array.isArray(initialUser?.user_metadata?.billing_history)) {
@@ -356,57 +368,61 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
           )}
         </div>
 
-        <div className="p-5 rounded-2xl bg-[#FFFCF5] border border-[#E5DED1] space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Key className="h-4 w-4 text-[#9C7D47]" />
-              <h4 className="text-sm font-bold text-[#292720]">Bring Your Own Gemini API Key (BYOK)</h4>
+        {(tier === 'free' || hasByok) && (
+          <div className="p-5 rounded-2xl bg-[#FFFCF5] border border-[#E5DED1] space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Key className="h-4 w-4 text-[#9C7D47]" />
+                <h4 className="text-sm font-bold text-[#292720]">Bring Your Own Gemini API Key (BYOK)</h4>
+              </div>
+              {hasByok && (
+                <span className="text-[11px] font-semibold text-[#1E7E34] flex items-center gap-1">
+                  <Check className="h-3 w-3" /> Configured
+                </span>
+              )}
             </div>
-            {hasByok && (
-              <span className="text-[11px] font-semibold text-[#1E7E34] flex items-center gap-1">
-                <Check className="h-3 w-3" /> Configured
-              </span>
+            <p className="text-xs text-[#777064]">
+              {tier === 'free'
+                ? 'Free Tier users can securely connect their Google Gemini API key to unlock full Ask AI, summaries, and semantic search without subscription fees. Keys are encrypted and processed strictly server-side.'
+                : 'Your active plan includes official FileMind Dual-Engine AI. You also have a custom personal Gemini API key configured.'}
+            </p>
+
+            {hasByok ? (
+              <div className="flex items-center justify-between p-3 rounded-xl bg-[#FAF5EC] border border-[#E5DED1]">
+                <span className="text-xs font-mono text-[#292720]">••••••••••••••••••••••••• (Encrypted)</span>
+                <button
+                  onClick={handleRemoveByok}
+                  disabled={byokSaving}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Remove Key</span>
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+                <input
+                  type="password"
+                  placeholder="AIzaSy..."
+                  value={byokKey}
+                  onChange={(e) => setByokKey(e.target.value)}
+                  className="flex-1 px-3.5 py-2 text-xs rounded-xl bg-[#FAF5EC] border border-[#D8D0C2] text-[#292720] focus:outline-none focus:border-[#9C7D47]"
+                />
+                <button
+                  onClick={handleSaveByok}
+                  disabled={byokSaving || !byokKey.trim()}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  {byokSaving && <Loader2 className="h-3 w-3 animate-spin" />}
+                  <span>Save Key</span>
+                </button>
+              </div>
             )}
+
+            {byokSuccess && <p className="text-xs text-emerald-700 font-medium">{byokSuccess}</p>}
+            {byokError && <p className="text-xs text-rose-600 font-medium">{byokError}</p>}
           </div>
-          <p className="text-xs text-[#777064]">
-            Free Tier users can securely connect their Google Gemini API key to unlock full Ask AI, summaries, and semantic search without subscription fees. Keys are encrypted and processed strictly server-side.
-          </p>
-
-          {hasByok ? (
-            <div className="flex items-center justify-between p-3 rounded-xl bg-[#FAF5EC] border border-[#E5DED1]">
-              <span className="text-xs font-mono text-[#292720]">••••••••••••••••••••••••• (Encrypted)</span>
-              <button
-                onClick={handleRemoveByok}
-                disabled={byokSaving}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-                <span>Remove Key</span>
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
-              <input
-                type="password"
-                placeholder="AIzaSy..."
-                value={byokKey}
-                onChange={(e) => setByokKey(e.target.value)}
-                className="flex-1 px-3.5 py-2 text-xs rounded-xl bg-[#FAF5EC] border border-[#D8D0C2] text-[#292720] focus:outline-none focus:border-[#9C7D47]"
-              />
-              <button
-                onClick={handleSaveByok}
-                disabled={byokSaving || !byokKey.trim()}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] disabled:opacity-50 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                {byokSaving && <Loader2 className="h-3 w-3 animate-spin" />}
-                <span>Save Key</span>
-              </button>
-            </div>
-          )}
-
-          {byokSuccess && <p className="text-xs text-emerald-700 font-medium">{byokSuccess}</p>}
-          {byokError && <p className="text-xs text-rose-600 font-medium">{byokError}</p>}
-        </div>
+        )}
 
         <div className="p-5 rounded-2xl bg-[#FAF5EC] border border-[#E5DED1] space-y-4">
           <div className="flex items-center justify-between">

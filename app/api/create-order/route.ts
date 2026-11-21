@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getRazorpayClient } from '@/lib/payments/razorpay'
 import { PLAN_CONFIGS, STORAGE_PACKS } from '@/lib/subscription/plans'
+import { getLivePlanConfigs } from '@/lib/subscription/dynamic-plans'
 import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
@@ -10,17 +11,21 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}))
     const { planTier, packId, currency = 'INR', notes = {} } = body
 
+    const liveConfig = await getLivePlanConfigs().catch(() => null)
+    const activePlans = liveConfig?.plans || PLAN_CONFIGS
+    const activePacks = liveConfig?.storagePacks || STORAGE_PACKS
+
     let amountInPaise: number | null = null
     let orderDescription = 'FileMind Order'
 
-    if (planTier && PLAN_CONFIGS[planTier as keyof typeof PLAN_CONFIGS]) {
-      const plan = PLAN_CONFIGS[planTier as keyof typeof PLAN_CONFIGS]
+    if (planTier && activePlans[planTier as keyof typeof activePlans]) {
+      const plan = activePlans[planTier as keyof typeof activePlans]
       amountInPaise = plan.priceINR * 100
       orderDescription = `${plan.name} Subscription`
       notes.type = 'subscription'
       notes.planTier = planTier
-    } else if (packId && STORAGE_PACKS[packId]) {
-      const pack = STORAGE_PACKS[packId]
+    } else if (packId && activePacks[packId]) {
+      const pack = activePacks[packId]
       amountInPaise = pack.priceINR * 100
       orderDescription = `${pack.name} Storage Add-on`
       notes.type = 'storage_pack'
@@ -30,8 +35,9 @@ export async function POST(req: Request) {
       orderDescription = body.planName || 'FileMind Service'
       notes.type = body.type || 'custom'
     } else {
-      amountInPaise = 24900
-      orderDescription = 'Pro Intelligence Subscription'
+      const defaultPro = activePlans.pro || PLAN_CONFIGS.pro
+      amountInPaise = defaultPro.priceINR * 100
+      orderDescription = `${defaultPro.name} Subscription`
       notes.type = 'subscription'
       notes.planTier = 'pro'
     }

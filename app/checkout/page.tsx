@@ -8,6 +8,7 @@ import { RazorpayCheckoutButton } from '@/components/checkout/RazorpayCheckoutBu
 import { createClient } from '@/lib/supabase/server'
 import { getServerUserTier } from '@/lib/subscription/plan-server'
 import { PLAN_CONFIGS, STORAGE_PACKS, formatINR } from '@/lib/subscription/plans'
+import { getLivePlanConfigs } from '@/lib/subscription/dynamic-plans'
 import { ProBadge } from '@/components/ui/ProBadge'
 
 export const dynamic = 'force-dynamic'
@@ -31,12 +32,16 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
 
   const currentTier = await getServerUserTier(user)
 
-  const requestedPackId = params.pack && STORAGE_PACKS[params.pack] ? params.pack : null
+  const liveConfig = await getLivePlanConfigs().catch(() => null)
+  const activePlans = liveConfig?.plans || PLAN_CONFIGS
+  const activePacks = liveConfig?.storagePacks || STORAGE_PACKS
+
+  const requestedPackId = params.pack && activePacks[params.pack] ? params.pack : null
   const isStoragePack = Boolean(requestedPackId)
-  const selectedPack = requestedPackId ? STORAGE_PACKS[requestedPackId] : null
+  const selectedPack = requestedPackId ? activePacks[requestedPackId] : null
 
   const selectedTier = params.plan === 'elite' ? 'elite' : 'pro'
-  const selectedPlan = PLAN_CONFIGS[selectedTier]
+  const selectedPlan = activePlans[selectedTier] || PLAN_CONFIGS[selectedTier]
 
   const title = isStoragePack
     ? `Purchase ${selectedPack?.name}`
