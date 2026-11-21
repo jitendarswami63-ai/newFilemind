@@ -34,3 +34,4 @@ next-env.d.ts
 .env*.local
 
 ~$*
+FileMind_YMCA_Progress_Report_*.pdf
