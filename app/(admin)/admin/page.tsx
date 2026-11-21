@@ -116,7 +116,7 @@ export default async function AdminOverviewPage() {
               {stats.proUsers}
             </div>
             <div className="text-[11px] text-[#777064]">
-              1 GB storage • 500 AI queries
+              {stats.manualProUsers} manual grant &bull; {stats.paidProUsers} paid
             </div>
           </div>
 
@@ -131,7 +131,7 @@ export default async function AdminOverviewPage() {
               {stats.eliteUsers}
             </div>
             <div className="text-[11px] text-[#777064]">
-              10 GB storage • Priority processing
+              {stats.manualEliteUsers} manual grants &bull; {stats.paidEliteUsers} paid
             </div>
           </div>
         </div>
@@ -184,7 +184,7 @@ export default async function AdminOverviewPage() {
               {stats.totalAiQueries}
             </div>
             <div className="text-[11px] text-[#777064]">
-              Ask AI synthesis & search runs
+              {stats.aiMessagesCount} grounded messages &bull; {stats.aiConversationsCount} sessions
             </div>
           </div>
 
@@ -199,9 +199,9 @@ export default async function AdminOverviewPage() {
               {stats.successRate}%
             </div>
             <div className="text-[11px] text-[#777064] flex items-center gap-1">
-              <span>{stats.processingSuccessCount} succeeded</span>
-              {stats.processingFailedCount > 0 && (
-                <span className="text-[#E07A7A]">• {stats.processingFailedCount} failed</span>
+              <span>{stats.realSuccessCount} succeeded</span>
+              {stats.realFailedCount > 0 && (
+                <span className="text-[#E07A7A]">&bull; {stats.realFailedCount} failed (prod)</span>
               )}
             </div>
           </div>

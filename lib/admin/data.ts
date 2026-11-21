@@ -26,13 +26,31 @@ export interface AdminOverviewStats {
   freeUsers: number
   proUsers: number
   eliteUsers: number
+  paidProUsers: number
+  manualProUsers: number
+  paidEliteUsers: number
+  manualEliteUsers: number
+  totalPaidSubscribers: number
+  totalManualGrants: number
+  paidMrr: number
+  theoreticalMrr: number
+  waivedMonthlyValue: number
+  oneTimePacksRevenue: number
+  totalRealRevenue: number
   totalDocuments: number
   totalStorageBytes: number
   totalStorageFormatted: string
   totalAiQueries: number
+  aiMessagesCount: number
+  aiConversationsCount: number
   processingSuccessCount: number
   processingFailedCount: number
   successRate: number
+  allTimeSuccessRate: number
+  realSuccessCount: number
+  realFailedCount: number
+  realDocumentsCount: number
+  devFixturesCount: number
 }
 
 export async function getAdminOverviewStats(): Promise<AdminOverviewStats> {
@@ -44,7 +62,13 @@ export async function getAdminOverviewStats(): Promise<AdminOverviewStats> {
   let freeUsers = 0
   let proUsers = 0
   let eliteUsers = 0
+  let paidProUsers = 0
+  let manualProUsers = 0
+  let paidEliteUsers = 0
+  let manualEliteUsers = 0
   let totalAiQueries = 0
+  let totalRealRevenue = 0
+  let oneTimePacksRevenue = 0
 
   const now = new Date()
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
@@ -67,9 +91,42 @@ export async function getAdminOverviewStats(): Promise<AdminOverviewStats> {
 
         const meta = u.user_metadata || {}
         const tier = (meta.tier || meta.plan_tier || meta.plan || 'free').toLowerCase()
-        if (tier === 'elite') eliteUsers++
-        else if (tier === 'pro' || meta.is_pro === true) proUsers++
-        else freeUsers++
+        const isPro = meta.is_pro === true
+        const billingHistory = Array.isArray(meta.billing_history) ? meta.billing_history : []
+
+        for (const tx of billingHistory) {
+          if (tx.status === 'paid' || !tx.status) {
+            const amt = Number(tx.amountINR || tx.priceINR) || 0
+            totalRealRevenue += amt
+            if (tx.type === 'storage_pack' || tx.packId) {
+              oneTimePacksRevenue += amt
+            }
+          }
+        }
+
+        const hasPaidSub = billingHistory.some(
+          (b) => b.type === 'subscription' && (b.status === 'paid' || !b.status)
+        )
+
+        if (tier === 'elite') {
+          eliteUsers++
+          if (hasPaidSub && !meta.manual_grant) {
+            paidEliteUsers++
+          } else if (hasPaidSub && meta.manual_grant) {
+            paidEliteUsers++
+          } else {
+            manualEliteUsers++
+          }
+        } else if (tier === 'pro' || isPro) {
+          proUsers++
+          if (hasPaidSub) {
+            paidProUsers++
+          } else {
+            manualProUsers++
+          }
+        } else {
+          freeUsers++
+        }
 
         if (meta.ai_usage && typeof meta.ai_usage.count === 'number') {
           totalAiQueries += meta.ai_usage.count
@@ -80,27 +137,82 @@ export async function getAdminOverviewStats(): Promise<AdminOverviewStats> {
     console.error('[getAdminOverviewStats] Error counting users:', err)
   }
 
+  let aiMessagesCount = 0
+  let aiConversationsCount = 0
+  try {
+    const { count: msgCount } = await admin
+      .from('conversation_messages')
+      .select('id', { count: 'exact', head: true })
+    if (typeof msgCount === 'number') aiMessagesCount = msgCount
+
+    const { count: userMsgCount } = await admin
+      .from('conversation_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('role', 'user')
+
+    const userQuestionsCount = typeof userMsgCount === 'number' ? userMsgCount : 0
+
+    const { count: convCount } = await admin
+      .from('conversations')
+      .select('id', { count: 'exact', head: true })
+    if (typeof convCount === 'number') aiConversationsCount = convCount
+
+    const effectiveAiQueries = Math.max(totalAiQueries, userQuestionsCount, Math.ceil(aiMessagesCount / 2))
+    totalAiQueries = effectiveAiQueries
+  } catch (err) {
+    console.error('[getAdminOverviewStats] Error querying conversations:', err)
+  }
+
+  const paidMrr = (paidProUsers * 249) + (paidEliteUsers * 499)
+  const theoreticalMrr = (proUsers * 249) + (eliteUsers * 499)
+  const waivedMonthlyValue = (manualProUsers * 249) + (manualEliteUsers * 499)
+  const totalPaidSubscribers = paidProUsers + paidEliteUsers
+  const totalManualGrants = manualProUsers + manualEliteUsers
+
   let totalDocuments = 0
   let totalStorageBytes = 0
   let processingSuccessCount = 0
   let processingFailedCount = 0
+  let devFixturesCount = 0
+  let realSuccessCount = 0
+  let realFailedCount = 0
 
   try {
     const { data: docs, error: docsErr } = await admin
       .from('documents')
-      .select('id, file_size, status')
+      .select('id, file_size, status, filename, created_at')
 
     if (!docsErr && Array.isArray(docs)) {
       totalDocuments = docs.length
       for (const doc of docs) {
-        totalStorageBytes += Number(doc.file_size) || 0
+        const size = Number(doc.file_size) || 0
+        totalStorageBytes += size
         const status = doc.status
-        if (status === 'completed' || status === 'indexed' || status === 'ready') {
+        const isSuccess = status === 'completed' || status === 'indexed' || status === 'ready'
+        const isFailed = status === 'failed' || status === 'error'
+
+        if (isSuccess) {
           processingSuccessCount++
-        } else if (status === 'failed' || status === 'error') {
+        } else if (isFailed) {
           processingFailedCount++
         } else {
           processingSuccessCount++
+        }
+
+        const isDevFixture =
+          (size <= 10 && (doc.filename.includes('test') || doc.filename.includes('exp'))) ||
+          (doc.filename === 'invoice_sample.pdf' && doc.created_at && doc.created_at.startsWith('2026-09'))
+
+        if (isDevFixture) {
+          devFixturesCount++
+        } else {
+          if (isSuccess) {
+            realSuccessCount++
+          } else if (isFailed) {
+            realFailedCount++
+          } else {
+            realSuccessCount++
+          }
         }
       }
     }
@@ -108,8 +220,11 @@ export async function getAdminOverviewStats(): Promise<AdminOverviewStats> {
     console.error('[getAdminOverviewStats] Error calculating documents/storage:', err)
   }
 
-  const evaluatedJobs = processingSuccessCount + processingFailedCount
-  const successRate = evaluatedJobs > 0 ? Math.round((processingSuccessCount / evaluatedJobs) * 100) : 100
+  const allTimeTotal = processingSuccessCount + processingFailedCount
+  const allTimeSuccessRate = allTimeTotal > 0 ? Math.round((processingSuccessCount / allTimeTotal) * 100) : 100
+
+  const realTotal = realSuccessCount + realFailedCount
+  const successRate = realTotal > 0 ? Math.round((realSuccessCount / realTotal) * 100) : allTimeSuccessRate
 
   return {
     totalUsers,
@@ -118,13 +233,31 @@ export async function getAdminOverviewStats(): Promise<AdminOverviewStats> {
     freeUsers,
     proUsers,
     eliteUsers,
+    paidProUsers,
+    manualProUsers,
+    paidEliteUsers,
+    manualEliteUsers,
+    totalPaidSubscribers,
+    totalManualGrants,
+    paidMrr,
+    theoreticalMrr,
+    waivedMonthlyValue,
+    oneTimePacksRevenue,
+    totalRealRevenue,
     totalDocuments,
     totalStorageBytes,
     totalStorageFormatted: formatBytes(totalStorageBytes),
     totalAiQueries,
+    aiMessagesCount,
+    aiConversationsCount,
     processingSuccessCount,
     processingFailedCount,
     successRate,
+    allTimeSuccessRate,
+    realSuccessCount,
+    realFailedCount,
+    realDocumentsCount: realTotal,
+    devFixturesCount,
   }
 }
 
