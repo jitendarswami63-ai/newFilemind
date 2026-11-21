@@ -47,7 +47,20 @@ function InstagramIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
 export function LandingPage({ user: initialUser }: LandingPageProps) {
   const [user, setUser] = useState(initialUser)
   const [openFaq, setOpenFaq] = useState<number | null>(null)
+  const [livePlans, setLivePlans] = useState<Record<string, any>>({
+    pro: { priceDisplay: '₹249', priceINR: 249, name: 'Pro Intelligence', tagline: 'For professionals and teams needing AI document understanding and smart search.' },
+    elite: { priceDisplay: '₹499', priceINR: 499, name: 'Elite Intelligence', tagline: 'High-volume file workflows, 10 GB storage, and hardware biometric vault.' },
+  })
   const { isPro, isElite, tier } = useUserPlan(user)
+
+  useEffect(() => {
+    fetch('/api/plans')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data?.plans) setLivePlans(data.plans)
+      })
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (initialUser) return
@@ -603,12 +616,12 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                 </div>
                 <div>
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-[#292720]">Pro Intelligence</h3>
+                    <h3 className="text-lg font-bold text-[#292720]">{livePlans.pro?.name || 'Pro Intelligence'}</h3>
                     {tier === 'pro' && <ProBadge variant="gold-pill" size="xs" label="ACTIVE" />}
                   </div>
-                  <p className="text-xs text-[#777064] mt-1 mb-4">For professionals and teams needing AI document understanding and smart search.</p>
+                  <p className="text-xs text-[#777064] mt-1 mb-4">{livePlans.pro?.tagline || 'For professionals and teams needing AI document understanding and smart search.'}</p>
                   <div className="flex items-baseline gap-1 mb-6">
-                    <span className="text-4xl font-extrabold text-[#292720]">₹249</span>
+                    <span className="text-4xl font-extrabold text-[#292720]">{livePlans.pro?.priceDisplay || '₹249'}</span>
                     <span className="text-xs text-[#777064]">/ month</span>
                   </div>
                   <ul className="space-y-3 text-xs text-[#292720] mb-8">
@@ -666,10 +679,10 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                 ) : (
                   <Link
                     href="/checkout?plan=pro"
-                    aria-label="Upgrade to FileMind Pro intelligence plan for ₹249/month"
+                    aria-label={`Upgrade to FileMind Pro intelligence plan for ${livePlans.pro?.priceDisplay || '₹249'}/month`}
                     className="w-full text-center py-2.5 text-xs font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] border border-[#856837] rounded-xl shadow-xs transition-colors cursor-pointer"
                   >
-                    Upgrade to Pro (₹249)
+                    Upgrade to Pro ({livePlans.pro?.priceDisplay || '₹249'})
                   </Link>
                 )}
               </div>
@@ -682,17 +695,17 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                       <span>Your Active Plan</span>
                     </>
                   ) : (
-                    'Advanced Power'
+                    livePlans.elite?.badgeLabel || 'Advanced Power'
                   )}
                 </div>
                 <div>
                   <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-bold text-[#F5F1E9]">Elite Intelligence</h3>
+                    <h3 className="text-lg font-bold text-[#F5F1E9]">{livePlans.elite?.name || 'Elite Intelligence'}</h3>
                     {tier === 'elite' && <ProBadge variant="elite-pill" size="xs" label="ACTIVE" />}
                   </div>
-                  <p className="text-xs text-[#A8A49B] mt-1 mb-4">High-volume file workflows, 10 GB storage, and hardware biometric vault.</p>
+                  <p className="text-xs text-[#A8A49B] mt-1 mb-4">{livePlans.elite?.tagline || 'High-volume file workflows, 10 GB storage, and hardware biometric vault.'}</p>
                   <div className="flex items-baseline gap-1 mb-6">
-                    <span className="text-4xl font-extrabold text-[#F5F1E9]">₹499</span>
+                    <span className="text-4xl font-extrabold text-[#F5F1E9]">{livePlans.elite?.priceDisplay || '₹499'}</span>
                     <span className="text-xs text-[#A8A49B]">/ month</span>
                   </div>
                   <ul className="space-y-3 text-xs text-[#DDD8CE] mb-8">
@@ -746,10 +759,10 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                 ) : (
                   <Link
                     href="/checkout?plan=elite"
-                    aria-label="Upgrade to FileMind Elite intelligence plan for ₹499/month"
+                    aria-label={`Upgrade to FileMind Elite intelligence plan for ${livePlans.elite?.priceDisplay || '₹499'}/month`}
                     className="w-full text-center py-2.5 text-xs font-semibold text-[#1C180A] bg-gradient-to-r from-[#C5A878] to-[#9C7D47] hover:opacity-95 rounded-xl shadow-xs transition-opacity cursor-pointer"
                   >
-                    Upgrade to Elite (₹499)
+                    Upgrade to Elite ({livePlans.elite?.priceDisplay || '₹499'})
                   </Link>
                 )}
               </div>
