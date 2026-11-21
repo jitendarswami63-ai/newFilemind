@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
 import Script from 'next/script'
+import { redirect } from 'next/navigation'
 import { Check, ShieldCheck, Zap, Crown, ArrowRight, HardDrive, Sparkles } from 'lucide-react'
 import { LandingNavbar } from '@/components/landing/LandingNavbar'
 import { RazorpayCheckoutButton } from '@/components/checkout/RazorpayCheckoutButton'
@@ -29,6 +30,15 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
   const {
     data: { user },
   } = await supabase.auth.getUser()
+
+  if (!user) {
+    const query = new URLSearchParams()
+    if (params.plan) query.set('plan', params.plan)
+    if (params.pack) query.set('pack', params.pack)
+    const queryString = query.toString()
+    const targetUrl = queryString ? `/checkout?${queryString}` : '/checkout'
+    redirect(`/login?next=${encodeURIComponent(targetUrl)}`)
+  }
 
   const currentTier = await getServerUserTier(user)
 
@@ -186,6 +196,7 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
                 planName={isStoragePack ? selectedPack?.name : selectedPlan.name}
                 userName={user?.user_metadata?.full_name}
                 userEmail={user?.email}
+                userPhone={user?.phone || user?.user_metadata?.phone}
                 buttonText={`Pay ${priceDisplay} with Razorpay`}
                 className="w-full text-center py-3 text-sm font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] border border-[#856837] rounded-xl shadow-xs transition-colors cursor-pointer"
               />

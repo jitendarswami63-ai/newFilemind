@@ -678,7 +678,7 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                   </Link>
                 ) : (
                   <Link
-                    href="/checkout?plan=pro"
+                    href={user ? "/checkout?plan=pro" : "/login?next=%2Fcheckout%3Fplan%3Dpro"}
                     aria-label={`Upgrade to FileMind Pro intelligence plan for ${livePlans.pro?.priceDisplay || '₹249'}/month`}
                     className="w-full text-center py-2.5 text-xs font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] border border-[#856837] rounded-xl shadow-xs transition-colors cursor-pointer"
                   >
@@ -758,7 +758,7 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                   </Link>
                 ) : (
                   <Link
-                    href="/checkout?plan=elite"
+                    href={user ? "/checkout?plan=elite" : "/login?next=%2Fcheckout%3Fplan%3Delite"}
                     aria-label={`Upgrade to FileMind Elite intelligence plan for ${livePlans.elite?.priceDisplay || '₹499'}/month`}
                     className="w-full text-center py-2.5 text-xs font-semibold text-[#1C180A] bg-gradient-to-r from-[#C5A878] to-[#9C7D47] hover:opacity-95 rounded-xl shadow-xs transition-opacity cursor-pointer"
                   >
@@ -803,7 +803,7 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                     </div>
                   </div>
                   <Link
-                    href="/checkout?pack=pack_1gb"
+                    href={user ? "/checkout?pack=pack_1gb" : "/login?next=%2Fcheckout%3Fpack%3Dpack_1gb"}
                     className="w-full text-center py-2 text-xs font-semibold text-[#292720] bg-[#FFFCF5] hover:bg-[#F3EFE5] border border-[#D8D0C2] rounded-xl transition-colors"
                   >
                     Add 1 GB (₹49)
@@ -827,7 +827,7 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                     </div>
                   </div>
                   <Link
-                    href="/checkout?pack=pack_5gb"
+                    href={user ? "/checkout?pack=pack_5gb" : "/login?next=%2Fcheckout%3Fpack%3Dpack_5gb"}
                     className="w-full text-center py-2 text-xs font-semibold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] rounded-xl shadow-2xs transition-colors"
                   >
                     Add 5 GB (₹199)
@@ -848,7 +848,7 @@ export function LandingPage({ user: initialUser }: LandingPageProps) {
                     </div>
                   </div>
                   <Link
-                    href="/checkout?pack=pack_10gb"
+                    href={user ? "/checkout?pack=pack_10gb" : "/login?next=%2Fcheckout%3Fpack%3Dpack_10gb"}
                     className="w-full text-center py-2 text-xs font-semibold text-[#292720] bg-[#FFFCF5] hover:bg-[#F3EFE5] border border-[#D8D0C2] rounded-xl transition-colors"
                   >
                     Add 10 GB (₹349)

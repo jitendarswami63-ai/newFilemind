@@ -8,6 +8,22 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
   try {
+    const supabase = await createClient()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
+
+    if (authError || !user) {
+      return NextResponse.json(
+        {
+          error: 'Authentication required. Please sign in to proceed with checkout.',
+          code: 'AUTH_REQUIRED',
+        },
+        { status: 401 }
+      )
+    }
+
     const body = await req.json().catch(() => ({}))
     const { planTier, packId, currency = 'INR', notes = {} } = body
 
@@ -49,32 +65,36 @@ export async function POST(req: Request) {
       )
     }
 
-    try {
-      const supabase = await createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+    const userMetadata = user.user_metadata || {}
+    const registeredName = (userMetadata.full_name || userMetadata.name || body.userName || '').trim() || 'FileMind User'
+    const registeredEmail = user.email || body.userEmail || ''
+    const registeredPhone = (user.phone || userMetadata.phone || userMetadata.phone_number || body.userPhone || '').trim()
+    const userId = user.id
 
-      const customerEmail = body.userEmail || user?.email
-      const customerName = body.userName || user?.user_metadata?.full_name
-
-      if (customerEmail) notes.customerEmail = customerEmail
-      if (customerName) notes.customerName = customerName
-      if (user?.id) notes.userId = user.id
-    } catch {}
-
-    const receipt =
-      body.receipt || `rcpt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`
+    const receipt = `rcpt_${userId.slice(0, 8)}_${Date.now()}`
     const razorpay = getRazorpayClient()
+
+    const orderNotes = {
+      description: orderDescription,
+      userId,
+      user_id: userId,
+      customerName: registeredName,
+      customerEmail: registeredEmail,
+      customerPhone: registeredPhone,
+      user_name: registeredName,
+      user_email: registeredEmail,
+      user_phone: registeredPhone,
+      type: notes.type || (packId ? 'storage_pack' : 'subscription'),
+      planTier: planTier || undefined,
+      packId: packId || undefined,
+      ...notes,
+    }
 
     const order = await razorpay.orders.create({
       amount: amountInPaise,
       currency,
       receipt,
-      notes: {
-        description: orderDescription,
-        ...notes,
-      },
+      notes: orderNotes,
     })
 
     const keyId = (
@@ -94,6 +114,10 @@ export async function POST(req: Request) {
       key_id: keyId,
       keyId: keyId,
       description: orderDescription,
+      userId,
+      customerName: registeredName,
+      customerEmail: registeredEmail,
+      customerPhone: registeredPhone,
     })
   } catch (error: any) {
     if (error?.statusCode === 401 || error?.error?.code === 'BAD_REQUEST_ERROR') {

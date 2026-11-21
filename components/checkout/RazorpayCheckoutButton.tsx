@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Sparkles, Loader2, CheckCircle2, Crown, ArrowRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -22,6 +23,7 @@ interface RazorpayCheckoutButtonProps {
   onSuccess?: (paymentId: string) => void
   userEmail?: string
   userName?: string
+  userPhone?: string
 }
 
 export function RazorpayCheckoutButton({
@@ -35,17 +37,21 @@ export function RazorpayCheckoutButton({
   onSuccess,
   userEmail,
   userName,
+  userPhone,
 }: RazorpayCheckoutButtonProps) {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [paymentSuccess, setPaymentSuccess] = useState<string | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [resolvedEmail, setResolvedEmail] = useState<string>(userEmail || '')
   const [resolvedName, setResolvedName] = useState<string>(userName || '')
+  const [resolvedPhone, setResolvedPhone] = useState<string>(userPhone || '')
 
   useEffect(() => {
     if (userEmail) setResolvedEmail(userEmail)
     if (userName) setResolvedName(userName)
-  }, [userEmail, userName])
+    if (userPhone) setResolvedPhone(userPhone)
+  }, [userEmail, userName, userPhone])
 
   useEffect(() => {
     if (!resolvedEmail) {
@@ -59,6 +65,10 @@ export function RazorpayCheckoutButton({
               setResolvedEmail(user.email)
               if (user.user_metadata?.full_name) {
                 setResolvedName(user.user_metadata.full_name)
+              }
+              const phone = user.phone || user.user_metadata?.phone || user.user_metadata?.phone_number
+              if (phone) {
+                setResolvedPhone(phone)
               }
             }
           })
@@ -90,10 +100,41 @@ export function RazorpayCheckoutButton({
     setLoading(true)
 
     try {
+      const supabase = createClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        try {
+          const pendingItem = {
+            planTier,
+            packId,
+            amount: effectiveAmount,
+            planName: effectivePlanName,
+            currency,
+            timestamp: Date.now(),
+          }
+          sessionStorage.setItem('filemind_pending_checkout', JSON.stringify(pendingItem))
+        } catch {}
+
+        const returnUrl = packId
+          ? `/checkout?pack=${encodeURIComponent(packId)}`
+          : `/checkout?plan=${encodeURIComponent(planTier || 'pro')}`
+
+        router.push(`/login?next=${encodeURIComponent(returnUrl)}`)
+        setLoading(false)
+        return
+      }
+
       const scriptLoaded = await loadRazorpayScript()
       if (!scriptLoaded) {
         throw new Error('Failed to load Razorpay SDK. Please check your internet connection.')
       }
+
+      const customerEmail = user.email || resolvedEmail || userEmail
+      const customerName = user.user_metadata?.full_name || resolvedName || userName
+      const customerPhone = user.phone || user.user_metadata?.phone || resolvedPhone || userPhone
 
       const res = await fetch('/api/create-order', {
         method: 'POST',
@@ -104,10 +145,20 @@ export function RazorpayCheckoutButton({
           amount: effectiveAmount,
           currency,
           planName: effectivePlanName,
-          userEmail: resolvedEmail || userEmail || undefined,
-          userName: resolvedName || userName || undefined,
+          userEmail: customerEmail,
+          userName: customerName,
+          userPhone: customerPhone,
         }),
       })
+
+      if (res.status === 401) {
+        const returnUrl = packId
+          ? `/checkout?pack=${encodeURIComponent(packId)}`
+          : `/checkout?plan=${encodeURIComponent(planTier || 'pro')}`
+        router.push(`/login?next=${encodeURIComponent(returnUrl)}`)
+        setLoading(false)
+        return
+      }
 
       const data = await res.json()
       if (!res.ok || (!data.order_id && !data.orderId)) {
@@ -143,6 +194,9 @@ export function RazorpayCheckoutButton({
 
             const verifyData = await verifyRes.json()
             if (verifyRes.ok && verifyData.success) {
+              try {
+                sessionStorage.removeItem('filemind_pending_checkout')
+              } catch {}
               window.dispatchEvent(new Event('filemind_plan_changed'))
               setPaymentSuccess(response.razorpay_payment_id)
               onSuccess?.(response.razorpay_payment_id)
@@ -156,8 +210,9 @@ export function RazorpayCheckoutButton({
           }
         },
         prefill: {
-          name: resolvedName || userName || undefined,
-          email: resolvedEmail || userEmail || undefined,
+          name: customerName || undefined,
+          email: customerEmail || undefined,
+          contact: customerPhone || undefined,
         },
         theme: {
           color: '#9C7D47',

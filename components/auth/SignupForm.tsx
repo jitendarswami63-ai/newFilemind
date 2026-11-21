@@ -29,9 +29,29 @@ export function SignupForm() {
   const supabase = createClient()
 
   const nextParam = searchParams.get('next')
-  const destination = nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') && !nextParam.startsWith('/\\')
-    ? nextParam
-    : '/'
+  const [destination, setDestination] = useState<string>(() => {
+    if (nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') && !nextParam.startsWith('/\\')) {
+      return nextParam
+    }
+    return '/'
+  })
+
+  React.useEffect(() => {
+    if (!nextParam || nextParam === '/') {
+      try {
+        const stored = sessionStorage.getItem('filemind_pending_checkout')
+        if (stored) {
+          const parsed = JSON.parse(stored)
+          if (parsed && typeof parsed.timestamp === 'number' && Date.now() - parsed.timestamp < 30 * 60 * 1000) {
+            const fallbackPath = parsed.packId
+              ? `/checkout?pack=${encodeURIComponent(parsed.packId)}`
+              : `/checkout?plan=${encodeURIComponent(parsed.planTier || 'pro')}`
+            setDestination(fallbackPath)
+          }
+        }
+      } catch {}
+    }
+  }, [nextParam])
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault()

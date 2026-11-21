@@ -87,17 +87,25 @@ export async function promoteUserPlan(
       : []
 
     if (metadataExtra.razorpay_payment_id) {
-      billingHistory.unshift({
-        id: `tx_${Date.now()}`,
-        type: 'subscription',
-        planTier: tier,
-        planName: PLAN_CONFIGS[tier].name,
-        amountINR: PLAN_CONFIGS[tier].priceINR,
-        date: now.toISOString(),
-        orderId: metadataExtra.razorpay_order_id,
-        paymentId: metadataExtra.razorpay_payment_id,
-        status: 'paid',
-      })
+      const isDuplicate = billingHistory.some(
+        (b) => b.paymentId === metadataExtra.razorpay_payment_id || (metadataExtra.razorpay_order_id && b.orderId === metadataExtra.razorpay_order_id)
+      )
+      if (!isDuplicate) {
+        billingHistory.unshift({
+          id: `tx_${Date.now()}`,
+          type: 'subscription',
+          planTier: tier,
+          planName: PLAN_CONFIGS[tier].name,
+          amountINR: metadataExtra.amount_paid_inr || PLAN_CONFIGS[tier].priceINR,
+          date: now.toISOString(),
+          orderId: metadataExtra.razorpay_order_id,
+          paymentId: metadataExtra.razorpay_payment_id,
+          status: metadataExtra.transaction_status || 'paid',
+          customerName: metadataExtra.customer_name || userData.user.user_metadata?.full_name || 'FileMind User',
+          customerEmail: metadataExtra.customer_email || userData.user.email || '',
+          customerPhone: metadataExtra.customer_phone || userData.user.phone || userData.user.user_metadata?.phone || '',
+        })
+      }
     }
 
     const updatedMeta = {
@@ -192,8 +200,20 @@ export async function addStoragePackToUser(
 
     const currentMeta = userData.user.user_metadata || {}
     const currentAdditional = Number(currentMeta.additional_storage_bytes) || 0
-    const newAdditional = currentAdditional + pack.storageBytes
 
+    const billingHistory = Array.isArray(currentMeta.billing_history)
+      ? [...currentMeta.billing_history]
+      : []
+
+    const isDuplicate = billingHistory.some(
+      (b) => b.paymentId === metadataExtra.razorpay_payment_id || (metadataExtra.razorpay_order_id && b.orderId === metadataExtra.razorpay_order_id)
+    )
+
+    if (isDuplicate) {
+      return true
+    }
+
+    const newAdditional = currentAdditional + pack.storageBytes
     const purchasedPacks = Array.isArray(currentMeta.purchased_storage_packs)
       ? [...currentMeta.purchased_storage_packs]
       : []
@@ -209,20 +229,19 @@ export async function addStoragePackToUser(
       paymentId: metadataExtra.razorpay_payment_id,
     })
 
-    const billingHistory = Array.isArray(currentMeta.billing_history)
-      ? [...currentMeta.billing_history]
-      : []
-
     billingHistory.unshift({
       id: `tx_${Date.now()}`,
       type: 'storage_pack',
       packId: pack.id,
       packName: pack.name,
-      amountINR: pack.priceINR,
+      amountINR: metadataExtra.amount_paid_inr || pack.priceINR,
       date: now,
       orderId: metadataExtra.razorpay_order_id,
       paymentId: metadataExtra.razorpay_payment_id,
-      status: 'paid',
+      status: metadataExtra.transaction_status || 'paid',
+      customerName: metadataExtra.customer_name || userData.user.user_metadata?.full_name || 'FileMind User',
+      customerEmail: metadataExtra.customer_email || userData.user.email || '',
+      customerPhone: metadataExtra.customer_phone || userData.user.phone || userData.user.user_metadata?.phone || '',
     })
 
     const updatedMeta = {
