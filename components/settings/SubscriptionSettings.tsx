@@ -488,57 +488,66 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
             <div>
               <h4 className="text-sm font-bold text-[#292720]">Plan Tier Management</h4>
               <p className="text-xs text-[#777064]">
-                Switch plans anytime. Upgrading grants immediate limits; downgrading never deletes your documents.
+                {tier === 'elite'
+                  ? 'You are on our highest tier with maximum performance and all capabilities unlocked.'
+                  : 'Upgrade your plan anytime to unlock higher file limits and increased AI processing capacity.'}
               </p>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
-            {tier !== 'pro' && (
-              <div className="p-4 rounded-xl bg-[#FAF5EC] border border-[#E5DED1] flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-bold text-[#292720]">{livePlans.pro?.name || 'Pro Intelligence'}</div>
-                  <div className="text-[11px] text-[#777064]">1 GB Storage • Dual AI • {livePlans.pro?.priceDisplay || '₹249'}/month</div>
+          {tier === 'elite' ? (
+            <div className="p-4 rounded-xl bg-[#1B1D21] text-[#F5F1E9] border border-[#3E4149] flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-[#D4AF37]/20 to-[#9C7D47]/10 border border-[#D4AF37]/30 flex items-center justify-center text-[#D4AF37] flex-shrink-0 shadow-inner">
+                  <Crown className="h-5 w-5 fill-[#D4AF37]" />
                 </div>
-                <Link
-                  href="/checkout?plan=pro"
-                  className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] shadow-xs"
-                >
-                  Switch to Pro
-                </Link>
+                <div>
+                  <div className="text-sm font-bold text-[#F5F1E9] flex items-center gap-2">
+                    <span>{livePlans.elite?.name || 'Elite Intelligence'}</span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-[#D4AF37] to-[#AA771C] text-[#1C180A]">
+                      MAX TIER
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#A8A49B] mt-0.5">
+                    Your account has the maximum 10 GB vault storage, priority processing queue, and FIDO2 biometric vault.
+                  </p>
+                </div>
               </div>
-            )}
+              <div className="text-xs font-bold text-[#D4AF37] sm:text-right whitespace-nowrap">
+                All Capabilities Active
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+              {tier === 'free' && (
+                <div className="p-4 rounded-xl bg-[#FAF5EC] border border-[#E5DED1] flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-bold text-[#292720]">{livePlans.pro?.name || 'Pro Intelligence'}</div>
+                    <div className="text-[11px] text-[#777064]">1 GB Storage • Dual AI • {livePlans.pro?.priceDisplay || '₹249'}/month</div>
+                  </div>
+                  <Link
+                    href="/checkout?plan=pro"
+                    className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-[#FFFCF5] bg-[#9C7D47] hover:bg-[#856837] shadow-xs cursor-pointer"
+                  >
+                    Upgrade to Pro
+                  </Link>
+                </div>
+              )}
 
-            {tier !== 'elite' && (
-              <div className="p-4 rounded-xl bg-[#1B1D21] text-[#F5F1E9] border border-[#3E4149] flex items-center justify-between">
+              <div className={`p-4 rounded-xl bg-[#1B1D21] text-[#F5F1E9] border border-[#3E4149] flex items-center justify-between ${tier === 'pro' ? 'col-span-1 sm:col-span-2' : ''}`}>
                 <div>
                   <div className="text-xs font-bold text-[#F5F1E9]">{livePlans.elite?.name || 'Elite Intelligence'}</div>
                   <div className="text-[11px] text-[#A8A49B]">10 GB Storage • Priority Queue • {livePlans.elite?.priceDisplay || '₹499'}/month</div>
                 </div>
                 <Link
                   href="/checkout?plan=elite"
-                  className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-[#1B1D21] bg-gradient-to-r from-[#C5A878] to-[#9C7D47] hover:opacity-95 shadow-xs"
+                  className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-[#1B1D21] bg-gradient-to-r from-[#C5A878] to-[#9C7D47] hover:opacity-95 shadow-xs cursor-pointer"
                 >
-                  Switch to Elite
+                  Upgrade to Elite
                 </Link>
               </div>
-            )}
-
-            {tier !== 'free' && (
-              <div className="p-4 rounded-xl bg-[#FAF5EC] border border-[#E5DED1] flex items-center justify-between col-span-1 sm:col-span-2">
-                <div>
-                  <div className="text-xs font-bold text-[#292720]">Downgrade to Free Tier</div>
-                  <div className="text-[11px] text-[#777064]">All existing documents are safely preserved without deletion.</div>
-                </div>
-                <button
-                  onClick={() => setShowDowngradeModal(true)}
-                  className="px-3 py-1.5 rounded-lg text-xs font-semibold text-[#777064] hover:text-[#292720] border border-[#D8D0C2] hover:bg-[#FFFCF5] transition-colors cursor-pointer"
-                >
-                  Switch to Free
-                </button>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
 
           {downgradeMsg && (
             <p className="text-xs text-emerald-700 font-semibold pt-1">{downgradeMsg}</p>
