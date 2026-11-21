@@ -439,7 +439,7 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
-            {Object.values(STORAGE_PACKS).map((pack) => (
+            {Object.values(livePacks).map((pack: any) => (
               <div
                 key={pack.id}
                 className="p-4 rounded-xl bg-[#FFFCF5] border border-[#E5DED1] flex flex-col justify-between hover:border-[#9C7D47]/40 transition-colors space-y-3"
@@ -497,8 +497,8 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
             {tier !== 'pro' && (
               <div className="p-4 rounded-xl bg-[#FAF5EC] border border-[#E5DED1] flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-bold text-[#292720]">Pro Intelligence</div>
-                  <div className="text-[11px] text-[#777064]">1 GB Storage • Dual AI • ₹249/month</div>
+                  <div className="text-xs font-bold text-[#292720]">{livePlans.pro?.name || 'Pro Intelligence'}</div>
+                  <div className="text-[11px] text-[#777064]">1 GB Storage • Dual AI • {livePlans.pro?.priceDisplay || '₹249'}/month</div>
                 </div>
                 <Link
                   href="/checkout?plan=pro"
@@ -512,8 +512,8 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
             {tier !== 'elite' && (
               <div className="p-4 rounded-xl bg-[#1B1D21] text-[#F5F1E9] border border-[#3E4149] flex items-center justify-between">
                 <div>
-                  <div className="text-xs font-bold text-[#F5F1E9]">Elite Intelligence</div>
-                  <div className="text-[11px] text-[#A8A49B]">10 GB Storage • Priority Queue • ₹499/month</div>
+                  <div className="text-xs font-bold text-[#F5F1E9]">{livePlans.elite?.name || 'Elite Intelligence'}</div>
+                  <div className="text-[11px] text-[#A8A49B]">10 GB Storage • Priority Queue • {livePlans.elite?.priceDisplay || '₹499'}/month</div>
                 </div>
                 <Link
                   href="/checkout?plan=elite"
