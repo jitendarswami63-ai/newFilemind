@@ -234,7 +234,7 @@ export function useUserPlan(
 ): UserPlanInfo {
   const context = useContext(UserPlanContext)
   if (context) {
-    if (!initialUser) {
+    if (initialUser === null) {
       return {
         ...context,
         isPro: false,

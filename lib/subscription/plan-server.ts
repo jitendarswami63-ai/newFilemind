@@ -27,17 +27,57 @@ function getAdminClient() {
 }
 
 export async function isServerUserPro(
-  user?: { user_metadata?: Record<string, any> | null } | null
+  user?: { id?: string; user_metadata?: Record<string, any> | null } | null
 ): Promise<boolean> {
   if (!user) return false
-  const tier = getUserPlanTier(user)
+  const tier = await getServerUserTier(user)
   return tier === 'pro' || tier === 'elite'
 }
 
 export async function getServerUserTier(
-  user?: { user_metadata?: Record<string, any> | null } | null
+  user?: { id?: string; user_metadata?: Record<string, any> | null } | null
 ): Promise<PlanTier> {
-  return getUserPlanTier(user)
+  if (!user) return 'free'
+  const metaTier = getUserPlanTier(user)
+  if (metaTier === 'elite') return 'elite'
+
+  if (user.id) {
+    try {
+      const admin = getAdminClient()
+      const { data: activeGrant } = await admin
+        .from('admin_subscription_grants')
+        .select('tier, expires_at, status')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (activeGrant) {
+        const isExpired = activeGrant.expires_at && new Date(activeGrant.expires_at).getTime() < Date.now()
+        if (!isExpired) {
+          const grantTier = String(activeGrant.tier).toLowerCase()
+          if (grantTier === 'elite' || grantTier === 'pro') {
+            return grantTier as PlanTier
+          }
+        }
+      }
+
+      if (metaTier === 'free') {
+        const { data: freshUser } = await admin.auth.admin.getUserById(user.id)
+        if (freshUser?.user) {
+          const freshTier = getUserPlanTier(freshUser.user)
+          if (freshTier !== 'free') {
+            return freshTier
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('[getServerUserTier] Authoritative lookup warning:', err)
+    }
+  }
+
+  return metaTier
 }
 
 export async function getServerUserEntitlements(
@@ -46,9 +86,45 @@ export async function getServerUserEntitlements(
   includeStorage: boolean = true
 ): Promise<UserEntitlements> {
   let totalUsedBytes = 0
-  if (includeStorage) {
-    try {
-      const admin = getAdminClient()
+  let effectiveMetadata: Record<string, any> = userMetadata ? { ...userMetadata } : {}
+
+  try {
+    const admin = getAdminClient()
+
+    const currentTier = getUserPlanTier({ user_metadata: effectiveMetadata })
+    if (currentTier !== 'elite') {
+      const { data: activeGrant } = await admin
+        .from('admin_subscription_grants')
+        .select('tier, expires_at, status')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (activeGrant) {
+        const isExpired = activeGrant.expires_at && new Date(activeGrant.expires_at).getTime() < Date.now()
+        if (!isExpired) {
+          const grantTier = String(activeGrant.tier).toLowerCase()
+          if (grantTier === 'elite' || grantTier === 'pro') {
+            effectiveMetadata.tier = grantTier
+            effectiveMetadata.plan_tier = grantTier
+            effectiveMetadata.plan = grantTier
+            effectiveMetadata.is_pro = true
+          }
+        }
+      } else if (currentTier === 'free') {
+        const { data: freshUser } = await admin.auth.admin.getUserById(userId)
+        if (freshUser?.user?.user_metadata) {
+          const freshTier = getUserPlanTier(freshUser.user)
+          if (freshTier !== 'free') {
+            effectiveMetadata = { ...effectiveMetadata, ...freshUser.user.user_metadata }
+          }
+        }
+      }
+    }
+
+    if (includeStorage) {
       const { data, error } = await admin
         .from('documents')
         .select('file_size')
@@ -57,12 +133,12 @@ export async function getServerUserEntitlements(
       if (!error && Array.isArray(data)) {
         totalUsedBytes = data.reduce((acc, row) => acc + (Number(row.file_size) || 0), 0)
       }
-    } catch (err) {
-      console.error('[getServerUserEntitlements] Error computing used storage:', err)
     }
+  } catch (err) {
+    console.error('[getServerUserEntitlements] Error computing used storage:', err)
   }
 
-  return calculateUserEntitlements({ user_metadata: userMetadata }, totalUsedBytes)
+  return calculateUserEntitlements({ user_metadata: effectiveMetadata }, totalUsedBytes)
 }
 
 export async function promoteUserPlan(

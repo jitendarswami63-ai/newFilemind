@@ -183,6 +183,13 @@ export function getUserPlanTier(
   if (!user) return 'free'
   const meta = user.user_metadata || {}
 
+  if (meta.manual_grant?.expires_at) {
+    const expires = new Date(meta.manual_grant.expires_at).getTime()
+    if (!Number.isNaN(expires) && expires < Date.now()) {
+      return 'free'
+    }
+  }
+
   const rawTier = (meta.tier || meta.plan_tier || meta.plan || meta.subscription || '').toLowerCase()
   if (rawTier === 'elite') return 'elite'
   if (rawTier === 'pro' || meta.is_pro === true) return 'pro'
@@ -247,7 +254,7 @@ export function calculateUserEntitlements(
   return {
     tier,
     plan,
-    isPro: tier === 'pro',
+    isPro: tier === 'pro' || tier === 'elite',
     isElite: tier === 'elite',
     isPaidPlan: tier === 'pro' || tier === 'elite',
     hasAiFeatures: effectiveAiEnabled,
