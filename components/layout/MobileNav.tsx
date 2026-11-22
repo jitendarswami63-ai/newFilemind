@@ -9,7 +9,7 @@ import { LogOut, Menu, X, Crown, Lock, ShieldAlert } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { navItems } from './nav-items'
 import { ProBadge } from '@/components/ui/ProBadge'
-import { useUserPlan, clearLegacyCookies } from '@/lib/subscription/plan'
+import { useUserPlan, clearLegacyCookies, invalidatePlanCache } from '@/lib/subscription/plan'
 import { useUpgradeModal } from '@/components/subscription/UpgradeModalContext'
 import { checkIsAdminClient } from '@/lib/admin/admin-client'
 
@@ -57,6 +57,7 @@ export function MobileNav({ user }: { user: { email?: string; user_metadata?: Re
 
   const handleLogout = async () => {
     clearLegacyCookies()
+    invalidatePlanCache()
     await supabase.auth.signOut()
     router.push('/')
     router.refresh()

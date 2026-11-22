@@ -55,6 +55,10 @@ export function LandingPage({ user: initialUser, initialPlans }: LandingPageProp
     }
   )
   const { isPro, isElite, tier } = useUserPlan(user)
+  const isUserLoggedIn = Boolean(user)
+  const isUserPro = isUserLoggedIn && (tier === 'pro' || isPro)
+  const isUserElite = isUserLoggedIn && (tier === 'elite' || isElite)
+  const isUserFree = isUserLoggedIn && !isUserPro && !isUserElite
 
   useEffect(() => {
     if (initialPlans) return
@@ -551,8 +555,8 @@ export function LandingPage({ user: initialUser, initialPlans }: LandingPageProp
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch mb-16">
-              <div className={`bg-[#FFFCF5] p-7 rounded-2xl border ${tier === 'free' && user ? 'border-2 border-[#9C7D47] ring-2 ring-[#9C7D47]/10 shadow-md' : 'border-[#E5DED1] shadow-xs'} flex flex-col justify-between relative`}>
-                {tier === 'free' && user && (
+              <div className={`bg-[#FFFCF5] p-7 rounded-2xl border ${isUserFree ? 'border-2 border-[#9C7D47] ring-2 ring-[#9C7D47]/10 shadow-md' : 'border-[#E5DED1] shadow-xs'} flex flex-col justify-between relative`}>
+                {isUserFree && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-xs bg-[#777064] text-[#FFFCF5]">
                     Current Plan
                   </div>
@@ -560,7 +564,7 @@ export function LandingPage({ user: initialUser, initialPlans }: LandingPageProp
                 <div>
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold text-[#292720]">Free Tier</h3>
-                    {tier === 'free' && user && <span className="text-[10px] bg-[#FAF5EC] text-[#777064] px-2 py-0.5 rounded-full border border-[#E5DED1] font-semibold uppercase tracking-wider">ACTIVE</span>}
+                    {isUserFree && <span className="text-[10px] bg-[#FAF5EC] text-[#777064] px-2 py-0.5 rounded-full border border-[#E5DED1] font-semibold uppercase tracking-wider">ACTIVE</span>}
                   </div>
                   <p className="text-xs text-[#777064] mt-1 mb-4">Essential document and file management with secure private storage.</p>
                   <div className="flex items-baseline gap-1 mb-6">
@@ -607,9 +611,9 @@ export function LandingPage({ user: initialUser, initialPlans }: LandingPageProp
                 </Link>
               </div>
 
-              <div className={`bg-[#FFFCF5] p-7 rounded-2xl ${tier === 'pro' ? 'border-2 border-[#D4AF37] ring-2 ring-[#D4AF37]/20 shadow-xl' : 'border-2 border-[#9C7D47] shadow-lg'} flex flex-col justify-between relative`}>
-                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-xs ${tier === 'pro' ? 'bg-gradient-to-r from-[#D4AF37] to-[#AA771C] text-[#1C180A] flex items-center gap-1 font-black' : 'bg-[#9C7D47] text-[#FFFCF5]'}`}>
-                  {tier === 'pro' ? (
+              <div className={`bg-[#FFFCF5] p-7 rounded-2xl ${isUserPro ? 'border-2 border-[#D4AF37] ring-2 ring-[#D4AF37]/20 shadow-xl' : 'border-2 border-[#9C7D47] shadow-lg'} flex flex-col justify-between relative`}>
+                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-xs ${isUserPro ? 'bg-gradient-to-r from-[#D4AF37] to-[#AA771C] text-[#1C180A] flex items-center gap-1 font-black' : 'bg-[#9C7D47] text-[#FFFCF5]'}`}>
+                  {isUserPro ? (
                     <>
                       <Crown className="h-3 w-3 fill-[#1C180A]" />
                       <span>Your Active Plan</span>
@@ -621,7 +625,7 @@ export function LandingPage({ user: initialUser, initialPlans }: LandingPageProp
                 <div>
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold text-[#292720]">{livePlans.pro?.name || 'Pro Intelligence'}</h3>
-                    {tier === 'pro' && <ProBadge variant="gold-pill" size="xs" label="ACTIVE" />}
+                    {isUserPro && <ProBadge variant="gold-pill" size="xs" label="ACTIVE" />}
                   </div>
                   <p className="text-xs text-[#777064] mt-1 mb-4">{livePlans.pro?.tagline || 'For professionals and teams needing AI document understanding and smart search.'}</p>
                   <div className="flex items-baseline gap-1 mb-6">
@@ -671,7 +675,7 @@ export function LandingPage({ user: initialUser, initialPlans }: LandingPageProp
                     </li>
                   </ul>
                 </div>
-                {tier === 'pro' ? (
+                {isUserPro ? (
                   <Link
                     href="/dashboard"
                     aria-label="Open your FileMind Pro workspace"
@@ -691,9 +695,9 @@ export function LandingPage({ user: initialUser, initialPlans }: LandingPageProp
                 )}
               </div>
 
-              <div className={`bg-[#1B1D21] text-[#F5F1E9] p-7 rounded-2xl border ${tier === 'elite' ? 'border-2 border-[#D4AF37] ring-2 ring-[#D4AF37]/30 shadow-2xl' : 'border-[#3E4149] shadow-lg'} flex flex-col justify-between relative`}>
-                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-xs ${tier === 'elite' ? 'bg-gradient-to-r from-[#D4AF37] to-[#AA771C] text-[#1C180A] flex items-center gap-1 font-black' : 'bg-gradient-to-r from-[#C5A878] to-[#9C7D47] text-[#1B1D21]'}`}>
-                  {tier === 'elite' ? (
+              <div className={`bg-[#1B1D21] text-[#F5F1E9] p-7 rounded-2xl border ${isUserElite ? 'border-2 border-[#D4AF37] ring-2 ring-[#D4AF37]/30 shadow-2xl' : 'border-[#3E4149] shadow-lg'} flex flex-col justify-between relative`}>
+                <div className={`absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider shadow-xs ${isUserElite ? 'bg-gradient-to-r from-[#D4AF37] to-[#AA771C] text-[#1C180A] flex items-center gap-1 font-black' : 'bg-gradient-to-r from-[#C5A878] to-[#9C7D47] text-[#1B1D21]'}`}>
+                  {isUserElite ? (
                     <>
                       <Crown className="h-3 w-3 fill-[#1C180A]" />
                       <span>Your Active Plan</span>
@@ -705,7 +709,7 @@ export function LandingPage({ user: initialUser, initialPlans }: LandingPageProp
                 <div>
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-bold text-[#F5F1E9]">{livePlans.elite?.name || 'Elite Intelligence'}</h3>
-                    {tier === 'elite' && <ProBadge variant="elite-pill" size="xs" label="ACTIVE" />}
+                    {isUserElite && <ProBadge variant="elite-pill" size="xs" label="ACTIVE" />}
                   </div>
                   <p className="text-xs text-[#A8A49B] mt-1 mb-4">{livePlans.elite?.tagline || 'High-volume file workflows, 10 GB storage, and hardware biometric vault.'}</p>
                   <div className="flex items-baseline gap-1 mb-6">
@@ -751,7 +755,7 @@ export function LandingPage({ user: initialUser, initialPlans }: LandingPageProp
                     </li>
                   </ul>
                 </div>
-                {tier === 'elite' ? (
+                {isUserElite ? (
                   <Link
                     href="/dashboard"
                     aria-label="Open your FileMind Elite workspace"
