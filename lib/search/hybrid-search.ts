@@ -62,6 +62,79 @@ export async function executeHybridSearch(
 
   let semanticCandidates: SemanticCandidate[] = []
 
+  let explicitPageCandidates: SearchResultItem[] = []
+  const pageMatch = cleanQuery.match(/(?:(?:pages?|pg|p\.?|page\s*no\.?|page\s*number)\s*(\d+)|(\d+)(?:st|nd|rd|th)?\s*pages?)\b/i)
+  if (pageMatch) {
+    const pageNum = parseInt(pageMatch[1] || pageMatch[2], 10)
+    if (!isNaN(pageNum) && pageNum > 0) {
+      let targetDocId = filterDocId
+      if (!targetDocId) {
+        try {
+          const {
+            data: { user },
+          } = await supabase.auth.getUser()
+          if (user) {
+            const { data: userDocs } = await supabase
+              .from('documents')
+              .select('id, filename, doc_category')
+              .eq('user_id', user.id)
+              .eq('status', 'completed')
+              .order('updated_at', { ascending: false })
+              .limit(1)
+
+            if (userDocs && userDocs.length === 1) {
+              targetDocId = userDocs[0].id
+            }
+          }
+        } catch {}
+      }
+
+      if (targetDocId) {
+        try {
+          const { data: pageRows } = await supabase
+            .from('document_pages')
+            .select('page_number, extracted_text')
+            .eq('document_id', targetDocId)
+            .gte('page_number', Math.max(1, pageNum - 1))
+            .lte('page_number', pageNum + 1)
+            .order('page_number', { ascending: true })
+
+          if (Array.isArray(pageRows) && pageRows.length > 0) {
+            const { data: docInfo } = await supabase
+              .from('documents')
+              .select('filename, doc_category')
+              .eq('id', targetDocId)
+              .single()
+
+            const exactPage = pageRows.find((p) => p.page_number === pageNum)
+            const otherPages = pageRows.filter((p) => p.page_number !== pageNum)
+            const orderedPages = exactPage ? [exactPage, ...otherPages] : pageRows
+
+            explicitPageCandidates = orderedPages
+              .filter((p) => (p.extracted_text || '').trim().length > 0)
+              .map((p, idx) => ({
+                chunk_id: `page_${p.page_number}`,
+                document_id: targetDocId!,
+                filename: docInfo?.filename || 'Document',
+                doc_category: docInfo?.doc_category,
+                page_start: p.page_number,
+                page_end: p.page_number,
+                matching_pages: [p.page_number],
+                chunk_index: idx,
+                content: p.extracted_text,
+                snippet: p.extracted_text.slice(0, 300),
+                score: p.page_number === pageNum ? 1.0 : 0.85,
+                rank_score: p.page_number === pageNum ? 1.0 : 0.85,
+                is_exact_match: true,
+              }))
+          }
+        } catch (pageErr) {
+          console.warn(`[Search] Error fetching explicit page ${pageNum}:`, pageErr)
+        }
+      }
+    }
+  }
+
   if (queryEmbedding) {
     const { data, error } = await supabase.rpc('match_document_chunks', {
       p_query_embedding: JSON.stringify(queryEmbedding),
@@ -224,6 +297,11 @@ export async function executeHybridSearch(
   console.log(
     `[Search] queryLength=${cleanQuery.length} semanticCandidates=${semanticCandidates.length} lexicalCandidates=${lexicalCandidates.length} finalDocumentResults=${documentResults.length}`
   )
+
+  if (explicitPageCandidates.length > 0) {
+    const combined = [...explicitPageCandidates, ...documentResults]
+    return combined.slice(0, options.limit || 8)
+  }
 
   return documentResults
 }
