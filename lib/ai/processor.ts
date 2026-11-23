@@ -495,13 +495,14 @@ export async function processDocument(
   const activeAttempt = preAcquiredToken ? currentAttempts : currentAttempts + 1
   console.log(`[DocumentAI] docId=${documentId} stage=acquire attempt=${activeAttempt} status=acquired`)
 
-  const SERVERLESS_TIMEOUT_MS = 48_000
+  const SERVERLESS_TIMEOUT_MS = 52_000
   let timeoutTimer: NodeJS.Timeout | null = null
+  let savedPagesCount = 0
   const timeoutPromise = new Promise<boolean>((_, reject) => {
     timeoutTimer = setTimeout(
       () =>
         reject(
-          new Error('Serverless processing timeout (48s reached). Operation halted before container termination.')
+          new Error('Serverless processing timeout (52s reached). Operation halted before container termination.')
         ),
       SERVERLESS_TIMEOUT_MS
     )
@@ -516,67 +517,79 @@ export async function processDocument(
     let canonicalBuffer = pdfBuffer
     let currentStoragePath = storagePath
 
-    try {
-      console.log(`[DocumentAI] docId=${documentId} stage=optimization attempt=${activeAttempt} status=started`)
-      const optResult = await optimizePdfBuffer(pdfBuffer)
+    const isLargeOrOptimized =
+      pdfBuffer.length > 5 * 1024 * 1024 ||
+      doc.optimization_status === 'completed'
 
-      if (optResult.status === 'optimized' && optResult.wasOptimized && optResult.buffer) {
-        const contentHash = crypto.createHash('sha256').update(optResult.buffer).digest('hex').slice(0, 12)
-        const sanitizedFilename = doc.filename ? sanitizeFilename(doc.filename) : 'document.pdf'
-        const baseName = sanitizedFilename.replace(/\.pdf$/i, '')
-        const newStoragePath = `${authoritativeUserId}/${documentId}/optimized-${contentHash}-${baseName}.pdf`
+    if (isLargeOrOptimized) {
+      console.log(
+        `[DocumentAI] docId=${documentId} stage=optimization status=bypassed reason=${
+          doc.optimization_status === 'completed' ? 'already_optimized' : 'large_pdf_direct_path'
+        } size=${pdfBuffer.length}`
+      )
+    } else {
+      try {
+        console.log(`[DocumentAI] docId=${documentId} stage=optimization attempt=${activeAttempt} status=started`)
+        const optResult = await optimizePdfBuffer(pdfBuffer)
 
-        const uploaded = await storeOptimizedDocument(newStoragePath, optResult.buffer)
-        if (uploaded) {
-          const verifyObj = await verifyStorageObject(newStoragePath)
-          if (verifyObj && verifyObj.size === optResult.optimizedSize) {
-            const updatedDb = await updateDocumentOptimizedSize({
-              documentId,
-              userId: authoritativeUserId,
-              expectedStoragePath: currentStoragePath,
-              newStoragePath,
-              optimizedSize: optResult.optimizedSize,
-              originalSize: optResult.originalSize,
-              savedBytes: optResult.savedBytes,
-              savingsPercent: optResult.savingsPercent,
-              status: 'completed',
-            })
+        if (optResult.status === 'optimized' && optResult.wasOptimized && optResult.buffer) {
+          const contentHash = crypto.createHash('sha256').update(optResult.buffer).digest('hex').slice(0, 12)
+          const sanitizedFilename = doc.filename ? sanitizeFilename(doc.filename) : 'document.pdf'
+          const baseName = sanitizedFilename.replace(/\.pdf$/i, '')
+          const newStoragePath = `${authoritativeUserId}/${documentId}/optimized-${contentHash}-${baseName}.pdf`
 
-            if (updatedDb) {
-              console.log(
-                `[DocumentAI] docId=${documentId} stage=optimization attempt=${activeAttempt} status=completed saved=${optResult.savedBytes}b (${optResult.savingsPercent}%)`
-              )
-              await deleteStorageObject(currentStoragePath).catch((delErr) => {
-                console.warn(
-                  `[DocumentAI] docId=${documentId} safe cleanup warning for old path ${currentStoragePath}:`,
-                  delErr
-                )
+          const uploaded = await storeOptimizedDocument(newStoragePath, optResult.buffer)
+          if (uploaded) {
+            const verifyObj = await verifyStorageObject(newStoragePath)
+            if (verifyObj && verifyObj.size === optResult.optimizedSize) {
+              const updatedDb = await updateDocumentOptimizedSize({
+                documentId,
+                userId: authoritativeUserId,
+                expectedStoragePath: currentStoragePath,
+                newStoragePath,
+                optimizedSize: optResult.optimizedSize,
+                originalSize: optResult.originalSize,
+                savedBytes: optResult.savedBytes,
+                savingsPercent: optResult.savingsPercent,
+                status: 'completed',
               })
-              currentStoragePath = newStoragePath
-              canonicalBuffer = optResult.buffer
+
+              if (updatedDb) {
+                console.log(
+                  `[DocumentAI] docId=${documentId} stage=optimization attempt=${activeAttempt} status=completed saved=${optResult.savedBytes}b (${optResult.savingsPercent}%)`
+                )
+                await deleteStorageObject(currentStoragePath).catch((delErr) => {
+                  console.warn(
+                    `[DocumentAI] docId=${documentId} safe cleanup warning for old path ${currentStoragePath}:`,
+                    delErr
+                  )
+                })
+                currentStoragePath = newStoragePath
+                canonicalBuffer = optResult.buffer
+              } else {
+                console.warn(
+                  `[DocumentAI] docId=${documentId} stage=optimization status=db_switch_failed, rolling back new object`
+                )
+                await deleteStorageObject(newStoragePath).catch(() => {})
+              }
             } else {
               console.warn(
-                `[DocumentAI] docId=${documentId} stage=optimization status=db_switch_failed, rolling back new object`
+                `[DocumentAI] docId=${documentId} stage=optimization status=storage_verify_failed, rolling back new object`
               )
               await deleteStorageObject(newStoragePath).catch(() => {})
             }
-          } else {
-            console.warn(
-              `[DocumentAI] docId=${documentId} stage=optimization status=storage_verify_failed, rolling back new object`
-            )
-            await deleteStorageObject(newStoragePath).catch(() => {})
           }
+        } else {
+          console.log(
+            `[DocumentAI] docId=${documentId} stage=optimization status=${optResult.status} reason=${optResult.reason || 'none'}`
+          )
         }
-      } else {
-        console.log(
-          `[DocumentAI] docId=${documentId} stage=optimization status=${optResult.status} reason=${optResult.reason || 'none'}`
+      } catch (optErr: unknown) {
+        console.warn(
+          `[DocumentAI] docId=${documentId} stage=optimization status=error (falling back to original buffer):`,
+          optErr
         )
       }
-    } catch (optErr: unknown) {
-      console.warn(
-        `[DocumentAI] docId=${documentId} stage=optimization status=error (falling back to original buffer):`,
-        optErr
-      )
     }
 
     console.log(`[DocumentAI] docId=${documentId} stage=validate_page_count attempt=${activeAttempt} status=started`)
@@ -600,6 +613,7 @@ export async function processDocument(
     })
 
     const alreadyCompletedPages = await getCompletedPageNumbers(documentId)
+    savedPagesCount = alreadyCompletedPages.size
 
     let docCategory = doc.doc_category || 'Other'
     let accumulatedTags: string[] = doc.tags || []
@@ -624,18 +638,28 @@ export async function processDocument(
           `[DocumentAI] docId=${documentId} stage=native_extract status=active_fast_path pages=${nativeResult.pages.length} - Bypassing visual OCR segments`
         )
 
-        for (let i = 0; i < nativeResult.pages.length; i += 100) {
-          const pageBatch = nativeResult.pages.slice(i, i + 100)
+        const missingPages = nativeResult.pages.filter(
+          (p) => !alreadyCompletedPages.has(p.page_number)
+        )
+
+        console.log(
+          `[DocumentAI] docId=${documentId} stage=native_extract totalPages=${nativeResult.pages.length} cachedPages=${alreadyCompletedPages.size} missingPages=${missingPages.length}`
+        )
+
+        const BATCH_SIZE = 400
+        for (let i = 0; i < missingPages.length; i += BATCH_SIZE) {
+          const pageBatch = missingPages.slice(i, i + BATCH_SIZE)
           await saveSegmentPagesCheckpoint({
             documentId,
             userId: authoritativeUserId,
             fencingToken: token,
             pages: pageBatch,
-            stage: `native_pages_${i + 1}_to_${Math.min(i + 100, nativeResult.pages.length)}`,
+            stage: `native_pages_${pageBatch[0].page_number}_to_${pageBatch[pageBatch.length - 1].page_number}`,
           })
           for (const p of pageBatch) {
             alreadyCompletedPages.add(p.page_number)
           }
+          savedPagesCount = alreadyCompletedPages.size
         }
 
         const candidateModels = Array.from(
@@ -795,6 +819,33 @@ export async function processDocument(
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error during AI document processing'
     console.error(`[DocumentAI] docId=${documentId} stage=error attempt=${activeAttempt} status=failed detail:`, errorMsg.slice(0, 300))
+
+    const isTimeout =
+      errorMsg.toLowerCase().includes('timeout') ||
+      errorMsg.toLowerCase().includes('timed out')
+
+    if (isTimeout && savedPagesCount > 0) {
+      console.warn(
+        `[DocumentAI] docId=${documentId} stage=timeout_pause pagesSaved=${savedPagesCount}. Releasing lock for resumption.`
+      )
+      try {
+        const adminClient = getServiceRoleClient()
+        await adminClient
+          .from('documents')
+          .update({
+            status: 'processing',
+            processing_locked_at: null,
+            processing_token: null,
+            processing_stage: `paused_at_page_${savedPagesCount}`,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', documentId)
+          .eq('processing_token', token)
+      } catch (unlockErr) {
+        console.error(`[DocumentAI] Failed to release lock on timeout:`, unlockErr)
+      }
+      return false
+    }
 
     const categorizedError = categorizeDocumentError(errorMsg, MAX_TOTAL_DOCUMENT_PAGES)
 

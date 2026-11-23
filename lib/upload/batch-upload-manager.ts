@@ -469,8 +469,8 @@ export class BatchUploadManager {
         }
       }
 
-      // Poll status for up to 90 seconds (polling /api/documents/:id every 2.5s)
-      const maxPollAttempts = 36
+      // Poll status for up to 150 seconds (polling /api/documents/:id every 2.5s)
+      const maxPollAttempts = 60
       let pollCount = 0
       let isDone = false
 
@@ -489,20 +489,40 @@ export class BatchUploadManager {
               break
             }
             if (docData.status === 'failed') {
-              throw new Error(docData.error_message || 'AI document analysis failed')
+              this.updateItem(id, {
+                status: 'failed',
+                error: docData.error_message || 'AI document analysis failed',
+              })
+              return
             }
           }
-        } catch (pollErr) {
-          if (pollErr instanceof Error && pollErr.message.includes('analysis failed')) {
-            throw pollErr
-          }
+        } catch {
+          // transient network glitch during polling, keep polling
         }
       }
 
-      this.updateItem(id, {
-        status: isDone ? 'completed' : 'processing',
-        error: null,
-      })
+      if (isDone) {
+        this.updateItem(id, {
+          status: 'completed',
+          error: null,
+        })
+      } else {
+        const finalRes = await fetch(`/api/documents/${documentId}`).catch(() => null)
+        const finalData = finalRes && finalRes.ok ? await finalRes.json().catch(() => ({})) : {}
+        if (finalData.status === 'completed') {
+          this.updateItem(id, { status: 'completed', error: null })
+        } else if (finalData.status === 'failed') {
+          this.updateItem(id, {
+            status: 'failed',
+            error: finalData.error_message || 'Analysis failed',
+          })
+        } else {
+          this.updateItem(id, {
+            status: 'processing',
+            error: null,
+          })
+        }
+      }
     } catch (err) {
       this.updateItem(id, {
         status: 'failed',

@@ -18,6 +18,7 @@ export interface AuthoritativeDocument {
   is_scanned?: boolean | null
   embedding_status?: string | null
   embedding_error?: string | null
+  optimization_status?: string | null
 }
 
 export interface FinalizePayload {
@@ -65,7 +66,7 @@ export async function getAuthoritativeDocument(
   const { data, error } = await client
     .from('documents')
     .select(
-      'id, user_id, filename, storage_path, status, processing_attempts, processing_locked_at, processing_token, doc_category, tags, extracted_data, is_scanned, embedding_status, embedding_error'
+      'id, user_id, filename, storage_path, status, processing_attempts, processing_locked_at, processing_token, doc_category, tags, extracted_data, is_scanned, embedding_status, embedding_error, optimization_status'
     )
     .eq('id', documentId)
     .single()
@@ -89,6 +90,7 @@ export async function getAuthoritativeDocument(
     is_scanned: data.is_scanned || null,
     embedding_status: data.embedding_status || null,
     embedding_error: data.embedding_error || null,
+    optimization_status: data.optimization_status || null,
   }
 }
 
