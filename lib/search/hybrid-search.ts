@@ -118,7 +118,6 @@ export async function executeHybridSearch(
         .limit(options.limit || 8)
 
       if (Array.isArray(docFallbackChunks) && docFallbackChunks.length > 0) {
-
         const { data: docInfo } = await supabase
           .from('documents')
           .select('filename, doc_category')
@@ -137,6 +136,36 @@ export async function executeHybridSearch(
           rank_score: 0.1,
           is_exact_match: false,
         }))
+      } else {
+        const { data: introPages } = await supabase
+          .from('document_pages')
+          .select('page_number, extracted_text')
+          .eq('document_id', filterDocId)
+          .lte('page_number', 10)
+          .order('page_number', { ascending: true })
+
+        if (Array.isArray(introPages) && introPages.length > 0) {
+          const { data: docInfo } = await supabase
+            .from('documents')
+            .select('filename, doc_category')
+            .eq('id', filterDocId)
+            .single()
+
+          const meaningfulPages = introPages.filter((p) => (p.extracted_text || '').trim().length > 30)
+
+          lexicalCandidates = meaningfulPages.slice(0, options.limit || 8).map((p, idx) => ({
+            chunk_id: `page_${p.page_number}`,
+            document_id: filterDocId,
+            filename: docInfo?.filename || 'Document',
+            doc_category: docInfo?.doc_category,
+            page_start: p.page_number,
+            page_end: p.page_number,
+            chunk_index: idx,
+            content: p.extracted_text,
+            rank_score: 0.15,
+            is_exact_match: false,
+          }))
+        }
       }
     }
   }
