@@ -184,12 +184,6 @@ async function extractStructuredDataWithGemini({
           'gemini-flash-lite-latest',
           'gemini-3.5-flash',
           'gemini-flash-latest',
-          'gemini-3.1-flash-lite',
-          'gemini-3.8-flash',
-          'gemini-3.7-flash',
-          'gemini-3.6-flash',
-          'gemini-3.5-flash-lite',
-          'gemini-3-flash-preview',
           process.env.GEMINI_FALLBACK_MODEL,
         ].filter(Boolean) as string[]
       )
@@ -199,7 +193,7 @@ async function extractStructuredDataWithGemini({
     let lastGenError: unknown = null
 
     for (const modelName of candidateModels) {
-      for (let attempt = 0; attempt < 3; attempt++) {
+      for (let attempt = 0; attempt < 2; attempt++) {
         try {
           console.log(
             `[DocumentAI] docId=${documentId} stage=generate attempt=${activeAttempt} model=${modelName} retry=${attempt + 1} status=started`
@@ -226,7 +220,7 @@ async function extractStructuredDataWithGemini({
 
           let timer: NodeJS.Timeout | null = null
           const timeoutPromise = new Promise<{ text?: string }>((_, reject) => {
-            timer = setTimeout(() => reject(new Error(`Gemini generateContent timeout after 45s on ${modelName}`)), 45000)
+            timer = setTimeout(() => reject(new Error(`Gemini generateContent timeout after 20s on ${modelName}`)), 20000)
           })
 
           try {
@@ -422,7 +416,7 @@ async function processSegmentWithAdaptiveBisection({
       errStr.includes('MAX_TOKENS') ||
       errStr.includes('Extraction incomplete')
 
-    if (isTruncationOrIncomplete && segment.pageCount > 1 && depth < 3) {
+    if (isTruncationOrIncomplete && segment.pageCount > 1 && depth < 1) {
       console.warn(
         `[DocumentAI] docId=${documentId} segment pages=${segment.pageStart}..${segment.pageEnd} hit extraction or token limit. Performing adaptive bisection (depth ${depth + 1})...`
       )
@@ -501,9 +495,22 @@ export async function processDocument(
   const activeAttempt = preAcquiredToken ? currentAttempts : currentAttempts + 1
   console.log(`[DocumentAI] docId=${documentId} stage=acquire attempt=${activeAttempt} status=acquired`)
 
+  const SERVERLESS_TIMEOUT_MS = 48_000
+  let timeoutTimer: NodeJS.Timeout | null = null
+  const timeoutPromise = new Promise<boolean>((_, reject) => {
+    timeoutTimer = setTimeout(
+      () =>
+        reject(
+          new Error('Serverless processing timeout (48s reached). Operation halted before container termination.')
+        ),
+      SERVERLESS_TIMEOUT_MS
+    )
+  })
+
   try {
-    console.log(`[DocumentAI] docId=${documentId} stage=download attempt=${activeAttempt} status=started`)
-    const pdfBuffer = await downloadDocumentBuffer(storagePath)
+    const runProcessing = async (): Promise<boolean> => {
+      console.log(`[DocumentAI] docId=${documentId} stage=download attempt=${activeAttempt} status=started`)
+      const pdfBuffer = await downloadDocumentBuffer(storagePath)
     console.log(`[DocumentAI] docId=${documentId} stage=download attempt=${activeAttempt} status=completed`)
 
     let canonicalBuffer = pdfBuffer
@@ -638,12 +645,6 @@ export async function processDocument(
               'gemini-flash-lite-latest',
               'gemini-3.5-flash',
               'gemini-flash-latest',
-              'gemini-3.1-flash-lite',
-              'gemini-3.8-flash',
-              'gemini-3.7-flash',
-              'gemini-3.6-flash',
-              'gemini-3.5-flash-lite',
-              'gemini-3-flash-preview',
               process.env.GEMINI_FALLBACK_MODEL,
             ].filter(Boolean) as string[]
           )
@@ -782,12 +783,15 @@ export async function processDocument(
         .eq('id', documentId)
     } catch {}
 
-    try {
-      await indexDocument(documentId)
-    } catch (idxErr) {
-      console.error(`[DocumentIndex] Indexing failed for doc ${documentId}:`, idxErr)
+      try {
+        await indexDocument(documentId)
+      } catch (idxErr) {
+        console.error(`[DocumentIndex] Indexing failed for doc ${documentId}:`, idxErr)
+      }
+      return true
     }
-    return true
+
+    return await Promise.race([runProcessing(), timeoutPromise])
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : 'Unknown error during AI document processing'
     console.error(`[DocumentAI] docId=${documentId} stage=error attempt=${activeAttempt} status=failed detail:`, errorMsg.slice(0, 300))
@@ -800,5 +804,7 @@ export async function processDocument(
     }
 
     return false
+  } finally {
+    if (timeoutTimer) clearTimeout(timeoutTimer)
   }
 }

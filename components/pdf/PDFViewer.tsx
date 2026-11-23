@@ -132,7 +132,7 @@ export function PDFViewer({
 
     const checkStale = () => {
       const lockTime = new Date(processingLockedAt).getTime()
-      setIsStaleLock(Date.now() - lockTime > 10 * 60 * 1000)
+      setIsStaleLock(Date.now() - lockTime > 2 * 60 * 1000)
     }
 
     checkStale()

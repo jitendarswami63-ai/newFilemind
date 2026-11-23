@@ -45,20 +45,34 @@ export async function POST(request: Request) {
       })
     }
 
-    after(async () => {
-      try {
-        await processUniversalFile(doc.id)
-      } catch (procErr) {
-        console.error('[ProcessQueue] Background document processing error:', procErr)
-      }
-    })
+    // Process directly with a 25-second fast race so images and short documents complete synchronously in 2-3 seconds!
+    try {
+      const fastProcessPromise = processUniversalFile(doc.id)
+      const fastTimeoutPromise = new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 25_000))
 
-    return NextResponse.json({
-      success: true,
-      documentId: doc.id,
-      scheduled: true,
-      status: 'processing',
-    })
+      const raceResult = await Promise.race([fastProcessPromise, fastTimeoutPromise])
+
+      if (raceResult === 'timeout') {
+        return NextResponse.json({
+          success: true,
+          documentId: doc.id,
+          scheduled: true,
+          status: 'processing',
+        })
+      }
+
+      return NextResponse.json({
+        success: raceResult,
+        documentId: doc.id,
+        status: raceResult ? 'completed' : 'failed',
+      })
+    } catch (procErr) {
+      console.error('[ProcessQueue] Processing error:', procErr)
+      return NextResponse.json(
+        { error: 'Processing error', documentId: doc.id },
+        { status: 500 }
+      )
+    }
   }
 
   const { data: claimedDocs, error: claimError } = await supabase.rpc('claim_next_pending_document', {

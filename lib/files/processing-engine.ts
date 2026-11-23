@@ -39,12 +39,6 @@ function getCandidateModels(): string[] {
         'gemini-flash-lite-latest',
         'gemini-3.5-flash',
         'gemini-flash-latest',
-        'gemini-3.1-flash-lite',
-        'gemini-3.8-flash',
-        'gemini-3.7-flash',
-        'gemini-3.6-flash',
-        'gemini-3.5-flash-lite',
-        'gemini-3-flash-preview',
         process.env.GEMINI_FALLBACK_MODEL,
       ].filter(Boolean) as string[]
     )
@@ -742,30 +736,43 @@ export async function processUniversalFile(
 
   const format = detectFileFormat(doc.filename, doc.mime_type)
 
-  // 1. If it's a PDF, delegate to the established PDF intelligence pipeline
-  if (format.extension.toLowerCase() === 'pdf' || format.mimeType === 'application/pdf') {
-    return await processPdfDocument(documentId, preAcquiredToken)
-  }
-
-  // 2. Multi-format processing
-  try {
-    await admin
-      .from('documents')
-      .update({
-        status: 'processing',
-        processing_stage: 'analyzing',
-        processing_locked_at: new Date().toISOString(),
-      })
-      .eq('id', documentId)
-
-    const { buffer } = await storageService.downloadBuffer(
-      doc.storage_path,
-      (doc.storage_provider as StorageProvider) || undefined
+  const SERVERLESS_TIMEOUT_MS = 50_000
+  let timeoutTimer: NodeJS.Timeout | null = null
+  const timeoutPromise = new Promise<boolean>((_, reject) => {
+    timeoutTimer = setTimeout(
+      () => reject(new Error('Serverless execution timeout (50s reached). Operation halted before container kill.')),
+      SERVERLESS_TIMEOUT_MS
     )
+  })
 
-    const processor = processingRegistry.getProcessor(format.category)
-    const result = await processor(documentId, doc, buffer, format)
-    return result.success
+  try {
+    const executeWork = async (): Promise<boolean> => {
+      // 1. If it's a PDF, delegate to the established PDF intelligence pipeline
+      if (format.extension.toLowerCase() === 'pdf' || format.mimeType === 'application/pdf') {
+        return await processPdfDocument(documentId, preAcquiredToken)
+      }
+
+      // 2. Multi-format processing
+      await admin
+        .from('documents')
+        .update({
+          status: 'processing',
+          processing_stage: 'analyzing',
+          processing_locked_at: new Date().toISOString(),
+        })
+        .eq('id', documentId)
+
+      const { buffer } = await storageService.downloadBuffer(
+        doc.storage_path,
+        (doc.storage_provider as StorageProvider) || undefined
+      )
+
+      const processor = processingRegistry.getProcessor(format.category)
+      const result = await processor(documentId, doc, buffer, format)
+      return result.success
+    }
+
+    return await Promise.race([executeWork(), timeoutPromise])
   } catch (procErr: unknown) {
     const errMsg = procErr instanceof Error ? procErr.message : 'Universal document processing failed'
     console.error(`[UniversalProcessing] Error processing ${doc.filename}:`, procErr)
@@ -775,9 +782,13 @@ export async function processUniversalFile(
       .update({
         status: 'failed',
         error_message: errMsg,
+        processing_locked_at: null,
+        processing_token: null,
       })
       .eq('id', documentId)
 
     return false
+  } finally {
+    if (timeoutTimer) clearTimeout(timeoutTimer)
   }
 }

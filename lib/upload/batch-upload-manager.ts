@@ -449,11 +449,25 @@ export class BatchUploadManager {
     if (!documentId) return
 
     try {
-      await fetch('/api/documents/process-queue', {
+      const queueRes = await fetch('/api/documents/process-queue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ documentId }),
-      }).catch(() => {})
+      }).catch(() => null)
+
+      if (queueRes && queueRes.ok) {
+        const queueData = await queueRes.json().catch(() => ({}))
+        if (queueData.status === 'completed') {
+          this.updateItem(id, {
+            status: 'completed',
+            error: null,
+          })
+          return
+        }
+        if (queueData.status === 'failed') {
+          throw new Error('AI document analysis failed')
+        }
+      }
 
       // Poll status for up to 90 seconds (polling /api/documents/:id every 2.5s)
       const maxPollAttempts = 36
@@ -486,7 +500,7 @@ export class BatchUploadManager {
       }
 
       this.updateItem(id, {
-        status: 'completed',
+        status: isDone ? 'completed' : 'processing',
         error: null,
       })
     } catch (err) {

@@ -40,8 +40,8 @@ export async function POST(
   if (doc.status === 'processing') {
     if (doc.processing_locked_at) {
       const lockTime = new Date(doc.processing_locked_at).getTime()
-      const TEN_MINUTES_MS = 10 * 60 * 1000
-      if (Date.now() - lockTime > TEN_MINUTES_MS) {
+      const TWO_MINUTES_MS = 2 * 60 * 1000
+      if (Date.now() - lockTime > TWO_MINUTES_MS) {
         isStaleProcessing = true
       }
     } else {

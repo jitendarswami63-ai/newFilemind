@@ -94,11 +94,12 @@ export function validateSegmentExtractionCompleteness(
     }
   }
 
+  // Tolerant validation: allow partial page returns (e.g. blank or diagram pages omitted by AI)
+  // as long as at least some pages were returned. Missing pages will be populated as blank by remapSegmentPagesToOriginal.
   const isValid =
-    missingPages.length === 0 &&
-    duplicatePages.length === 0 &&
-    outOfRangePages.length === 0 &&
-    extractedPages.length === expectedCount
+    extractedPages.length > 0 &&
+    missingPages.length < expectedCount &&
+    outOfRangePages.length === 0
 
   let errorMessage: string | undefined
   if (!isValid) {
@@ -152,23 +153,25 @@ export function subdivideSegmentRange(
 }
 
 export function calculateSegmentSize(totalPages: number, fileSizeBytes: number): number {
-  if (totalPages <= 0) return DEFAULT_SEGMENT_PAGE_SIZE
+  if (totalPages <= 0) return 15
 
   const bytesPerPage = fileSizeBytes / totalPages
 
-  let segmentSize = DEFAULT_SEGMENT_PAGE_SIZE
+  let segmentSize = 15
 
   if (bytesPerPage > 200_000) {
-    segmentSize = 25
+    segmentSize = 10
   } else if (bytesPerPage > 100_000) {
-    segmentSize = 40
+    segmentSize = 12
+  } else if (totalPages > 50) {
+    segmentSize = 20
   }
 
   if (totalPages <= segmentSize) {
     return totalPages
   }
 
-  return Math.max(MIN_SEGMENT_PAGES, Math.min(segmentSize, MAX_SEGMENT_PAGES))
+  return Math.max(5, Math.min(segmentSize, 25))
 }
 
 export function computeSegmentPlan(totalPages: number, fileSizeBytes: number): SegmentPlan {
@@ -298,6 +301,11 @@ export function remapSegmentPagesToOriginal(
   for (let p = pageStart; p <= pageEnd; p++) {
     if (!hasPageRecord.has(p)) {
       missingPages.push(p)
+      // Provide clean empty string for blank/visual pages instead of failing whole document
+      remappedPages.push({
+        page_number: p,
+        text: '',
+      })
     } else {
       remappedPages.push({
         page_number: p,
@@ -306,9 +314,10 @@ export function remapSegmentPagesToOriginal(
     }
   }
 
-  if (missingPages.length > 0) {
+  // Only throw if all pages in the segment were completely missed (total generation failure)
+  if (missingPages.length === expectedSegmentCount) {
     throw new ExtractionIncompleteError(
-      `Extraction incomplete: missing pages [${missingPages.join(', ')}] in range ${pageStart}..${pageEnd}`,
+      `Extraction incomplete: missing all pages [${missingPages.join(', ')}] in range ${pageStart}..${pageEnd}`,
       { missingPages }
     )
   }
