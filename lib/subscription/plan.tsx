@@ -21,8 +21,14 @@ export interface UserPlanInfo {
   refreshPlan: () => Promise<void>
 }
 
+export interface PlanUserLike {
+  id?: string
+  email?: string | null
+  user_metadata?: Record<string, unknown> | null
+}
+
 export function isUserPro(
-  user?: { user_metadata?: Record<string, any> | null } | null
+  user?: { user_metadata?: Record<string, unknown> | null } | null
 ): boolean {
   if (!user) return false
   const tier = getUserPlanTier(user)
@@ -92,9 +98,10 @@ async function fetchAuthoritativePlan(expectedUserId?: string | null): Promise<{
 }
 
 function useUserPlanInternal(
-  initialUser?: { id?: string; email?: string; user_metadata?: Record<string, any> | null } | null
+  initialUser?: PlanUserLike | null,
+  disabled: boolean = false
 ): UserPlanInfo {
-  const isGuest = !initialUser
+  const isGuest = disabled || !initialUser
   const initialTier: PlanTier = isGuest ? 'free' : getUserPlanTier(initialUser)
   const [tier, setTier] = useState<PlanTier>(() => {
     if (isGuest) return 'free'
@@ -112,25 +119,8 @@ function useUserPlanInternal(
   })
   const [loading, setLoading] = useState<boolean>(!isGuest && !cachedPlanData)
 
-  useEffect(() => {
-    if (!initialUser) {
-      setTier('free')
-      setEntitlements(null)
-      setLoading(false)
-      return
-    }
-    const computedTier = getUserPlanTier(initialUser)
-    if (cachedPlanData && cachedPlanData.userId === initialUser.id) {
-      setTier(cachedPlanData.tier)
-      setEntitlements(cachedPlanData.entitlements)
-    } else {
-      setTier(computedTier)
-      setEntitlements(calculateUserEntitlements(initialUser, 0))
-    }
-  }, [initialUser])
-
   const syncPlan = useCallback(async (force = false) => {
-    if (!initialUser) {
+    if (disabled || !initialUser) {
       setTier('free')
       setEntitlements(null)
       setLoading(false)
@@ -149,36 +139,60 @@ function useUserPlanInternal(
         }
       } else {
         setTier(getUserPlanTier(initialUser))
+        setEntitlements(calculateUserEntitlements(initialUser, 0))
       }
     } finally {
       setLoading(false)
     }
-  }, [initialUser])
+  }, [initialUser, disabled])
 
   useEffect(() => {
+    if (disabled) return
     clearLegacyCookies()
 
     if (!initialUser) {
-      return
+      const resetTimer = setTimeout(() => {
+        setTier('free')
+        setEntitlements(null)
+        setLoading(false)
+      }, 0)
+      return () => clearTimeout(resetTimer)
     }
 
     const now = Date.now()
-    if (!cachedPlanData || cachedPlanData.userId !== initialUser.id || now - cachedPlanData.timestamp >= PLAN_CACHE_TTL_MS) {
-      syncPlan()
+    const needsFetch =
+      !cachedPlanData ||
+      cachedPlanData.userId !== initialUser.id ||
+      now - cachedPlanData.timestamp >= PLAN_CACHE_TTL_MS
+
+    let initTimer: ReturnType<typeof setTimeout> | null = null
+    if (needsFetch) {
+      initTimer = setTimeout(() => {
+        void syncPlan()
+      }, 0)
+    } else if (cachedPlanData) {
+      const cachedSnapshot = cachedPlanData
+      initTimer = setTimeout(() => {
+        setTier(cachedSnapshot.tier)
+        setEntitlements(cachedSnapshot.entitlements)
+        setLoading(false)
+      }, 0)
     }
 
     const handlePlanUpdate = () => {
-      syncPlan(true)
+      void syncPlan(true)
     }
 
     window.addEventListener('filemind_plan_changed', handlePlanUpdate)
 
     return () => {
+      if (initTimer) clearTimeout(initTimer)
       window.removeEventListener('filemind_plan_changed', handlePlanUpdate)
     }
-  }, [syncPlan, initialUser])
+  }, [syncPlan, initialUser, disabled])
 
   useEffect(() => {
+    if (disabled) return undefined
     try {
       const supabase = createClient()
       const { data: { subscription } } = supabase.auth.onAuthStateChange((event: string) => {
@@ -188,7 +202,7 @@ function useUserPlanInternal(
           setEntitlements(null)
         } else if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
           invalidatePlanCache()
-          syncPlan(true)
+          void syncPlan(true)
         }
       })
       return () => {
@@ -197,7 +211,7 @@ function useUserPlanInternal(
     } catch {
       return undefined
     }
-  }, [syncPlan])
+  }, [syncPlan, disabled])
 
   const planConfig = PLAN_CONFIGS[tier] || PLAN_CONFIGS.free
   const isPro = !isGuest && (tier === 'pro' || tier === 'elite')
@@ -222,17 +236,18 @@ export function UserPlanProvider({
   initialUser,
   children,
 }: {
-  initialUser?: { id?: string; email?: string; user_metadata?: Record<string, any> | null } | null
+  initialUser?: PlanUserLike | null
   children: React.ReactNode
 }) {
-  const planInfo = useUserPlanInternal(initialUser)
+  const planInfo = useUserPlanInternal(initialUser, false)
   return <UserPlanContext.Provider value={planInfo}>{children}</UserPlanContext.Provider>
 }
 
 export function useUserPlan(
-  initialUser?: { id?: string; email?: string; user_metadata?: Record<string, any> | null } | null
+  initialUser?: PlanUserLike | null
 ): UserPlanInfo {
   const context = useContext(UserPlanContext)
+  const fallbackPlan = useUserPlanInternal(context ? undefined : initialUser, Boolean(context))
   if (context) {
     if (initialUser === null) {
       return {
@@ -247,5 +262,5 @@ export function useUserPlan(
     }
     return context
   }
-  return useUserPlanInternal(initialUser)
+  return fallbackPlan
 }

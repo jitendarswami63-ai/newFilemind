@@ -7,7 +7,11 @@ import type {
 
 let geminiClient: GoogleGenAI | null = null
 
-export function getGeminiClient(): GoogleGenAI {
+export function getGeminiClient(apiKeyOverride?: string): GoogleGenAI {
+  if (apiKeyOverride && apiKeyOverride.trim()) {
+    return new GoogleGenAI({ apiKey: apiKeyOverride.trim() })
+  }
+
   if (geminiClient) {
     return geminiClient
   }
@@ -22,9 +26,10 @@ export function getGeminiClient(): GoogleGenAI {
 }
 
 const CANDIDATE_GEMINI_MODELS = [
-  'gemini-flash-lite-latest',
-  'gemini-3.5-flash',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
   'gemini-flash-latest',
+  'gemini-3.8-flash',
 ]
 
 export function isQuotaExhaustedError(err: unknown): boolean {
@@ -58,7 +63,7 @@ export function isTransientError(err: unknown): boolean {
 export async function generateWithGemini(
   options: ProviderGenerateOptions
 ): Promise<ProviderGenerateResult> {
-  const client = getGeminiClient()
+  const client = getGeminiClient(options.apiKey)
   const candidateModels = Array.from(
     new Set(
       [
@@ -75,8 +80,9 @@ export async function generateWithGemini(
   for (const modelName of candidateModels) {
     for (let attempt = 0; attempt < 3; attempt++) {
       const startTime = Date.now()
+      let timeoutHandle: NodeJS.Timeout | null = null
       try {
-        const response = await client.models.generateContent({
+        const genPromise = client.models.generateContent({
           model: modelName,
           contents: [{ text: options.prompt }],
           config: {
@@ -86,6 +92,11 @@ export async function generateWithGemini(
           },
         })
 
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timeoutHandle = setTimeout(() => reject(new Error(`Gemini generation timeout (12s) on ${modelName}`)), 12_000)
+        })
+
+        const response = await Promise.race([genPromise, timeoutPromise])
         const latencyMs = Date.now() - startTime
 
         if (response && response.text) {
@@ -116,6 +127,8 @@ export async function generateWithGemini(
         } else {
           break
         }
+      } finally {
+        if (timeoutHandle) clearTimeout(timeoutHandle)
       }
     }
   }

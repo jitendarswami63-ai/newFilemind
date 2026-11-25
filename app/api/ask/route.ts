@@ -4,6 +4,7 @@ import { askAiQuestion, sanitizeAskAiError } from '@/lib/ai/ask-ai'
 import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
 import { hasActiveBiometricLease } from '@/lib/auth/webauthn'
 import { getServerUserEntitlements, incrementUserAiUsage } from '@/lib/subscription/plan-server'
+import { isSameOrigin } from '@/lib/validation/origin'
 import { z } from 'zod'
 
 export const dynamic = 'force-dynamic'
@@ -37,6 +38,10 @@ function generateSensibleTitle(question: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: 'Invalid origin' }, { status: 403 })
+  }
+
   try {
     const supabase = await createClient()
 
@@ -128,24 +133,6 @@ export async function POST(request: NextRequest) {
         })
       }
 
-      if (doc.embedding_status === 'failed') {
-        return NextResponse.json({
-          answer: `The search index for "${doc.filename}" is not available (indexing failed). Please retry indexing from the document view.`,
-          sources: [],
-          verifiedCitations: [],
-          status: 'indexing_failed',
-        })
-      }
-
-      if (doc.embedding_status !== 'completed') {
-        return NextResponse.json({
-          answer: `The search index for "${doc.filename}" is pending. Please open the document page to generate the AI search index.`,
-          sources: [],
-          verifiedCitations: [],
-          status: 'indexing_pending',
-        })
-      }
-
       if (doc.status !== 'completed') {
         return NextResponse.json({
           answer: `The document "${doc.filename}" is not yet ready for questions (status: ${doc.status}).`,
@@ -153,6 +140,31 @@ export async function POST(request: NextRequest) {
           verifiedCitations: [],
           status: 'not_ready',
         })
+      }
+
+      if (doc.embedding_status !== 'completed') {
+        const { count: extractedPagesCount } = await supabase
+          .from('document_pages')
+          .select('id', { count: 'exact', head: true })
+          .eq('document_id', documentId)
+
+        if (!extractedPagesCount || extractedPagesCount === 0) {
+          if (doc.embedding_status === 'failed') {
+            return NextResponse.json({
+              answer: `The search index for "${doc.filename}" is not available (indexing failed). Please retry indexing from the document view.`,
+              sources: [],
+              verifiedCitations: [],
+              status: 'indexing_failed',
+            })
+          }
+
+          return NextResponse.json({
+            answer: `The search index for "${doc.filename}" is pending. Please open the document page to generate the AI search index.`,
+            sources: [],
+            verifiedCitations: [],
+            status: 'indexing_pending',
+          })
+        }
       }
     }
 
@@ -328,12 +340,18 @@ export async function POST(request: NextRequest) {
       } catch {}
     }
 
+    const byokApiKey =
+      typeof user.user_metadata?.byok_gemini_key === 'string' && user.user_metadata.byok_gemini_key.trim()
+        ? user.user_metadata.byok_gemini_key.trim()
+        : undefined
+
     const result = await askAiQuestion(supabase, {
       question,
       documentId,
       history: historyToUse,
       provider,
       model,
+      apiKey: byokApiKey,
     })
 
     await incrementUserAiUsage(user.id)

@@ -108,7 +108,7 @@ export interface AdminUserDetail {
   additionalStorageFormatted?: string
   documentsCount: number
   aiUsageCount: number
-  manualGrant: Record<string, any> | null
+  manualGrant: Record<string, unknown> | null
   billingHistory?: Array<{
     id?: string
     date?: string
@@ -121,7 +121,7 @@ export interface AdminUserDetail {
     orderId?: string
     paymentId?: string
     status?: string
-    [key: string]: any
+    [key: string]: unknown
   }>
   purchasedStoragePacks?: Array<{
     packId?: string
@@ -131,9 +131,9 @@ export interface AdminUserDetail {
     orderId?: string
     paymentId?: string
     purchasedAt?: string
-    [key: string]: any
+    [key: string]: unknown
   }>
-  metadata: Record<string, any>
+  metadata: Record<string, unknown>
   documents: Array<{
     id: string
     title: string | null
@@ -184,7 +184,7 @@ export interface AuditLogItem {
   action_type: string
   target_id: string | null
   target_email: string | null
-  details: Record<string, any>
+  details: Record<string, unknown>
   reason: string | null
   created_at: string
 }

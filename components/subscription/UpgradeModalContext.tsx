@@ -25,7 +25,7 @@ export function UpgradeModalProvider({
   user,
 }: {
   children: React.ReactNode
-  user?: { email?: string; user_metadata?: Record<string, any> } | null
+  user?: { email?: string; user_metadata?: Record<string, unknown> } | null
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [targetTier, setTargetTier] = useState<'pro' | 'elite'>('pro')
@@ -51,7 +51,7 @@ export function UpgradeModalProvider({
           targetTier={targetTier}
           featureName={featureName}
           userEmail={user?.email}
-          userName={user?.user_metadata?.full_name}
+          userName={typeof user?.user_metadata?.full_name === 'string' ? user.user_metadata.full_name : undefined}
           onUpgradeSuccess={() => {
             window.dispatchEvent(new Event('filemind_plan_changed'))
           }}

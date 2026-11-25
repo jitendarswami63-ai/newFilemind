@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { verifyAdminApi } from '@/lib/admin/auth'
+import { isSameOrigin } from '@/lib/validation/origin'
 import {
   getCMSSection,
   saveCMSDraft,
@@ -17,15 +18,19 @@ export async function GET() {
   try {
     const data = await getCMSSection('global')
     return NextResponse.json(data)
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error?.message || 'Failed to fetch CMS content' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch CMS content' },
       { status: 500 }
     )
   }
 }
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ error: 'Invalid origin' }, { status: 403 })
+  }
+
   const auth = await verifyAdminApi()
   if (auth instanceof NextResponse) return auth
 
@@ -69,9 +74,9 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ error: 'Invalid CMS action' }, { status: 400 })
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error?.message || 'Failed to execute CMS action' },
+      { error: error instanceof Error ? error.message : 'Failed to execute CMS action' },
       { status: 500 }
     )
   }

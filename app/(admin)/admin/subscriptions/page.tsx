@@ -56,7 +56,7 @@ export default function AdminSubscriptionsPage() {
   const [payments, setPayments] = useState<AdminPaymentTransaction[]>([])
   const [loadingPayments, setLoadingPayments] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedInvoice, setSelectedInvoice] = useState<any | null>(null)
+  const [selectedInvoice, setSelectedInvoice] = useState<AdminPaymentTransaction | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
   const [targetEmail, setTargetEmail] = useState(prefillEmail)
@@ -65,11 +65,6 @@ export default function AdminSubscriptionsPage() {
   const [reason, setReason] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
-
-  useEffect(() => {
-    fetchGrants()
-    fetchPayments()
-  }, [])
 
   const fetchGrants = async () => {
     setIsLoading(true)
@@ -99,6 +94,14 @@ export default function AdminSubscriptionsPage() {
       setLoadingPayments(false)
     }
   }
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void fetchGrants()
+      void fetchPayments()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [])
 
   const handleCopy = (text: string, field: string) => {
     if (!text) return
@@ -308,7 +311,7 @@ export default function AdminSubscriptionsPage() {
                   <label className="font-semibold text-[#777064]">Subscription Tier</label>
                   <select
                     value={tier}
-                    onChange={(e) => setTier(e.target.value as any)}
+                    onChange={(e) => setTier(e.target.value as 'pro' | 'elite')}
                     className="w-full text-xs px-3.5 py-2.5 rounded-xl border border-[#D8D0C2] bg-white text-[#292720] focus:ring-2 focus:ring-[#9C7D47] focus:outline-none"
                   >
                     <option value="pro">Pro Intelligence (₹249)</option>

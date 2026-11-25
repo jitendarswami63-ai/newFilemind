@@ -6,8 +6,8 @@ import { StatusBadge, DocumentStatus } from '@/components/documents/StatusBadge'
 import { WorkspaceSearchBar } from '@/components/dashboard/WorkspaceSearchBar'
 import { formatDate, formatFileSize } from '@/lib/utils'
 import { ProBadge } from '@/components/ui/ProBadge'
-import { isServerUserPro, getServerUserTier } from '@/lib/subscription/plan-server'
-import { PLAN_CONFIGS } from '@/lib/subscription/plans'
+import { getServerUserEntitlements } from '@/lib/subscription/plan-server'
+import { formatBytes } from '@/lib/subscription/plans'
 import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
@@ -40,10 +40,13 @@ export default async function DashboardPage() {
   }).format(new Date())
 
   const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'
-  const tier = await getServerUserTier(user)
-  const isPro = tier === 'pro' || tier === 'elite'
-  const isElite = tier === 'elite'
-  const currentPlan = PLAN_CONFIGS[tier] || PLAN_CONFIGS.free
+  const entitlements = user
+    ? await getServerUserEntitlements(user.id, user.user_metadata, false)
+    : null
+  const isPro = entitlements?.isPro ?? false
+  const isElite = entitlements?.isElite ?? false
+  const currentPlan = entitlements?.plan || { name: 'Free Tier', maxFileSizeMB: 5, includedStorageBytes: 100 * 1024 * 1024 }
+  const totalQuotaFormatted = entitlements ? formatBytes(entitlements.totalStorageBytes) : '100 MB'
 
   return (
     <div className="space-y-8 w-full max-w-6xl mx-auto">
@@ -78,12 +81,17 @@ export default async function DashboardPage() {
           <span>{displayName}</span>
           <span>•</span>
           <span>{formattedDate}</span>
-          {isPro && (
+          {isElite ? (
+            <>
+              <span>•</span>
+              <span className="font-bold text-[#AA771C]">Elite Member</span>
+            </>
+          ) : isPro ? (
             <>
               <span>•</span>
               <span className="font-bold text-[#AA771C]">Pro Member</span>
             </>
-          )}
+          ) : null}
         </div>
       </div>
 
@@ -120,7 +128,7 @@ export default async function DashboardPage() {
             {formatFileSize(totalStorageBytes)}
           </div>
           <p className="text-[11px] text-[#777064]">
-            {currentPlan.maxFileSizeMB} MB per-file • {currentPlan.name}
+            {currentPlan.maxFileSizeMB} MB per-file • {totalQuotaFormatted} quota • {currentPlan.name}
           </p>
         </div>
 
@@ -151,7 +159,7 @@ export default async function DashboardPage() {
               <span>Upload documents</span>
             </h2>
             <span className="text-[11px] font-semibold text-[#9C7D47] bg-[#FAF5EC] px-2.5 py-0.5 rounded-full border border-[#E5DED1]">
-              PDF only
+              Universal Vault
             </span>
           </div>
           <UploadZone compact />
@@ -188,7 +196,7 @@ export default async function DashboardPage() {
               </div>
               <p className="text-sm font-bold text-[#292720]">No documents in your vault yet</p>
               <p className="text-xs text-[#777064] mt-1 max-w-xs">
-                Upload your first PDF document using the dropzone to start searching and asking questions.
+                Upload your first document, PDF, image, or office file using the dropzone to start searching and asking questions.
               </p>
             </div>
           ) : (

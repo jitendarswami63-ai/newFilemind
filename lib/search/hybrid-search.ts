@@ -54,10 +54,12 @@ export async function executeHybridSearch(
   }
 
   let queryEmbedding: number[] | null = null
-  try {
-    queryEmbedding = await embedSearchQuery(cleanQuery)
-  } catch (err) {
-    console.warn(`[Search] Semantic query embedding failed, falling back to lexical-only:`, err)
+  if (options.enableSemantic !== false) {
+    try {
+      queryEmbedding = await embedSearchQuery(cleanQuery, options.apiKey)
+    } catch (err) {
+      console.warn(`[Search] Semantic query embedding failed, falling back to lexical-only:`, err)
+    }
   }
 
   let semanticCandidates: SemanticCandidate[] = []
@@ -179,6 +181,80 @@ export async function executeHybridSearch(
       })
       if (Array.isArray(retryLexData) && retryLexData.length > 0) {
         lexicalCandidates = retryLexData
+      }
+    }
+
+    if (lexicalCandidates.length === 0) {
+      try {
+        const stopWords = new Set([
+          'what', 'when', 'where', 'which', 'whose', 'this', 'that', 'these', 'those',
+          'with', 'from', 'about', 'into', 'your', 'book', 'document', 'documents',
+          'page', 'pages', 'tell', 'explain', 'summarize', 'find', 'show', 'list', 'give',
+        ])
+        const sourceText = strippedQuery && strippedQuery.length >= 3 ? strippedQuery : cleanQuery
+        const keywords = Array.from(
+          new Set(
+            sourceText
+              .toLowerCase()
+              .replace(/[^\p{L}\p{N}\s-]/gu, ' ')
+              .split(/\s+/)
+              .map((w) => w.trim())
+              .filter((w) => w.length >= 3 && !stopWords.has(w))
+          )
+        ).slice(0, 4)
+
+        if (keywords.length > 0) {
+          const orFilter = keywords
+            .map((k) => `extracted_text.ilike.%${k.replace(/[%_,()]/g, '')}%`)
+            .filter(Boolean)
+            .join(',')
+
+          if (orFilter) {
+            let pageQuery = supabase
+              .from('document_pages')
+              .select('document_id, page_number, extracted_text, documents!inner(filename, doc_category, status)')
+              .eq('documents.status', 'completed')
+              .or(orFilter)
+              .limit(options.limit || 12)
+
+            if (filterDocId) {
+              pageQuery = pageQuery.eq('document_id', filterDocId)
+            }
+
+            const { data: matchedPages } = await pageQuery
+            if (Array.isArray(matchedPages) && matchedPages.length > 0) {
+              const lowerClean = cleanQuery.toLowerCase()
+              lexicalCandidates = matchedPages
+                .map((row, idx) => {
+                  const rawDoc = row.documents as
+                    | { filename?: string; doc_category?: string }
+                    | Array<{ filename?: string; doc_category?: string }>
+                    | null
+                  const docMeta = Array.isArray(rawDoc) ? rawDoc[0] : rawDoc
+                  const text = row.extracted_text || ''
+                  const lowerText = text.toLowerCase()
+                  const hitCount = keywords.filter((k) => lowerText.includes(k)).length
+                  const exactPhrase = lowerText.includes(lowerClean)
+                  return {
+                    chunk_id: `page_${row.document_id}_${row.page_number}`,
+                    document_id: row.document_id,
+                    filename: docMeta?.filename || 'Document',
+                    doc_category: docMeta?.doc_category,
+                    page_start: row.page_number,
+                    page_end: row.page_number,
+                    chunk_index: idx,
+                    content: text,
+                    rank_score: exactPhrase ? 0.9 : 0.1 + hitCount * 0.15,
+                    is_exact_match: exactPhrase || hitCount === keywords.length,
+                  }
+                })
+                .filter((c) => c.content.trim().length > 0)
+                .sort((a, b) => (b.rank_score ?? 0) - (a.rank_score ?? 0))
+            }
+          }
+        }
+      } catch (pageSearchErr) {
+        console.warn('[Search] document_pages lexical fallback failed:', pageSearchErr)
       }
     }
 

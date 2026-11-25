@@ -21,7 +21,7 @@ interface AuditLogItem {
   action_type: string
   target_id: string | null
   target_email: string | null
-  details: Record<string, any>
+  details: Record<string, unknown>
   reason: string | null
   created_at: string
 }
@@ -34,10 +34,6 @@ export default function AdminAuditLogsPage() {
   const [search, setSearch] = useState('')
   const [actionType, setActionType] = useState<string>('')
   const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    fetchLogs()
-  }, [page, actionType])
 
   const fetchLogs = async () => {
     setIsLoading(true)
@@ -61,6 +57,13 @@ export default function AdminAuditLogsPage() {
       setIsLoading(false)
     }
   }
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void fetchLogs()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [page, actionType])
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()

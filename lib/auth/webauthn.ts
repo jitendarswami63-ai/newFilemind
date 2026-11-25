@@ -81,21 +81,89 @@ export function getServiceRoleClient(): SupabaseClient {
   )
 }
 
-const challengeCache = new Map<string, { challenge: string; expiresAt: number; userId: string; documentId?: string }>()
+const EPHEMERAL_FALLBACK_SECRET = crypto.randomBytes(32).toString('hex')
+const consumedChallengeJtis = new Map<string, number>()
+
+function getChallengeHmacSecret(): string {
+  return (
+    process.env.WEBAUTHN_CHALLENGE_SECRET ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.CRON_SECRET ||
+    EPHEMERAL_FALLBACK_SECRET
+  )
+}
+
+function pruneConsumedJtis(now: number): void {
+  if (consumedChallengeJtis.size < 2000) return
+  for (const [jti, exp] of consumedChallengeJtis.entries()) {
+    if (now > exp) {
+      consumedChallengeJtis.delete(jti)
+    }
+  }
+}
 
 export function storeChallenge(userId: string, challenge: string, documentId?: string): string {
-  const token = crypto.randomUUID()
+  const jti = crypto.randomUUID()
   const expiresAt = Date.now() + 60 * 1000
-  challengeCache.set(token, { challenge, expiresAt, userId, documentId })
-  return token
+  const payload = Buffer.from(
+    JSON.stringify({ jti, userId, challenge, documentId, expiresAt }),
+    'utf8'
+  ).toString('base64url')
+  const sig = crypto
+    .createHmac('sha256', getChallengeHmacSecret())
+    .update(payload)
+    .digest('base64url')
+  return `${payload}.${sig}`
 }
 
 export function consumeChallenge(token: string): { challenge: string; userId: string; documentId?: string } | null {
-  const item = challengeCache.get(token)
-  if (!item) return null
-  challengeCache.delete(token)
-  if (Date.now() > item.expiresAt) return null
-  return { challenge: item.challenge, userId: item.userId, documentId: item.documentId }
+  if (!token || typeof token !== 'string') return null
+  const dotIdx = token.indexOf('.')
+  if (dotIdx <= 0) return null
+
+  const payload = token.slice(0, dotIdx)
+  const providedSig = token.slice(dotIdx + 1)
+  if (!payload || !providedSig) return null
+
+  const expectedSig = crypto
+    .createHmac('sha256', getChallengeHmacSecret())
+    .update(payload)
+    .digest('base64url')
+
+  const expectedBuf = Buffer.from(expectedSig, 'utf8')
+  const providedBuf = Buffer.from(providedSig, 'utf8')
+  if (expectedBuf.length !== providedBuf.length || !crypto.timingSafeEqual(expectedBuf, providedBuf)) {
+    return null
+  }
+
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
+      jti?: string
+      challenge?: string
+      userId?: string
+      documentId?: string
+      expiresAt?: number
+    }
+
+    const now = Date.now()
+    if (!parsed.jti || !parsed.challenge || !parsed.userId || !parsed.expiresAt || now > parsed.expiresAt) {
+      return null
+    }
+
+    pruneConsumedJtis(now)
+    if (consumedChallengeJtis.has(parsed.jti)) {
+      return null
+    }
+    consumedChallengeJtis.set(parsed.jti, parsed.expiresAt)
+
+    return {
+      challenge: parsed.challenge,
+      userId: parsed.userId,
+      documentId: parsed.documentId,
+    }
+  } catch {
+    return null
+  }
 }
 
 export async function createBiometricLease(

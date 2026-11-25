@@ -126,14 +126,15 @@ export function DocumentList() {
 
   useEffect(() => {
     let ignore = false
-    setLoading(true)
-
-    fetchDocuments(false).then(() => {
+    const timer = setTimeout(() => {
       if (ignore) return
-    })
+      setLoading(true)
+      void fetchDocuments(false)
+    }, 0)
 
     return () => {
       ignore = true
+      clearTimeout(timer)
     }
   }, [fetchDocuments])
 
@@ -160,12 +161,18 @@ export function DocumentList() {
   }, [fetchDocuments])
 
   const hasActiveJobs = documents.some(
-    (d) => d.status === 'pending' || d.status === 'processing'
+    (d) =>
+      d.status === 'pending' ||
+      d.status === 'processing' ||
+      (d.status === 'completed' && (d.embedding_status === 'pending' || d.embedding_status === 'processing'))
   )
   const hasActiveJobsRef = useRef(hasActiveJobs)
+  const docsRef = useRef(documents)
+  const lastEmbeddingResumeRef = useRef<Record<string, number>>({})
   useEffect(() => {
     hasActiveJobsRef.current = hasActiveJobs
-  }, [hasActiveJobs])
+    docsRef.current = documents
+  }, [hasActiveJobs, documents])
 
   useEffect(() => {
     if (!hasActiveJobs) return
@@ -173,6 +180,23 @@ export function DocumentList() {
     const timer = setInterval(() => {
       if (hasActiveJobsRef.current) {
         fetchRef.current(true)
+
+        const nowMs = Date.now()
+        for (const d of docsRef.current) {
+          if (
+            d.status === 'completed' &&
+            d.embedding_status === 'processing' &&
+            !d.embedding_locked_at &&
+            d.updated_at
+          ) {
+            const elapsed = nowMs - new Date(d.updated_at).getTime()
+            const lastTriggered = lastEmbeddingResumeRef.current[d.id] || 0
+            if (elapsed >= 65_000 && nowMs - lastTriggered >= 65_000) {
+              lastEmbeddingResumeRef.current[d.id] = nowMs
+              fetch(`/api/documents/${d.id}/reindex?resume=true`, { method: 'POST' }).catch(() => {})
+            }
+          }
+        }
       }
     }, 3000)
 

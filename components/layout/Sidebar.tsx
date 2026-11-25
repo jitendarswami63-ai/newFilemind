@@ -13,7 +13,7 @@ import { useUserPlan, clearLegacyCookies, invalidatePlanCache } from '@/lib/subs
 import { useUpgradeModal } from '@/components/subscription/UpgradeModalContext'
 import { checkIsAdminClient } from '@/lib/admin/admin-client'
 
-export function Sidebar({ user }: { user: { email?: string; user_metadata?: Record<string, any> } | null }) {
+export function Sidebar({ user }: { user: { email?: string; user_metadata?: Record<string, unknown> } | null }) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -43,7 +43,7 @@ export function Sidebar({ user }: { user: { email?: string; user_metadata?: Reco
     router.refresh()
   }
 
-  const displayName = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User'
+  const displayName = String(user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User')
   const displayInitial = (displayName.charAt(0) || 'U').toUpperCase()
 
   return (

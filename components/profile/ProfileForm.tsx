@@ -79,7 +79,7 @@ export function ProfileForm({ initialProfile, initialCompletion }: ProfileFormPr
     },
   ]
 
-  const handleChange = (field: keyof UserProfileData, value: any) => {
+  const handleChange = (field: keyof UserProfileData, value: string | boolean) => {
     const updated = { ...profile, [field]: value }
     setProfile(updated)
     const newComp = calculateProfileCompletion(updated)
@@ -110,8 +110,8 @@ export function ProfileForm({ initialProfile, initialCompletion }: ProfileFormPr
       if (advanceNext && activeStep < 4) {
         setActiveStep(activeStep + 1)
       }
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Error saving changes')
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Error saving changes')
     } finally {
       setSaving(false)
       setTimeout(() => setSaveSuccess(null), 4000)

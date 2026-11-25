@@ -7,7 +7,8 @@ import sitemapHandler from '../app/sitemap.ts'
 async function run() {
   console.log('Testing FileMind SEO and Google Indexing Suite...')
 
-  const robots = robotsHandler()
+  const robotsFn = typeof robotsHandler === 'function' ? robotsHandler : robotsHandler.default
+  const robots = robotsFn()
   assert.strictEqual(robots.sitemap, 'https://www.filemindhub.xyz/sitemap.xml', 'robots.txt must declare sitemap URL')
   assert.strictEqual(robots.host, 'https://www.filemindhub.xyz', 'robots.txt must declare canonical host')
   assert.ok(Array.isArray(robots.rules), 'robots.txt rules must be an array')
@@ -21,7 +22,8 @@ async function run() {
   assert.ok(rule.disallow.includes('/auth/'), 'robots.txt must disallow /auth/')
   console.log('PASS: Technical SEO - robots.txt rules and directives verified')
 
-  const sitemap = sitemapHandler()
+  const sitemapFn = typeof sitemapHandler === 'function' ? sitemapHandler : sitemapHandler.default
+  const sitemap = sitemapFn()
   assert.ok(Array.isArray(sitemap), 'Sitemap must return an array of entries')
   assert.ok(sitemap.length >= 3, 'Sitemap must contain public canonical routes')
   const urls = sitemap.map(entry => entry.url)

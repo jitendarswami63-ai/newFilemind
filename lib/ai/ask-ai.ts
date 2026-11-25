@@ -126,6 +126,7 @@ export async function askAiQuestion(
   const results: SearchResultItem[] = await executeHybridPassageSearch(supabase, retrievalQuery, {
     limit: MAX_EVIDENCE_ITEMS,
     documentId: options.documentId,
+    apiKey: options.apiKey,
   })
 
   if (results.length === 0) {
@@ -177,6 +178,7 @@ Please provide a factual, well-structured answer with inline document citations 
     maxTokens: MAX_OUTPUT_TOKENS,
     preferredProvider: options.provider,
     model: options.model,
+    apiKey: options.apiKey,
   })
 
   const generatedText = generationResult.text

@@ -7,7 +7,7 @@ export interface AdminAuditEntry {
   actionType: string
   targetId?: string | null
   targetEmail?: string | null
-  details?: Record<string, any>
+  details?: Record<string, unknown>
   reason?: string | null
 }
 

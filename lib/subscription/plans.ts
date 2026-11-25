@@ -178,19 +178,20 @@ export function formatBytes(bytes: number): string {
 }
 
 export function getUserPlanTier(
-  user?: { user_metadata?: Record<string, any> | null } | null
+  user?: { user_metadata?: Record<string, unknown> | null } | null
 ): PlanTier {
   if (!user) return 'free'
-  const meta = user.user_metadata || {}
+  const meta = (user.user_metadata || {}) as Record<string, unknown>
+  const manualGrant = meta.manual_grant as { expires_at?: string } | undefined
 
-  if (meta.manual_grant?.expires_at) {
-    const expires = new Date(meta.manual_grant.expires_at).getTime()
+  if (manualGrant?.expires_at) {
+    const expires = new Date(manualGrant.expires_at).getTime()
     if (!Number.isNaN(expires) && expires < Date.now()) {
       return 'free'
     }
   }
 
-  const rawTier = (meta.tier || meta.plan_tier || meta.plan || meta.subscription || '').toLowerCase()
+  const rawTier = String(meta.tier || meta.plan_tier || meta.plan || meta.subscription || '').toLowerCase()
   if (rawTier === 'elite') return 'elite'
   if (rawTier === 'pro' || meta.is_pro === true) return 'pro'
   return 'free'
@@ -227,12 +228,13 @@ export interface UserEntitlements {
 }
 
 export function calculateUserEntitlements(
-  user?: { user_metadata?: Record<string, any> | null } | null,
-  usedStorageBytes: number = 0
+  user?: { user_metadata?: Record<string, unknown> | null } | null,
+  usedStorageBytes: number = 0,
+  planConfigs: Record<PlanTier, PlanConfig> = PLAN_CONFIGS
 ): UserEntitlements {
   const tier = getUserPlanTier(user)
-  const plan = PLAN_CONFIGS[tier]
-  const meta = user?.user_metadata || {}
+  const plan = planConfigs[tier] || PLAN_CONFIGS[tier]
+  const meta = (user?.user_metadata || {}) as Record<string, unknown>
 
   const additionalStorageBytes = Number(meta.additional_storage_bytes) || 0
   const totalStorageBytes = plan.includedStorageBytes + additionalStorageBytes
@@ -245,7 +247,7 @@ export function calculateUserEntitlements(
   const effectiveAiEnabled = plan.hasAiFeatures || hasByok
 
   const currentMonthKey = new Date().toISOString().slice(0, 7)
-  const aiUsageMeta = meta.ai_usage || {}
+  const aiUsageMeta = (meta.ai_usage as { month?: string; count?: number } | undefined) || {}
   const usedAiCount = aiUsageMeta.month === currentMonthKey ? Number(aiUsageMeta.count) || 0 : 0
   const monthlyAiAllowance = plan.monthlyAiAllowance
   const remainingAiCount = hasByok ? 999999 : Math.max(0, monthlyAiAllowance - usedAiCount)
@@ -277,8 +279,8 @@ export function calculateUserEntitlements(
     maxBatchFiles: plan.maxBatchFiles,
     maxFileSizeBytes: plan.maxFileSizeBytes,
     maxFileSizeMB: plan.maxFileSizeMB,
-    renewalDate: meta.plan_renewal_date || null,
-    activatedAt: meta.plan_activated_at || null,
+    renewalDate: typeof meta.plan_renewal_date === 'string' ? meta.plan_renewal_date : null,
+    activatedAt: typeof meta.plan_activated_at === 'string' ? meta.plan_activated_at : null,
   }
 }
 

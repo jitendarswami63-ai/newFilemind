@@ -49,7 +49,9 @@ export async function POST(
     return NextResponse.json({ error: 'Only the document owner can unlock this document' }, { status: 403 })
   }
 
-  // Verification step
+  // Verification step — require explicit TOTP or password verification before granting recovery lease
+  let verified = false
+
   if (auth.mfaEnrolled && totpCode && auth.factorId) {
     const { data: challengeData, error: challengeErr } = await supabase.auth.mfa.challenge({ factorId: auth.factorId })
     if (challengeErr) {
@@ -63,6 +65,7 @@ export async function POST(
     if (verifyErr) {
       return NextResponse.json({ error: 'Invalid 6-digit TOTP code' }, { status: 400 })
     }
+    verified = true
   } else if (password) {
     const { error: pwdErr } = await supabase.auth.signInWithPassword({
       email: user.email!,
@@ -71,9 +74,12 @@ export async function POST(
     if (pwdErr) {
       return NextResponse.json({ error: 'Incorrect account password' }, { status: 400 })
     }
-  } else if (auth.currentLevel !== 'aal2' && auth.mfaEnrolled) {
+    verified = true
+  }
+
+  if (!verified) {
     return NextResponse.json(
-      { error: 'Security verification required: please enter your 6-digit TOTP code or account password' },
+      { error: 'Security verification required: please enter your account password or 6-digit TOTP code' },
       { status: 400 }
     )
   }

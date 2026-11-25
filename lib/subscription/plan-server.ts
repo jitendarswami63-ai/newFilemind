@@ -4,11 +4,11 @@ import {
   PlanTier,
   PLAN_CONFIGS,
   STORAGE_PACKS,
-  StoragePack,
   getUserPlanTier,
   calculateUserEntitlements,
   UserEntitlements,
 } from './plans'
+import { getLivePlanConfigs } from './dynamic-plans'
 
 function getAdminClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -27,7 +27,7 @@ function getAdminClient() {
 }
 
 export async function isServerUserPro(
-  user?: { id?: string; user_metadata?: Record<string, any> | null } | null
+  user?: { id?: string; user_metadata?: Record<string, unknown> | null } | null
 ): Promise<boolean> {
   if (!user) return false
   const tier = await getServerUserTier(user)
@@ -35,7 +35,7 @@ export async function isServerUserPro(
 }
 
 export async function getServerUserTier(
-  user?: { id?: string; user_metadata?: Record<string, any> | null } | null
+  user?: { id?: string; user_metadata?: Record<string, unknown> | null } | null
 ): Promise<PlanTier> {
   if (!user) return 'free'
   const metaTier = getUserPlanTier(user)
@@ -82,11 +82,11 @@ export async function getServerUserTier(
 
 export async function getServerUserEntitlements(
   userId: string,
-  userMetadata?: Record<string, any> | null,
+  userMetadata?: Record<string, unknown> | null,
   includeStorage: boolean = true
 ): Promise<UserEntitlements> {
   let totalUsedBytes = 0
-  let effectiveMetadata: Record<string, any> = userMetadata ? { ...userMetadata } : {}
+  let effectiveMetadata: Record<string, unknown> = userMetadata ? { ...userMetadata } : {}
 
   try {
     const admin = getAdminClient()
@@ -138,28 +138,38 @@ export async function getServerUserEntitlements(
     console.error('[getServerUserEntitlements] Error computing used storage:', err)
   }
 
-  return calculateUserEntitlements({ user_metadata: effectiveMetadata }, totalUsedBytes)
+  const liveConfigs = await getLivePlanConfigs().catch(() => null)
+  return calculateUserEntitlements(
+    { user_metadata: effectiveMetadata },
+    totalUsedBytes,
+    liveConfigs?.plans || PLAN_CONFIGS
+  )
 }
 
 export async function promoteUserPlan(
   userId: string,
   tier: 'pro' | 'elite',
-  metadataExtra: Record<string, any> = {}
+  metadataExtra: Record<string, unknown> = {}
 ): Promise<boolean> {
   try {
     const admin = getAdminClient()
-    const { data: userData, error: getUserError } = await admin.auth.admin.getUserById(userId)
+    const [{ data: userData, error: getUserError }, liveConfigs] = await Promise.all([
+      admin.auth.admin.getUserById(userId),
+      getLivePlanConfigs().catch(() => null),
+    ])
     if (getUserError || !userData?.user) {
       console.error('[promoteUserPlan] User lookup failed:', getUserError)
       return false
     }
 
-    const currentMeta = userData.user.user_metadata || {}
+    const activePlans = liveConfigs?.plans || PLAN_CONFIGS
+    const activePlan = activePlans[tier] || PLAN_CONFIGS[tier]
+    const currentMeta = (userData.user.user_metadata || {}) as Record<string, unknown>
     const now = new Date()
     const renewalDate = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
 
     const billingHistory = Array.isArray(currentMeta.billing_history)
-      ? [...currentMeta.billing_history]
+      ? [...(currentMeta.billing_history as Array<Record<string, unknown>>)]
       : []
 
     if (metadataExtra.razorpay_payment_id) {
@@ -171,8 +181,8 @@ export async function promoteUserPlan(
           id: `tx_${Date.now()}`,
           type: 'subscription',
           planTier: tier,
-          planName: PLAN_CONFIGS[tier].name,
-          amountINR: metadataExtra.amount_paid_inr || PLAN_CONFIGS[tier].priceINR,
+          planName: activePlan.name,
+          amountINR: metadataExtra.amount_paid_inr || activePlan.priceINR,
           date: now.toISOString(),
           orderId: metadataExtra.razorpay_order_id,
           paymentId: metadataExtra.razorpay_payment_id,
@@ -190,7 +200,7 @@ export async function promoteUserPlan(
       plan_tier: tier,
       plan: tier,
       is_pro: true,
-      plan_name: PLAN_CONFIGS[tier].name,
+      plan_name: activePlan.name,
       plan_activated_at: now.toISOString(),
       plan_renewal_date: renewalDate,
       billing_history: billingHistory.slice(0, 50),
@@ -213,7 +223,7 @@ export async function promoteUserPlan(
   }
 }
 
-export async function promoteUserToPro(userId: string, metadataExtra: Record<string, any> = {}) {
+export async function promoteUserToPro(userId: string, metadataExtra: Record<string, unknown> = {}) {
   return promoteUserPlan(userId, 'pro', metadataExtra)
 }
 
@@ -258,9 +268,11 @@ export async function downgradeUserToFree(userId: string): Promise<boolean> {
 export async function addStoragePackToUser(
   userId: string,
   packId: 'pack_1gb' | 'pack_5gb' | 'pack_10gb',
-  metadataExtra: Record<string, any> = {}
+  metadataExtra: Record<string, unknown> = {}
 ): Promise<boolean> {
-  const pack = STORAGE_PACKS[packId]
+  const liveConfigs = await getLivePlanConfigs().catch(() => null)
+  const activePacks = liveConfigs?.storagePacks || STORAGE_PACKS
+  const pack = activePacks[packId] || STORAGE_PACKS[packId]
   if (!pack) {
     console.error('[addStoragePackToUser] Unknown pack ID:', packId)
     return false
@@ -274,11 +286,11 @@ export async function addStoragePackToUser(
       return false
     }
 
-    const currentMeta = userData.user.user_metadata || {}
+    const currentMeta = (userData.user.user_metadata || {}) as Record<string, unknown>
     const currentAdditional = Number(currentMeta.additional_storage_bytes) || 0
 
     const billingHistory = Array.isArray(currentMeta.billing_history)
-      ? [...currentMeta.billing_history]
+      ? [...(currentMeta.billing_history as Array<Record<string, unknown>>)]
       : []
 
     const isDuplicate = billingHistory.some(
@@ -291,7 +303,7 @@ export async function addStoragePackToUser(
 
     const newAdditional = currentAdditional + pack.storageBytes
     const purchasedPacks = Array.isArray(currentMeta.purchased_storage_packs)
-      ? [...currentMeta.purchased_storage_packs]
+      ? [...(currentMeta.purchased_storage_packs as Array<Record<string, unknown>>)]
       : []
 
     const now = new Date().toISOString()
@@ -347,14 +359,18 @@ export async function addStoragePackToUser(
 export async function incrementUserAiUsage(userId: string): Promise<{ allowed: boolean; remaining: number }> {
   try {
     const admin = getAdminClient()
-    const { data: userData, error: getUserError } = await admin.auth.admin.getUserById(userId)
+    const [{ data: userData, error: getUserError }, liveConfigs] = await Promise.all([
+      admin.auth.admin.getUserById(userId),
+      getLivePlanConfigs().catch(() => null),
+    ])
     if (getUserError || !userData?.user) {
       return { allowed: false, remaining: 0 }
     }
 
-    const meta = userData.user.user_metadata || {}
+    const meta = (userData.user.user_metadata || {}) as Record<string, unknown>
     const tier = getUserPlanTier(userData.user)
-    const plan = PLAN_CONFIGS[tier]
+    const activePlans = liveConfigs?.plans || PLAN_CONFIGS
+    const plan = activePlans[tier] || PLAN_CONFIGS[tier]
 
     if (meta.byok_gemini_key) {
       return { allowed: true, remaining: 999999 }
@@ -365,7 +381,8 @@ export async function incrementUserAiUsage(userId: string): Promise<{ allowed: b
     }
 
     const currentMonthKey = new Date().toISOString().slice(0, 7)
-    const currentUsage = meta.ai_usage?.month === currentMonthKey ? Number(meta.ai_usage.count) || 0 : 0
+    const aiUsageMeta = meta.ai_usage as { month?: string; count?: number } | undefined
+    const currentUsage = aiUsageMeta?.month === currentMonthKey ? Number(aiUsageMeta.count) || 0 : 0
 
     if (currentUsage >= plan.monthlyAiAllowance) {
       return { allowed: false, remaining: 0 }

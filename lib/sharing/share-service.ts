@@ -42,8 +42,22 @@ const rateLimitMap = new Map<string, RateLimitBucket>()
 const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000
 const MAX_ATTEMPTS_PER_WINDOW = 60
 
+const MAX_RATE_LIMIT_BUCKETS = 5000
+
 export function checkTokenRateLimit(identifier: string): boolean {
   const now = Date.now()
+  if (rateLimitMap.size >= 2000) {
+    for (const [key, b] of rateLimitMap.entries()) {
+      if (now >= b.resetTime) {
+        rateLimitMap.delete(key)
+      }
+    }
+    if (rateLimitMap.size >= MAX_RATE_LIMIT_BUCKETS) {
+      const oldestKey = rateLimitMap.keys().next().value
+      if (oldestKey) rateLimitMap.delete(oldestKey)
+    }
+  }
+
   const bucket = rateLimitMap.get(identifier)
 
   if (!bucket || now >= bucket.resetTime) {
@@ -149,15 +163,23 @@ export async function createRestrictedShare(
   const allowDownload = params.allowDownload ?? true
   const expiresAt = params.expiresAt ? params.expiresAt.toISOString() : null
 
-  // Lookup if recipient user exists in auth.users
+  // Lookup if recipient user exists in auth.users (paginated to cover >50 users)
   let recipientUserId: string | null = null
   try {
-    const { data: usersData } = await admin.auth.admin.listUsers()
-    const foundUser = usersData?.users?.find(
-      (u: { email?: string }) => u.email?.toLowerCase() === email
-    )
-    if (foundUser) {
-      recipientUserId = foundUser.id
+    for (let page = 1; page <= 10; page++) {
+      const { data: usersData, error: listErr } = await admin.auth.admin.listUsers({
+        page,
+        perPage: 1000,
+      })
+      if (listErr || !usersData?.users || usersData.users.length === 0) break
+      const foundUser = usersData.users.find(
+        (u: { email?: string }) => u.email?.toLowerCase() === email
+      )
+      if (foundUser) {
+        recipientUserId = foundUser.id
+        break
+      }
+      if (usersData.users.length < 1000) break
     }
   } catch {}
 
@@ -325,29 +347,30 @@ export async function validatePublicShareToken(
     mime_type: string
     storage_path: string
     storage_provider?: string | null
+    is_locked?: boolean | null
     created_at: string
   } | null = null
 
   const { data: initialDoc, error: docError } = await admin
     .from('documents')
-    .select('id, filename, file_size, mime_type, storage_path, storage_provider, created_at')
+    .select('id, filename, file_size, mime_type, storage_path, storage_provider, is_locked, created_at')
     .eq('id', share.document_id)
     .single()
 
   if (initialDoc) {
     doc = initialDoc
-  } else if (docError && (docError.code === '42703' || docError.message?.includes('storage_provider'))) {
+  } else if (docError && (docError.code === '42703' || docError.message?.includes('storage_provider') || docError.message?.includes('is_locked'))) {
     const { data: fallbackDoc } = await admin
       .from('documents')
       .select('id, filename, file_size, mime_type, storage_path, created_at')
       .eq('id', share.document_id)
       .single()
     if (fallbackDoc) {
-      doc = { ...fallbackDoc, storage_provider: undefined }
+      doc = { ...fallbackDoc, storage_provider: undefined, is_locked: false }
     }
   }
 
-  if (!doc) {
+  if (!doc || doc.is_locked) {
     return { valid: false, reason: 'NOT_FOUND', share }
   }
 

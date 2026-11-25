@@ -3,10 +3,10 @@ import { MAX_DOCUMENT_PAGES, MAX_TOTAL_DOCUMENT_PAGES } from '../constants.ts'
 
 export { MAX_DOCUMENT_PAGES, MAX_TOTAL_DOCUMENT_PAGES }
 
-export async function getAndValidatePdfPageCount(
+export async function loadAndValidatePdf(
   buffer: Buffer,
   maxPages: number = MAX_DOCUMENT_PAGES
-): Promise<number> {
+): Promise<{ pageCount: number; pdfDoc: PDFDocument }> {
   if (!buffer || buffer.length === 0) {
     throw new Error('PDF buffer is empty or missing.')
   }
@@ -43,6 +43,14 @@ export async function getAndValidatePdfPageCount(
     )
   }
 
+  return { pageCount, pdfDoc }
+}
+
+export async function getAndValidatePdfPageCount(
+  buffer: Buffer,
+  maxPages: number = MAX_DOCUMENT_PAGES
+): Promise<number> {
+  const { pageCount } = await loadAndValidatePdf(buffer, maxPages)
   return pageCount
 }
 

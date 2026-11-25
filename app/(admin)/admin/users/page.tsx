@@ -29,10 +29,6 @@ export default function AdminUsersPage() {
   const [status, setStatus] = useState<'all' | 'active' | 'suspended'>('all')
   const [isLoading, setIsLoading] = useState(true)
 
-  useEffect(() => {
-    fetchUsers()
-  }, [page, tier, status])
-
   const fetchUsers = async () => {
     setIsLoading(true)
     try {
@@ -56,6 +52,13 @@ export default function AdminUsersPage() {
       setIsLoading(false)
     }
   }
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void fetchUsers()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [page, tier, status])
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -100,7 +103,7 @@ export default function AdminUsersPage() {
             <select
               value={tier}
               onChange={(e) => {
-                setTier(e.target.value as any)
+                setTier(e.target.value as 'all' | 'free' | 'pro' | 'elite')
                 setPage(1)
               }}
               className="text-xs px-3 py-2.5 rounded-xl border border-[#D8D0C2] bg-white text-[#292720] focus:ring-2 focus:ring-[#9C7D47] focus:outline-none"
@@ -114,7 +117,7 @@ export default function AdminUsersPage() {
             <select
               value={status}
               onChange={(e) => {
-                setStatus(e.target.value as any)
+                setStatus(e.target.value as 'all' | 'active' | 'suspended')
                 setPage(1)
               }}
               className="text-xs px-3 py-2.5 rounded-xl border border-[#D8D0C2] bg-white text-[#292720] focus:ring-2 focus:ring-[#9C7D47] focus:outline-none"

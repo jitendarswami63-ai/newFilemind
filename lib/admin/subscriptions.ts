@@ -229,7 +229,20 @@ export async function listManualGrants(filter: { page?: number; limit?: number; 
       perPage: 1000,
     })
 
-    const allGrants: any[] = []
+    const allGrants: Array<{
+      id: string
+      user_id: string
+      user_email: string
+      granted_by_id: string | null
+      granted_by_email: string
+      tier: string
+      duration_days: number | null
+      starts_at: string
+      expires_at: string | null
+      reason: string
+      status: string
+      created_at: string
+    }> = []
     if (usersData?.users) {
       for (const u of usersData.users) {
         const meta = u.user_metadata || {}

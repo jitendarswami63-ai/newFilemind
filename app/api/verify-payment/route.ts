@@ -3,10 +3,17 @@ import crypto from 'crypto'
 import { createClient } from '@/lib/supabase/server'
 import { promoteUserPlan, addStoragePackToUser } from '@/lib/subscription/plan-server'
 import { getRazorpayClient } from '@/lib/payments/razorpay'
+import { PLAN_CONFIGS, STORAGE_PACKS } from '@/lib/subscription/plans'
+import { getLivePlanConfigs } from '@/lib/subscription/dynamic-plans'
+import { isSameOrigin } from '@/lib/validation/origin'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ error: 'Invalid origin' }, { status: 403 })
+  }
+
   try {
     const supabase = await createClient()
     const {
@@ -27,10 +34,22 @@ export async function POST(req: Request) {
     const authenticatedUserId = user.id
     const userMeta = user.user_metadata || {}
 
-    const body = await req.json().catch(() => ({}))
-    const order_id = body.razorpay_order_id || body.order_id
-    const payment_id = body.razorpay_payment_id || body.payment_id
-    const signature = body.razorpay_signature || body.signature
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
+    const order_id = typeof body.razorpay_order_id === 'string'
+      ? body.razorpay_order_id.trim()
+      : typeof body.order_id === 'string'
+      ? body.order_id.trim()
+      : ''
+    const payment_id = typeof body.razorpay_payment_id === 'string'
+      ? body.razorpay_payment_id.trim()
+      : typeof body.payment_id === 'string'
+      ? body.payment_id.trim()
+      : ''
+    const signature = typeof body.razorpay_signature === 'string'
+      ? body.razorpay_signature.trim()
+      : typeof body.signature === 'string'
+      ? body.signature.trim()
+      : ''
 
     if (!order_id || !payment_id || !signature) {
       return NextResponse.json(
@@ -53,10 +72,11 @@ export async function POST(req: Request) {
       .update(payload)
       .digest('hex')
 
-    const isValid = crypto.timingSafeEqual(
-      Buffer.from(expectedSignature),
-      Buffer.from(signature)
-    )
+    const expectedBuf = Buffer.from(expectedSignature, 'utf8')
+    const providedBuf = Buffer.from(signature, 'utf8')
+    const isValid =
+      expectedBuf.length === providedBuf.length &&
+      crypto.timingSafeEqual(expectedBuf, providedBuf)
 
     if (!isValid) {
       return NextResponse.json(
@@ -103,26 +123,75 @@ export async function POST(req: Request) {
       )
     }
 
-    const orderNotes = order.notes || {}
-    if (orderNotes.userId && orderNotes.userId !== authenticatedUserId) {
+    const orderNotes = (order.notes || {}) as Record<string, string | number | null>
+    if (!orderNotes.userId || String(orderNotes.userId) !== authenticatedUserId) {
       return NextResponse.json(
         { error: 'Payment order does not belong to the authenticated user' },
         { status: 403 }
       )
     }
 
-    const existingHistory = Array.isArray(userMeta.billing_history) ? userMeta.billing_history : []
+    if (String(order.currency || '').toUpperCase() !== 'INR' || String(payment.currency || '').toUpperCase() !== 'INR') {
+      return NextResponse.json(
+        { error: 'Invalid payment currency mismatch' },
+        { status: 400 }
+      )
+    }
+
+    const paidAmountPaise = Number(payment.amount)
+    const orderAmountPaise = Number(order.amount)
+    if (!Number.isFinite(paidAmountPaise) || !Number.isFinite(orderAmountPaise) || paidAmountPaise < orderAmountPaise) {
+      return NextResponse.json(
+        { error: 'Paid amount is less than the order amount' },
+        { status: 400 }
+      )
+    }
+
+    const itemType = String(orderNotes.type || '').trim()
+    const planTier = orderNotes.planTier ? String(orderNotes.planTier).trim().toLowerCase() : ''
+    const packId = orderNotes.packId ? String(orderNotes.packId).trim().toLowerCase() : ''
+
+    const liveConfig = await getLivePlanConfigs().catch(() => null)
+    const activePlans = liveConfig?.plans || PLAN_CONFIGS
+    const activePacks = liveConfig?.storagePacks || STORAGE_PACKS
+
+    let expectedAmountPaise = 0
+    if (itemType === 'storage_pack' && packId && activePacks[packId]) {
+      expectedAmountPaise = Math.round(activePacks[packId].priceINR * 100)
+    } else if (itemType === 'subscription' && (planTier === 'pro' || planTier === 'elite')) {
+      expectedAmountPaise = Math.round(activePlans[planTier].priceINR * 100)
+    } else {
+      return NextResponse.json(
+        { error: 'Unrecognized or untrusted order item specification' },
+        { status: 400 }
+      )
+    }
+
+    if (expectedAmountPaise < 100 || paidAmountPaise < expectedAmountPaise) {
+      return NextResponse.json(
+        {
+          error: 'Payment amount does not satisfy the authoritative price for this item.',
+          expectedAmountPaise,
+          paidAmountPaise,
+        },
+        { status: 400 }
+      )
+    }
+
+    const existingHistory = Array.isArray(userMeta.billing_history)
+      ? (userMeta.billing_history as Array<{ paymentId?: string; orderId?: string; status?: string }>)
+      : []
     const alreadyProcessed = existingHistory.some(
-      (tx: any) => tx.paymentId === payment_id || (tx.orderId === order_id && tx.status === 'paid')
+      (tx) => tx.paymentId === payment_id || (tx.orderId === order_id && tx.status === 'paid')
     )
 
     if (alreadyProcessed) {
       const response = NextResponse.json({
         success: true,
         message: 'Payment verified and confirmed successfully (already processed)',
-        itemType: orderNotes.type || body.type || 'subscription',
-        planTier: orderNotes.planTier || body.planTier,
-        packId: orderNotes.packId || body.packId,
+        itemType,
+        planTier: itemType === 'subscription' ? planTier : undefined,
+        packId: itemType === 'storage_pack' ? packId : undefined,
         order_id,
         payment_id,
         alreadyProcessed: true,
@@ -132,14 +201,15 @@ export async function POST(req: Request) {
       return response
     }
 
-    const itemType = orderNotes.type || body.type || 'subscription'
-    const planTier = orderNotes.planTier || body.planTier || (body.planName?.toLowerCase().includes('elite') ? 'elite' : 'pro')
-    const packId = orderNotes.packId || body.packId
+    const registeredName = String(
+      userMeta.full_name || userMeta.name || orderNotes.customerName || 'FileMind User'
+    ).trim()
+    const registeredEmail = user.email || String(orderNotes.customerEmail || '')
+    const registeredPhone = String(
+      user.phone || userMeta.phone || orderNotes.customerPhone || ''
+    ).trim()
 
-    const registeredName = (userMeta.full_name || userMeta.name || orderNotes.customerName || 'FileMind User').trim()
-    const registeredEmail = user.email || orderNotes.customerEmail || ''
-    const registeredPhone = (user.phone || userMeta.phone || orderNotes.customerPhone || '').trim()
-
+    const paymentObj = payment as { method?: string }
     const metadataExtra = {
       razorpay_order_id: order_id,
       razorpay_payment_id: payment_id,
@@ -147,16 +217,20 @@ export async function POST(req: Request) {
       customer_name: registeredName,
       customer_email: registeredEmail,
       customer_phone: registeredPhone,
-      payment_method: (payment as any).method || 'online',
-      amount_paid_inr: payment.amount ? Number(payment.amount) / 100 : undefined,
+      payment_method: paymentObj.method || 'online',
+      amount_paid_inr: paidAmountPaise / 100,
     }
 
-    if (itemType === 'storage_pack' && packId) {
-      await addStoragePackToUser(authenticatedUserId, packId, metadataExtra)
-    } else if (planTier === 'elite') {
-      await promoteUserPlan(authenticatedUserId, 'elite', metadataExtra)
-    } else {
-      await promoteUserPlan(authenticatedUserId, 'pro', metadataExtra)
+    if (itemType === 'storage_pack' && (packId === 'pack_1gb' || packId === 'pack_5gb' || packId === 'pack_10gb')) {
+      const updated = await addStoragePackToUser(authenticatedUserId, packId, metadataExtra)
+      if (!updated) {
+        return NextResponse.json({ error: 'Failed to provision storage pack' }, { status: 500 })
+      }
+    } else if (planTier === 'elite' || planTier === 'pro') {
+      const updated = await promoteUserPlan(authenticatedUserId, planTier, metadataExtra)
+      if (!updated) {
+        return NextResponse.json({ error: 'Failed to activate subscription plan' }, { status: 500 })
+      }
     }
 
     const response = NextResponse.json({
@@ -175,10 +249,10 @@ export async function POST(req: Request) {
     response.cookies.set('filemind_plan', '', { path: '/', expires: new Date(0) })
 
     return response
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Razorpay Verify Error]:', error)
     return NextResponse.json(
-      { error: error.message || 'Payment signature verification error' },
+      { error: error instanceof Error ? error.message : 'Payment signature verification error' },
       { status: 500 }
     )
   }

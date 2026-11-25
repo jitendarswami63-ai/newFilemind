@@ -26,6 +26,9 @@ function createFileStreamResponse(
     safeMime = `${safeMime}; charset=utf-8`
   }
 
+  const lowerMime = safeMime.toLowerCase()
+  const needsSandboxCsp = lowerMime.includes('image/svg+xml') || lowerMime.includes('xml')
+
   if (rangeHeader && rangeHeader.startsWith('bytes=')) {
     const parts = rangeHeader.replace(/bytes=/, '').split('-')
     const start = parseInt(parts[0], 10)
@@ -34,34 +37,43 @@ function createFileStreamResponse(
     if (!isNaN(start) && start < buffer.length && end >= start) {
       const safeEnd = Math.min(end, buffer.length - 1)
       const chunk = buffer.subarray(start, safeEnd + 1)
+      const rangeHeaders: Record<string, string> = {
+        'Content-Type': safeMime,
+        'Content-Range': `bytes ${start}-${safeEnd}/${buffer.length}`,
+        'Content-Length': chunk.length.toString(),
+        'Accept-Ranges': 'bytes',
+        'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
+        'Cache-Control': cacheControl,
+        'X-Frame-Options': 'SAMEORIGIN',
+        'X-Content-Type-Options': 'nosniff',
+      }
+      if (needsSandboxCsp) {
+        rangeHeaders['Content-Security-Policy'] = "sandbox; default-src 'none'; style-src 'unsafe-inline'; script-src 'none'"
+      }
 
       return new Response(new Uint8Array(chunk), {
         status: 206,
-        headers: {
-          'Content-Type': safeMime,
-          'Content-Range': `bytes ${start}-${safeEnd}/${buffer.length}`,
-          'Content-Length': chunk.length.toString(),
-          'Accept-Ranges': 'bytes',
-          'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
-          'Cache-Control': cacheControl,
-          'X-Frame-Options': 'SAMEORIGIN',
-          'X-Content-Type-Options': 'nosniff',
-        },
+        headers: rangeHeaders,
       })
     }
   }
 
+  const headers: Record<string, string> = {
+    'Content-Type': safeMime,
+    'Content-Length': buffer.length.toString(),
+    'Accept-Ranges': 'bytes',
+    'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
+    'Cache-Control': cacheControl,
+    'X-Frame-Options': 'SAMEORIGIN',
+    'X-Content-Type-Options': 'nosniff',
+  }
+  if (needsSandboxCsp) {
+    headers['Content-Security-Policy'] = "sandbox; default-src 'none'; style-src 'unsafe-inline'; script-src 'none'"
+  }
+
   return new Response(new Uint8Array(buffer), {
     status: 200,
-    headers: {
-      'Content-Type': safeMime,
-      'Content-Length': buffer.length.toString(),
-      'Accept-Ranges': 'bytes',
-      'Content-Disposition': `inline; filename="${encodeURIComponent(filename)}"`,
-      'Cache-Control': cacheControl,
-      'X-Frame-Options': 'SAMEORIGIN',
-      'X-Content-Type-Options': 'nosniff',
-    },
+    headers,
   })
 }
 

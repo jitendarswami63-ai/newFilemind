@@ -39,7 +39,7 @@ export async function GET(request: Request) {
   let query = supabase
     .from('documents')
     .select(
-      'id, filename, mime_type, file_size, original_file_size, storage_path, status, processing_stage, doc_category, tags, extracted_data, page_count, is_locked, locked_at, error_message, embedding_status, created_at, updated_at',
+      'id, filename, mime_type, file_size, original_file_size, storage_path, status, processing_stage, doc_category, tags, extracted_data, page_count, is_locked, locked_at, error_message, embedding_status, embedding_locked_at, embedding_error, created_at, updated_at',
       { count: needCount ? 'exact' : undefined }
     )
     .eq('user_id', user.id)
@@ -78,7 +78,12 @@ export async function GET(request: Request) {
   }
 
   if (searchQuery) {
-    query = query.ilike('filename', `%${searchQuery}%`)
+    const safeQ = searchQuery.replace(/[,()\\"]/g, ' ').trim()
+    if (safeQ) {
+      query = query.or(
+        `filename.ilike.%${safeQ}%,doc_category.ilike.%${safeQ}%`
+      )
+    }
   }
 
   let { data: documents, error, count } = await query.range(from, to)
@@ -87,28 +92,58 @@ export async function GET(request: Request) {
     let fallbackQuery = supabase
       .from('documents')
       .select(
-        'id, filename, mime_type, file_size, storage_path, status, processing_stage, doc_category, tags, extracted_data, page_count, error_message, embedding_status, created_at, updated_at',
+        'id, filename, mime_type, file_size, storage_path, status, processing_stage, doc_category, tags, extracted_data, page_count, error_message, embedding_status, embedding_locked_at, embedding_error, created_at, updated_at',
         { count: needCount ? 'exact' : undefined }
       )
       .eq('user_id', user.id)
       .order(sortColumn, { ascending: sortOrder })
 
     if (statusFilter && statusFilter !== 'all') {
-      if (statusFilter === 'locked') {
-        fallbackQuery = fallbackQuery.eq('is_locked', true)
-      } else {
+      if (statusFilter !== 'locked') {
         fallbackQuery = fallbackQuery.eq('status', statusFilter)
       }
     }
 
+    if (categoryFilter && categoryFilter !== 'all') {
+      if (categoryFilter === 'pdfs') {
+        fallbackQuery = fallbackQuery.or('mime_type.eq.application/pdf,filename.ilike.%.pdf')
+      } else if (categoryFilter === 'documents') {
+        fallbackQuery = fallbackQuery.or('doc_category.ilike.document%,filename.ilike.%.docx,filename.ilike.%.doc,filename.ilike.%.txt,filename.ilike.%.md,filename.ilike.%.rtf,filename.ilike.%.odt,filename.ilike.%.epub')
+      } else if (categoryFilter === 'images') {
+        fallbackQuery = fallbackQuery.or('doc_category.ilike.image%,mime_type.ilike.image/%,filename.ilike.%.jpg,filename.ilike.%.jpeg,filename.ilike.%.png,filename.ilike.%.webp,filename.ilike.%.gif,filename.ilike.%.svg,filename.ilike.%.bmp,filename.ilike.%.tiff,filename.ilike.%.heic')
+      } else if (categoryFilter === 'spreadsheets') {
+        fallbackQuery = fallbackQuery.or('doc_category.ilike.spreadsheet%,filename.ilike.%.xlsx,filename.ilike.%.xls,filename.ilike.%.csv,filename.ilike.%.ods')
+      } else if (categoryFilter === 'presentations') {
+        fallbackQuery = fallbackQuery.or('doc_category.ilike.presentation%,filename.ilike.%.pptx,filename.ilike.%.ppt,filename.ilike.%.odp')
+      } else if (categoryFilter === 'videos') {
+        fallbackQuery = fallbackQuery.or('doc_category.ilike.video%,mime_type.ilike.video/%,filename.ilike.%.mp4,filename.ilike.%.mov,filename.ilike.%.avi,filename.ilike.%.webm,filename.ilike.%.mkv')
+      } else if (categoryFilter === 'audio') {
+        fallbackQuery = fallbackQuery.or('doc_category.ilike.audio%,mime_type.ilike.audio/%,filename.ilike.%.mp3,filename.ilike.%.wav,filename.ilike.%.aac,filename.ilike.%.m4a,filename.ilike.%.flac,filename.ilike.%.ogg')
+      } else if (categoryFilter === 'archives') {
+        fallbackQuery = fallbackQuery.or('doc_category.ilike.archive%,filename.ilike.%.zip,filename.ilike.%.tar,filename.ilike.%.gz,filename.ilike.%.rar,filename.ilike.%.7z')
+      } else if (categoryFilter === 'code') {
+        fallbackQuery = fallbackQuery.or('doc_category.ilike.code%,filename.ilike.%.json,filename.ilike.%.js,filename.ilike.%.ts,filename.ilike.%.jsx,filename.ilike.%.tsx,filename.ilike.%.py,filename.ilike.%.html,filename.ilike.%.css,filename.ilike.%.sql,filename.ilike.%.yaml,filename.ilike.%.toml')
+      } else if (categoryFilter === 'other') {
+        fallbackQuery = fallbackQuery.or('doc_category.ilike.other%,doc_category.is.null')
+      }
+    }
+
     if (searchQuery) {
-      fallbackQuery = fallbackQuery.ilike('filename', `%${searchQuery}%`)
+      const safeQ = searchQuery.replace(/[,()\\"]/g, ' ').trim()
+      if (safeQ) {
+        fallbackQuery = fallbackQuery.or(
+          `filename.ilike.%${safeQ}%,doc_category.ilike.%${safeQ}%`
+        )
+      }
     }
 
     const fallback = await fallbackQuery.range(from, to)
-    documents = fallback.data?.map((d) => ({ ...d, original_file_size: null, is_locked: false, locked_at: null })) ?? null
+    documents =
+      fallback.data
+        ?.filter((d) => statusFilter !== 'locked' && Boolean(d))
+        .map((d) => ({ ...d, original_file_size: null, is_locked: false, locked_at: null })) ?? null
     error = fallback.error
-    count = fallback.count
+    count = statusFilter === 'locked' ? 0 : fallback.count
   }
 
   if (error) {

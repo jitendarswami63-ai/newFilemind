@@ -79,7 +79,7 @@ function normalizeStoragePack(base: StoragePack, override?: Partial<StoragePack>
   }
 }
 
-async function findPrimaryAdminUser(adminClient: any) {
+async function findPrimaryAdminUser(adminClient: ReturnType<typeof getAdminClient>) {
   const allowlistEnv = process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || 'jitendarswami63@gmail.com'
   const allowedList = allowlistEnv.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
 
@@ -87,7 +87,7 @@ async function findPrimaryAdminUser(adminClient: any) {
   if (error || !data?.users) return null
 
   for (const email of allowedList) {
-    const found = data.users.find((u: any) => u.email?.toLowerCase() === email)
+    const found = data.users.find((u) => u.email?.toLowerCase() === email)
     if (found) return found
   }
 

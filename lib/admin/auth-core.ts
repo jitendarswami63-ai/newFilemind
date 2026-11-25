@@ -5,11 +5,11 @@ export interface AdminVerificationResult {
 }
 
 export function getAdminAllowlist(): string[] {
-  const raw = process.env.ADMIN_EMAILS || ''
+  const raw = process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || ''
   if (!raw.trim()) return []
 
   return raw
-    .split(',')
+    .split(/[,;]/)
     .map((e) => e.trim().toLowerCase())
     .filter((e) => e.length > 0)
 }
@@ -29,7 +29,7 @@ export function verifyAdminUserCredentials(user?: {
   email?: string | null
   email_confirmed_at?: string | null
   confirmed_at?: string | null
-  app_metadata?: Record<string, any>
+  app_metadata?: Record<string, unknown>
 } | null): AdminVerificationResult {
   if (!user || !user.email) {
     return {

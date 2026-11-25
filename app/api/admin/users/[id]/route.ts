@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { verifyAdminApi } from '@/lib/admin/auth'
 import { getAdminUserDetail, updateUserAccountStatus } from '@/lib/admin/data'
+import { isSameOrigin } from '@/lib/validation/origin'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,9 +19,9 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
     return NextResponse.json(user)
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error?.message || 'Failed to fetch user details' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch user details' },
       { status: 500 }
     )
   }
@@ -30,6 +31,10 @@ export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ error: 'Invalid origin' }, { status: 403 })
+  }
+
   const auth = await verifyAdminApi()
   if (auth instanceof NextResponse) return auth
 
@@ -62,9 +67,9 @@ export async function PATCH(
       message: isSuspended ? 'Account suspended' : 'Account reactivated',
       user: updated,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error?.message || 'Failed to update account status' },
+      { error: error instanceof Error ? error.message : 'Failed to update account status' },
       { status: 500 }
     )
   }

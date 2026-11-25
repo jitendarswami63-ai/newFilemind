@@ -43,7 +43,7 @@ export function LandingNavbar({ user: initialUser }: LandingNavbarProps) {
   }, [user?.email])
 
   useEffect(() => {
-    if (initialUser) return
+    if (initialUser !== undefined) return
     let isMounted = true
     try {
       const supabase = createClient()

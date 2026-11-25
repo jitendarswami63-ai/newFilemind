@@ -62,7 +62,10 @@ export default function AdminPlansPage() {
   }
 
   useEffect(() => {
-    fetchPlans()
+    const timer = setTimeout(() => {
+      void fetchPlans()
+    }, 0)
+    return () => clearTimeout(timer)
   }, [])
 
   const openPlanEditor = (tier: PlanTier) => {
@@ -80,7 +83,7 @@ export default function AdminPlansPage() {
     setPlanForm(null)
   }
 
-  const handlePlanFormChange = (field: keyof PlanConfig, value: any) => {
+  const handlePlanFormChange = (field: keyof PlanConfig, value: string | number | boolean | string[]) => {
     if (!planForm) return
     setPlanForm((prev) => {
       if (!prev) return null
@@ -205,7 +208,7 @@ export default function AdminPlansPage() {
     setPackForm(null)
   }
 
-  const handlePackFormChange = (field: keyof StoragePack, value: any) => {
+  const handlePackFormChange = (field: keyof StoragePack, value: string | number) => {
     if (!packForm) return
     setPackForm((prev) => {
       if (!prev) return null

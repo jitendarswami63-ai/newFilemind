@@ -93,7 +93,11 @@ export function clearQueryCache(): void {
   inFlightQueryRequests.clear()
 }
 
-function getGeminiClient(): GoogleGenAI {
+function getGeminiClient(apiKeyOverride?: string): GoogleGenAI {
+  if (apiKeyOverride && apiKeyOverride.trim()) {
+    return new GoogleGenAI({ apiKey: apiKeyOverride.trim() })
+  }
+
   if (geminiClient) {
     return geminiClient
   }
@@ -163,6 +167,16 @@ function sleepWithJitter(attempt: number, error?: unknown): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, totalDelay))
 }
 
+export function isPerMinuteTokenRateLimitError(err: unknown): boolean {
+  if (!err) return false
+  const msg = String(err instanceof Error ? err.message : err).toLowerCase()
+  return (
+    msg.includes('embed_content_free_tier_tokens') ||
+    msg.includes('tokens per minute') ||
+    msg.includes('tpm')
+  )
+}
+
 export function isQuotaExhaustedError(err: unknown): boolean {
   if (!err) return false
   const msg = String(err instanceof Error ? err.message : err).toLowerCase()
@@ -170,6 +184,7 @@ export function isQuotaExhaustedError(err: unknown): boolean {
     msg.includes('exceeded your current quota') ||
     msg.includes('per day limit') ||
     msg.includes('embed_content_free_tier_requests') ||
+    msg.includes('embed_content_free_tier_tokens') ||
     msg.includes('generate_content_free_tier_requests') ||
     msg.includes('daily limit') ||
     msg.includes('resource_exhausted')
@@ -193,8 +208,8 @@ function isTransientError(error: unknown): boolean {
   return false
 }
 
-async function callEmbedWithRetry(formattedText: string): Promise<number[]> {
-  const client = getGeminiClient()
+async function callEmbedWithRetry(formattedText: string, apiKeyOverride?: string): Promise<number[]> {
+  const client = getGeminiClient(apiKeyOverride)
   let lastError: unknown = null
 
   for (const modelName of FALLBACK_EMBEDDING_MODELS) {
@@ -246,14 +261,15 @@ async function callEmbedWithRetry(formattedText: string): Promise<number[]> {
 
 export async function embedDocumentChunk(
   chunkText: string,
-  documentTitle?: string | null
+  documentTitle?: string | null,
+  apiKeyOverride?: string
 ): Promise<number[]> {
   const titleFormatted = documentTitle && documentTitle.trim().length > 0 ? documentTitle.trim() : 'none'
   const formattedInput = `title: ${titleFormatted} | text: ${chunkText.trim()}`
-  return await callEmbedWithRetry(formattedInput)
+  return await callEmbedWithRetry(formattedInput, apiKeyOverride)
 }
 
-export async function embedSearchQuery(queryText: string): Promise<number[]> {
+export async function embedSearchQuery(queryText: string, apiKeyOverride?: string): Promise<number[]> {
   const cleanQuery = queryText.trim()
   if (!cleanQuery) {
     throw new Error('Search query text cannot be empty')
@@ -274,7 +290,7 @@ export async function embedSearchQuery(queryText: string): Promise<number[]> {
 
   const embeddingPromise = (async () => {
     try {
-      const vector = await callEmbedWithRetry(formattedQuery)
+      const vector = await callEmbedWithRetry(formattedQuery, apiKeyOverride)
       if (cacheKey) {
         setCachedQueryEmbedding(cacheKey, vector)
       }
@@ -293,14 +309,14 @@ export async function embedSearchQuery(queryText: string): Promise<number[]> {
   return await embeddingPromise
 }
 
-async function callEmbedBatchWithRetry(formattedTexts: string[]): Promise<number[][]> {
+async function callEmbedBatchWithRetry(formattedTexts: string[], apiKeyOverride?: string): Promise<number[][]> {
   if (formattedTexts.length === 0) return []
   if (formattedTexts.length === 1) {
-    const single = await callEmbedWithRetry(formattedTexts[0])
+    const single = await callEmbedWithRetry(formattedTexts[0], apiKeyOverride)
     return [single]
   }
 
-  const client = getGeminiClient()
+  const client = getGeminiClient(apiKeyOverride)
   let lastError: unknown = null
 
   for (const modelName of FALLBACK_EMBEDDING_MODELS) {
@@ -361,7 +377,8 @@ async function callEmbedBatchWithRetry(formattedTexts: string[]): Promise<number
 
 export async function embedChunksConcurrently(
   chunks: Array<{ chunk_index: number; content: string }>,
-  documentTitle?: string | null
+  documentTitle?: string | null,
+  apiKeyOverride?: string
 ): Promise<Map<number, number[]>> {
   const results = new Map<number, number[]>()
   if (chunks.length === 0) return results
@@ -375,7 +392,7 @@ export async function embedChunksConcurrently(
 
   const batchQueue = [...batches]
 
-  const concurrencyLimit = batchQueue.length > 8 ? 2 : Math.min(MAX_CONCURRENT_EMBEDDINGS, batchQueue.length)
+  const concurrencyLimit = batchQueue.length > 8 ? 1 : Math.min(MAX_CONCURRENT_EMBEDDINGS, batchQueue.length)
   const workers = Array.from(
     { length: concurrencyLimit },
     async () => {
@@ -386,22 +403,25 @@ export async function embedChunksConcurrently(
         const formattedInputs = batch.map((item) => `title: ${titleFormatted} | text: ${item.content.trim()}`)
 
         try {
-          const vectors = await callEmbedBatchWithRetry(formattedInputs)
+          const vectors = await callEmbedBatchWithRetry(formattedInputs, apiKeyOverride)
           for (let i = 0; i < batch.length; i++) {
             results.set(batch[i].chunk_index, vectors[i])
           }
 
           if (batchQueue.length > 0) {
-            const pacingDelay = batchQueue.length > 8 ? 600 : 150
+            const pacingDelay = batchQueue.length > 8 ? 400 : 150
             await new Promise((r) => setTimeout(r, pacingDelay))
           }
         } catch (batchErr: unknown) {
+          if (isQuotaExhaustedError(batchErr)) {
+            throw batchErr
+          }
           console.warn(
             `[Embedding] Batch embedding of ${batch.length} chunks encountered error, falling back to sequential item embedding:`,
             batchErr instanceof Error ? batchErr.message : batchErr
           )
           for (const item of batch) {
-            const singleVector = await embedDocumentChunk(item.content, documentTitle)
+            const singleVector = await embedDocumentChunk(item.content, documentTitle, apiKeyOverride)
             results.set(item.chunk_index, singleVector)
           }
         }

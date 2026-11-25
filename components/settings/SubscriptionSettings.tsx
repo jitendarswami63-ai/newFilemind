@@ -35,7 +35,7 @@ interface SubscriptionSettingsProps {
   initialUser?: {
     id?: string
     email?: string
-    user_metadata?: Record<string, any> | null
+    user_metadata?: Record<string, unknown> | null
   } | null
 }
 
@@ -73,13 +73,13 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
     : null
 
   const billingHistory = Array.isArray(initialUser?.user_metadata?.billing_history)
-    ? initialUser.user_metadata.billing_history
+    ? (initialUser.user_metadata.billing_history as PaymentItem[])
     : []
 
   const [historyList, setHistoryList] = useState<PaymentItem[]>(billingHistory)
   const [selectedPayment, setSelectedPayment] = useState<PaymentItem | null>(null)
-  const [livePlans, setLivePlans] = useState<Record<string, any>>(PLAN_CONFIGS)
-  const [livePacks, setLivePacks] = useState<Record<string, any>>(STORAGE_PACKS)
+  const [livePlans, setLivePlans] = useState(PLAN_CONFIGS)
+  const [livePacks, setLivePacks] = useState(STORAGE_PACKS)
 
   useEffect(() => {
     fetch('/api/plans')
@@ -93,7 +93,9 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
 
   useEffect(() => {
     if (Array.isArray(initialUser?.user_metadata?.billing_history)) {
-      setHistoryList(initialUser.user_metadata.billing_history)
+      const nextHistory = initialUser.user_metadata.billing_history as PaymentItem[]
+      const timer = setTimeout(() => setHistoryList(nextHistory), 0)
+      return () => clearTimeout(timer)
     }
   }, [initialUser])
 
@@ -109,7 +111,7 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
   }, [])
 
   const purchasedPacks = Array.isArray(initialUser?.user_metadata?.purchased_storage_packs)
-    ? initialUser.user_metadata.purchased_storage_packs
+    ? (initialUser.user_metadata.purchased_storage_packs as Array<{ packName?: string; storageBytes?: number }>)
     : []
 
   const handleSaveByok = async () => {
@@ -439,7 +441,7 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-1">
-            {Object.values(livePacks).map((pack: any) => (
+            {Object.values(livePacks).map((pack) => (
               <div
                 key={pack.id}
                 className="p-4 rounded-xl bg-[#FFFCF5] border border-[#E5DED1] flex flex-col justify-between hover:border-[#9C7D47]/40 transition-colors space-y-3"
@@ -459,7 +461,7 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
                   buttonText={`Buy ${pack.priceDisplay}/mo`}
                   className="w-full py-2 text-xs font-semibold rounded-lg bg-[#FAF5EC] hover:bg-[#F3EFE5] text-[#292720] border border-[#D8D0C2] transition-colors cursor-pointer text-center"
                   userEmail={initialUser?.email}
-                  userName={initialUser?.user_metadata?.full_name}
+                  userName={typeof initialUser?.user_metadata?.full_name === 'string' ? initialUser.user_metadata.full_name : undefined}
                   onSuccess={() => refreshPlan()}
                 />
               </div>
@@ -472,10 +474,10 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
                 Active Storage Add-on Packs ({purchasedPacks.length})
               </span>
               <div className="space-y-1.5">
-                {purchasedPacks.map((p: any, idx: number) => (
+                {purchasedPacks.map((p, idx) => (
                   <div key={idx} className="flex items-center justify-between text-xs p-2 rounded-lg bg-[#FFFCF5] border border-[#E5DED1]">
                     <span className="font-semibold text-[#292720]">{p.packName || 'Storage Pack'}</span>
-                    <span className="text-[#9C7D47] font-medium">+{formatBytes(p.storageBytes)}</span>
+                    <span className="text-[#9C7D47] font-medium">+{formatBytes(p.storageBytes || 0)}</span>
                   </div>
                 ))}
               </div>
@@ -624,7 +626,7 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#E5DED1]/60">
-                  {historyList.map((item: any, idx: number) => (
+                  {historyList.map((item, idx) => (
                     <tr
                       key={idx}
                       onClick={() => setSelectedPayment(item)}
@@ -632,11 +634,13 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
                       title="Click to view payment receipt and details"
                     >
                       <td className="py-2.5 text-[#777064]">
-                        {new Date(item.date).toLocaleDateString('en-IN', {
-                          day: 'numeric',
-                          month: 'short',
-                          year: 'numeric',
-                        })}
+                        {item.date
+                          ? new Date(item.date).toLocaleDateString('en-IN', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                          : '—'}
                       </td>
                       <td className="py-2.5 font-medium text-[#292720]">
                         {item.planName || item.packName || (item.type === 'subscription' ? 'Pro Plan' : 'Storage Pack')}
@@ -686,7 +690,7 @@ export function SubscriptionSettings({ initialUser }: SubscriptionSettingsProps)
             payment={selectedPayment}
             onClose={() => setSelectedPayment(null)}
             userEmail={initialUser?.email}
-            userName={initialUser?.user_metadata?.full_name}
+            userName={typeof initialUser?.user_metadata?.full_name === 'string' ? initialUser.user_metadata.full_name : undefined}
           />
         )}
       </CardContent>

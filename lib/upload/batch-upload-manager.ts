@@ -469,10 +469,11 @@ export class BatchUploadManager {
         }
       }
 
-      // Poll status for up to 150 seconds (polling /api/documents/:id every 2.5s)
-      const maxPollAttempts = 60
+      // Poll status for up to 5 minutes (120 * 2.5s) and auto-resume paused multi-segment checkpoints
+      const maxPollAttempts = 120
       let pollCount = 0
       let isDone = false
+      let lastResumeTriggerAt = 0
 
       while (pollCount < maxPollAttempts) {
         await new Promise((resolve) => setTimeout(resolve, 2500))
@@ -494,6 +495,19 @@ export class BatchUploadManager {
                 error: docData.error_message || 'AI document analysis failed',
               })
               return
+            }
+
+            // If multi-segment processing paused at a checkpoint (lock released) or stayed pending, resume worker
+            const isPausedCheckpoint =
+              docData.status === 'processing' && !docData.processing_locked_at
+            const nowMs = Date.now()
+            if ((isPausedCheckpoint || docData.status === 'pending') && nowMs - lastResumeTriggerAt > 12_000) {
+              lastResumeTriggerAt = nowMs
+              fetch('/api/documents/process-queue', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ documentId }),
+              }).catch(() => {})
             }
           }
         } catch {

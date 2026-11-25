@@ -49,9 +49,16 @@ export async function GET(request: NextRequest) {
 
     const docIdParam = searchParams.get('documentId') || undefined
 
+    const byokApiKey =
+      typeof user.user_metadata?.byok_gemini_key === 'string' && user.user_metadata.byok_gemini_key.trim()
+        ? user.user_metadata.byok_gemini_key.trim()
+        : undefined
+
     const results = await executeHybridSearch(supabase, trimmedQuery, {
       limit,
       documentId: docIdParam,
+      enableSemantic: entitlements.hasAiFeatures,
+      apiKey: byokApiKey,
     })
 
     return NextResponse.json({

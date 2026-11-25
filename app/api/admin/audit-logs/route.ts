@@ -17,9 +17,9 @@ export async function GET(req: Request) {
   try {
     const data = await listAdminAuditLogs({ page, limit, actionType, search })
     return NextResponse.json(data)
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error?.message || 'Failed to list audit logs' },
+      { error: error instanceof Error ? error.message : 'Failed to list audit logs' },
       { status: 500 }
     )
   }

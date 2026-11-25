@@ -30,9 +30,21 @@ import { createClient } from '@/lib/supabase/client'
 import { ProBadge } from '@/components/ui/ProBadge'
 import { useUserPlan } from '@/lib/subscription/plan'
 
+interface PlanDisplayInfo {
+  priceDisplay?: string
+  priceINR?: number
+  name?: string
+  tagline?: string
+  badgeLabel?: string
+  includedStorageMB?: number
+  maxBatchFiles?: number
+  maxFileSizeMB?: number
+  monthlyAiAllowance?: number
+}
+
 interface LandingPageProps {
   user?: { email?: string; user_metadata?: Record<string, unknown> } | null
-  initialPlans?: Record<string, any>
+  initialPlans?: Record<string, PlanDisplayInfo>
 }
 
 function InstagramIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
@@ -48,7 +60,7 @@ function InstagramIcon({ className = "h-3.5 w-3.5" }: { className?: string }) {
 export function LandingPage({ user: initialUser, initialPlans }: LandingPageProps) {
   const [user, setUser] = useState(initialUser)
   const [openFaq, setOpenFaq] = useState<number | null>(null)
-  const [livePlans, setLivePlans] = useState<Record<string, any>>(
+  const [livePlans, setLivePlans] = useState<Record<string, PlanDisplayInfo>>(
     initialPlans || {
       pro: { priceDisplay: '₹249', priceINR: 249, name: 'Pro Intelligence', tagline: 'For professionals and teams needing AI document understanding and smart search.' },
       elite: { priceDisplay: '₹499', priceINR: 499, name: 'Elite Intelligence', tagline: 'High-volume file workflows, 10 GB storage, and hardware biometric vault.' },
@@ -71,7 +83,7 @@ export function LandingPage({ user: initialUser, initialPlans }: LandingPageProp
   }, [initialPlans])
 
   useEffect(() => {
-    if (initialUser) return
+    if (initialUser !== undefined) return
     let isMounted = true
     try {
       const supabase = createClient()

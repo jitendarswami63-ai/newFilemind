@@ -1,4 +1,5 @@
 import 'server-only'
+import crypto from 'crypto'
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import { STORAGE_BUCKET } from '@/lib/constants'
 import { NormalizedMetadataItem } from './schema'
@@ -105,11 +106,30 @@ export async function acquireLock(
     p_user_id: authoritativeUserId,
   })
 
-  if (error) {
-    return null
+  if (!error && data) {
+    return data as string
   }
 
-  return (data as string) || null
+  // Fallback for paused checkpoints whose processing_locked_at was cleared to NULL (SQL `< interval` evaluates NULL as false)
+  const fallbackToken = crypto.randomUUID()
+  const { data: resumed } = await client
+    .from('documents')
+    .update({
+      status: 'processing',
+      processing_stage: 'resuming',
+      processing_locked_at: new Date().toISOString(),
+      processing_token: fallbackToken,
+      error_message: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', documentId)
+    .eq('user_id', authoritativeUserId)
+    .eq('status', 'processing')
+    .is('processing_locked_at', null)
+    .select('processing_token')
+    .maybeSingle()
+
+  return resumed?.processing_token || null
 }
 
 export async function finalizeResults(
@@ -329,11 +349,188 @@ export async function acquireIndexingLock(
     p_user_id: authoritativeUserId,
   })
 
-  if (error) {
-    return null
+  if (!error && data) {
+    return data as string
   }
 
-  return (data as string) || null
+  // Reclaim paused embedding cooldown checkpoints (embedding_status = 'processing' with embedding_locked_at = NULL)
+  const fallbackToken = crypto.randomUUID()
+  const { data: resumed } = await client
+    .from('documents')
+    .update({
+      embedding_status: 'processing',
+      embedding_started_at: new Date().toISOString(),
+      embedding_locked_at: new Date().toISOString(),
+      embedding_token: fallbackToken,
+      embedding_error: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', documentId)
+    .eq('user_id', authoritativeUserId)
+    .eq('status', 'completed')
+    .eq('embedding_status', 'processing')
+    .is('embedding_locked_at', null)
+    .select('embedding_token')
+    .maybeSingle()
+
+  return resumed?.embedding_token || null
+}
+
+export async function getEmbeddedChunkCheckpoints(
+  documentId: string
+): Promise<Map<number, { content_hash: string; embedding: string }>> {
+  const client = getServiceRoleClient()
+  const embeddedMap = new Map<number, { content_hash: string; embedding: string }>()
+  const pageSize = 1000
+  let from = 0
+
+  while (true) {
+    const to = from + pageSize - 1
+    const { data, error } = await client
+      .from('document_chunks')
+      .select('chunk_index, content_hash, embedding')
+      .eq('document_id', documentId)
+      .not('embedding', 'is', null)
+      .order('chunk_index', { ascending: true })
+      .range(from, to)
+
+    if (error || !data || data.length === 0) {
+      break
+    }
+
+    for (const row of data as Array<{ chunk_index: number; content_hash: string; embedding: unknown }>) {
+      if (row.embedding) {
+        embeddedMap.set(row.chunk_index, {
+          content_hash: row.content_hash,
+          embedding: typeof row.embedding === 'string' ? row.embedding : JSON.stringify(row.embedding),
+        })
+      }
+    }
+
+    if (data.length < pageSize) {
+      break
+    }
+    from += pageSize
+  }
+
+  return embeddedMap
+}
+
+export async function saveEmbeddedChunkWave(
+  documentId: string,
+  authoritativeUserId: string,
+  token: string,
+  chunks: ChunkInsertPayload[]
+): Promise<boolean> {
+  const client = getServiceRoleClient()
+
+  const { data: fenceDoc } = await client
+    .from('documents')
+    .select('id')
+    .eq('id', documentId)
+    .eq('user_id', authoritativeUserId)
+    .eq('embedding_token', token)
+    .maybeSingle()
+
+  if (!fenceDoc) {
+    return false
+  }
+
+  const UPSERT_BATCH = 25
+  for (let i = 0; i < chunks.length; i += UPSERT_BATCH) {
+    const batch = chunks.slice(i, i + UPSERT_BATCH).map((c) => ({
+      document_id: documentId,
+      page_start: c.page_start,
+      page_end: c.page_end,
+      chunk_index: c.chunk_index,
+      content: c.content,
+      content_hash: c.content_hash,
+      embedding: c.embedding,
+      updated_at: new Date().toISOString(),
+    }))
+
+    const { error } = await client
+      .from('document_chunks')
+      .upsert(batch, { onConflict: 'document_id,chunk_index' })
+
+    if (error) {
+      console.error(`[DocumentIndex] Chunk wave upsert error:`, error.message)
+      return false
+    }
+  }
+
+  return true
+}
+
+export async function pauseIndexingForCooldown(
+  documentId: string,
+  authoritativeUserId: string,
+  token: string,
+  statusMessage: string
+): Promise<boolean> {
+  const client = getServiceRoleClient()
+  const { data, error } = await client
+    .from('documents')
+    .update({
+      embedding_status: 'processing',
+      embedding_locked_at: null,
+      embedding_token: null,
+      embedding_error: statusMessage.slice(0, 500),
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', documentId)
+    .eq('user_id', authoritativeUserId)
+    .eq('embedding_token', token)
+    .select('id')
+    .maybeSingle()
+
+  return !error && Boolean(data)
+}
+
+export async function completeCheckpointedIndexing(
+  documentId: string,
+  authoritativeUserId: string,
+  token: string,
+  expectedTotalChunks: number
+): Promise<boolean> {
+  const client = getServiceRoleClient()
+
+  const { data: fenceDoc } = await client
+    .from('documents')
+    .select('id')
+    .eq('id', documentId)
+    .eq('user_id', authoritativeUserId)
+    .eq('embedding_token', token)
+    .maybeSingle()
+
+  if (!fenceDoc) {
+    return false
+  }
+
+  await client
+    .from('document_chunks')
+    .delete()
+    .eq('document_id', documentId)
+    .gte('chunk_index', expectedTotalChunks)
+
+  const nowIso = new Date().toISOString()
+  const { data, error } = await client
+    .from('documents')
+    .update({
+      embedding_status: 'completed',
+      embedding_completed_at: nowIso,
+      embedding_locked_at: null,
+      embedding_token: null,
+      embedding_error: null,
+      updated_at: nowIso,
+    })
+    .eq('id', documentId)
+    .eq('user_id', authoritativeUserId)
+    .eq('embedding_token', token)
+    .select('id')
+    .maybeSingle()
+
+  return !error && Boolean(data)
 }
 
 export interface ChunkInsertPayload {

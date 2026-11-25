@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { verifyAdminApi } from '@/lib/admin/auth'
+import { isSameOrigin } from '@/lib/validation/origin'
 import {
   getLivePlanConfigs,
   saveLivePlanConfigs,
@@ -16,15 +17,19 @@ export async function GET() {
   try {
     const config = await getLivePlanConfigs(true)
     return NextResponse.json(config)
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error?.message || 'Failed to load plan configurations' },
+      { error: error instanceof Error ? error.message : 'Failed to load plan configurations' },
       { status: 500 }
     )
   }
 }
 
 export async function PUT(req: Request) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ error: 'Invalid origin' }, { status: 403 })
+  }
+
   const auth = await verifyAdminApi()
   if (auth instanceof NextResponse) return auth
 
@@ -65,15 +70,19 @@ export async function PUT(req: Request) {
       message: 'Plans and pricing updated successfully. Changes are now live across the website and Razorpay checkout.',
       ...updated,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error?.message || 'Failed to save plan configuration' },
+      { error: error instanceof Error ? error.message : 'Failed to save plan configuration' },
       { status: 500 }
     )
   }
 }
 
-export async function DELETE() {
+export async function DELETE(req: Request) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ error: 'Invalid origin' }, { status: 403 })
+  }
+
   const auth = await verifyAdminApi()
   if (auth instanceof NextResponse) return auth
 
@@ -96,9 +105,9 @@ export async function DELETE() {
       message: 'Plan configurations have been reset to factory defaults.',
       ...reset,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error?.message || 'Failed to reset plan configuration' },
+      { error: error instanceof Error ? error.message : 'Failed to reset plan configuration' },
       { status: 500 }
     )
   }

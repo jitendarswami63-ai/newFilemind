@@ -55,15 +55,29 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
     const dispositionType = isDownload ? 'attachment' : 'inline'
     const safeFilename = doc.filename.replace(/["\r\n]/g, '_')
+    let safeMime = (doc.mime_type || 'application/pdf').trim()
+    const lowerMime = safeMime.toLowerCase()
+
+    if (lowerMime.includes('text/html') || lowerMime.includes('application/xhtml+xml')) {
+      safeMime = 'text/plain; charset=utf-8'
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': safeMime,
+      'Content-Disposition': `${dispositionType}; filename="${safeFilename}"`,
+      'Content-Length': fileBuffer.length.toString(),
+      'Cache-Control': 'private, max-age=300',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'SAMEORIGIN',
+    }
+
+    if (lowerMime.includes('image/svg+xml') || lowerMime.includes('xml')) {
+      headers['Content-Security-Policy'] = "sandbox; default-src 'none'; style-src 'unsafe-inline'; script-src 'none'"
+    }
 
     return new Response(new Uint8Array(fileBuffer), {
       status: 200,
-      headers: {
-        'Content-Type': doc.mime_type || 'application/pdf',
-        'Content-Disposition': `${dispositionType}; filename="${safeFilename}"`,
-        'Content-Length': fileBuffer.length.toString(),
-        'Cache-Control': 'private, max-age=300',
-      },
+      headers,
     })
   } catch (error: unknown) {
     console.error('[Public Share Content API] Unexpected error:', error)

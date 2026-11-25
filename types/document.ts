@@ -31,6 +31,9 @@ export interface DocumentItem {
   status: DocumentStatus
   processing_stage?: string | null
   embedding_status?: 'pending' | 'processing' | 'completed' | 'failed' | null
+  embedding_locked_at?: string | null
+  embedding_error?: string | null
+  updated_at?: string | null
   extracted_data?: Record<string, unknown> | null
   created_at: string
   file_size: number | null
@@ -111,6 +114,7 @@ export interface AskAIQuestionOptions {
   }>
   provider?: 'gemini' | 'nvidia'
   model?: string
+  apiKey?: string
 }
 
 export interface AskAIResult {
@@ -132,6 +136,7 @@ export interface AskAIRequest {
   }>
   provider?: 'gemini' | 'nvidia'
   model?: string
+  apiKey?: string
 }
 
 export interface AskAIResponse {

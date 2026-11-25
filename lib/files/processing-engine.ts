@@ -25,8 +25,8 @@ function createAdminClient() {
   return createSupabaseAdminClient(url, serviceKey)
 }
 
-function getGeminiClient(): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY
+function getGeminiClient(apiKeyOverride?: string): GoogleGenAI | null {
+  const apiKey = apiKeyOverride?.trim() || process.env.GEMINI_API_KEY
   if (!apiKey) return null
   return new GoogleGenAI({ apiKey })
 }
@@ -65,6 +65,7 @@ export type FileProcessor = (
     storage_provider?: string | null
     file_size: number | null
     mime_type: string
+    byokApiKey?: string
   },
   buffer: Buffer,
   format: FileFormatDefinition
@@ -141,7 +142,7 @@ const documentProcessor: FileProcessor = async (documentId, doc, buffer, format)
   )
 
   // AI analysis pipeline
-  const gemini = getGeminiClient()
+  const gemini = getGeminiClient(doc.byokApiKey)
   const candidateModels = getCandidateModels()
   let aiResult: DocumentMetadataResult
 
@@ -184,7 +185,7 @@ const documentProcessor: FileProcessor = async (documentId, doc, buffer, format)
 
   // Trigger semantic embedding index
   try {
-    await indexDocument(documentId)
+    await indexDocument(documentId, doc.byokApiKey)
   } catch (err) {
     console.warn(`[ProcessingEngine] Semantic indexing warning for ${doc.filename}:`, err)
   }
@@ -232,7 +233,7 @@ const presentationProcessor: FileProcessor = async (documentId, doc, buffer, for
     }))
   )
 
-  const gemini = getGeminiClient()
+  const gemini = getGeminiClient(doc.byokApiKey)
   const candidateModels = getCandidateModels()
   let aiResult: DocumentMetadataResult
 
@@ -273,9 +274,9 @@ const presentationProcessor: FileProcessor = async (documentId, doc, buffer, for
     .eq('id', documentId)
 
   try {
-    await indexDocument(documentId)
+    await indexDocument(documentId, doc.byokApiKey)
   } catch (idxErr) {
-    console.warn(`[ProcessingEngine] Indexing warning for presentation ${doc.filename}:`, idxErr)
+    console.warn(`[ProcessingEngine] Indexing warning for ${doc.filename}:`, idxErr)
   }
 
   return {
@@ -325,7 +326,7 @@ const spreadsheetProcessor: FileProcessor = async (documentId, doc, buffer, form
     }))
   )
 
-  const gemini = getGeminiClient()
+  const gemini = getGeminiClient(doc.byokApiKey)
   const candidateModels = getCandidateModels()
   let aiResult: DocumentMetadataResult
 
@@ -369,9 +370,9 @@ const spreadsheetProcessor: FileProcessor = async (documentId, doc, buffer, form
     .eq('id', documentId)
 
   try {
-    await indexDocument(documentId)
+    await indexDocument(documentId, doc.byokApiKey)
   } catch (idxErr) {
-    console.warn(`[ProcessingEngine] Indexing warning for presentation ${doc.filename}:`, idxErr)
+    console.warn(`[ProcessingEngine] Indexing warning for ${doc.filename}:`, idxErr)
   }
 
   return {
@@ -412,7 +413,7 @@ const codeProcessor: FileProcessor = async (documentId, doc, buffer, format) => 
     }))
   )
 
-  const gemini = getGeminiClient()
+  const gemini = getGeminiClient(doc.byokApiKey)
   const candidateModels = getCandidateModels()
   let aiResult: DocumentMetadataResult
 
@@ -455,9 +456,9 @@ const codeProcessor: FileProcessor = async (documentId, doc, buffer, format) => 
     .eq('id', documentId)
 
   try {
-    await indexDocument(documentId)
+    await indexDocument(documentId, doc.byokApiKey)
   } catch (idxErr) {
-    console.warn(`[ProcessingEngine] Indexing warning for presentation ${doc.filename}:`, idxErr)
+    console.warn(`[ProcessingEngine] Indexing warning for ${doc.filename}:`, idxErr)
   }
 
   return {
@@ -472,7 +473,7 @@ const codeProcessor: FileProcessor = async (documentId, doc, buffer, format) => 
 const imageProcessor: FileProcessor = async (documentId, doc, buffer, format) => {
   const admin = createAdminClient()
   const meta = parseImageMetadata(buffer, format.extension)
-  const gemini = getGeminiClient()
+  const gemini = getGeminiClient(doc.byokApiKey)
   const candidateModels = getCandidateModels()
 
   let aiResult: DocumentMetadataResult
@@ -533,9 +534,9 @@ const imageProcessor: FileProcessor = async (documentId, doc, buffer, format) =>
 
   // Trigger semantic embedding so images are searchable via OCR and visual description
   try {
-    await indexDocument(documentId)
+    await indexDocument(documentId, doc.byokApiKey)
   } catch (idxErr) {
-    console.warn(`[ProcessingEngine] Indexing warning for presentation ${doc.filename}:`, idxErr)
+    console.warn(`[ProcessingEngine] Indexing warning for ${doc.filename}:`, idxErr)
   }
 
   return {
@@ -665,7 +666,7 @@ const genericProcessor: FileProcessor = async (documentId, doc, buffer, format) 
         summary: `Binary file "${doc.filename}" stored securely in FileMind vault.`,
         fileSizeBytes: buffer.length,
         mimeType: format.mimeType,
-        notice: 'File stored securely in Cloudflare R2.',
+        notice: 'File stored securely in FileMind Encrypted Vault.',
       },
       embedding_status: 'completed',
     })
@@ -694,7 +695,8 @@ processingRegistry.register('default', genericProcessor)
  */
 export async function processUniversalFile(
   documentId: string,
-  preAcquiredToken?: string
+  preAcquiredToken?: string,
+  apiKeyOverride?: string
 ): Promise<boolean> {
   const admin = createAdminClient()
 
@@ -707,6 +709,7 @@ export async function processUniversalFile(
     file_size: number | null
     mime_type: string
     status: string
+    byokApiKey?: string
   } | null = null
 
   const { data, error } = await admin
@@ -734,7 +737,24 @@ export async function processUniversalFile(
     doc = data
   }
 
+  let effectiveByok = apiKeyOverride?.trim() || undefined
+  if (!effectiveByok) {
+    try {
+      const { data: ownerData } = await admin.auth.admin.getUserById(doc.user_id)
+      const ownerByok = ownerData?.user?.user_metadata?.byok_gemini_key
+      if (typeof ownerByok === 'string' && ownerByok.trim()) {
+        effectiveByok = ownerByok.trim()
+      }
+    } catch {}
+  }
+  doc.byokApiKey = effectiveByok
+
   const format = detectFileFormat(doc.filename, doc.mime_type)
+
+  // Delegate PDFs directly so processPdfDocument manages its own checkpoint-pause timeout and clears it before vector indexing.
+  if (format.extension.toLowerCase() === 'pdf' || format.mimeType === 'application/pdf') {
+    return await processPdfDocument(documentId, preAcquiredToken, effectiveByok)
+  }
 
   const SERVERLESS_TIMEOUT_MS = 50_000
   let timeoutTimer: NodeJS.Timeout | null = null
@@ -747,10 +767,6 @@ export async function processUniversalFile(
 
   try {
     const executeWork = async (): Promise<boolean> => {
-      // 1. If it's a PDF, delegate to the established PDF intelligence pipeline
-      if (format.extension.toLowerCase() === 'pdf' || format.mimeType === 'application/pdf') {
-        return await processPdfDocument(documentId, preAcquiredToken)
-      }
 
       // 2. Multi-format processing
       await admin

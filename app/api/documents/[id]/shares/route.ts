@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { verifyVaultAccess } from '@/lib/auth/vault-mfa'
+import { isSameOrigin } from '@/lib/validation/origin'
 import {
   createPublicShare,
   createRestrictedShare,
@@ -79,6 +80,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
 // POST /api/documents/[id]/shares
 export async function POST(request: NextRequest, context: RouteContext) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: 'Invalid origin' }, { status: 403 })
+  }
+
   try {
     const { id } = await context.params
     const supabase = await createClient()
@@ -88,15 +93,37 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: auth.status })
     }
 
-    const { data: doc, error: docError } = await supabase
+    let doc: { id: string; filename: string; user_id: string; is_locked?: boolean | null } | null = null
+    const { data: initialDoc, error: docError } = await supabase
       .from('documents')
-      .select('id, filename, user_id')
+      .select('id, filename, user_id, is_locked')
       .eq('id', id)
       .eq('user_id', auth.user.id)
       .single()
 
-    if (docError || !doc) {
+    if (initialDoc) {
+      doc = initialDoc
+    } else if (docError && (docError.code === '42703' || docError.message?.includes('is_locked'))) {
+      const { data: fallbackDoc } = await supabase
+        .from('documents')
+        .select('id, filename, user_id')
+        .eq('id', id)
+        .eq('user_id', auth.user.id)
+        .single()
+      if (fallbackDoc) {
+        doc = { ...fallbackDoc, is_locked: false }
+      }
+    }
+
+    if (!doc) {
       return NextResponse.json({ error: 'Document not found or access denied' }, { status: 404 })
+    }
+
+    if (doc.is_locked) {
+      return NextResponse.json(
+        { error: 'Biometrically locked vault documents cannot be shared. Unlock the document first before sharing.' },
+        { status: 403 }
+      )
     }
 
     let body: unknown
@@ -164,6 +191,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
 // PATCH /api/documents/[id]/shares
 export async function PATCH(request: NextRequest) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: 'Invalid origin' }, { status: 403 })
+  }
+
   try {
     const supabase = await createClient()
 
@@ -215,6 +246,10 @@ export async function PATCH(request: NextRequest) {
 
 // DELETE /api/documents/[id]/shares
 export async function DELETE(request: NextRequest) {
+  if (!isSameOrigin(request)) {
+    return NextResponse.json({ error: 'Invalid origin' }, { status: 403 })
+  }
+
   try {
     const { searchParams } = new URL(request.url)
     const shareId = searchParams.get('shareId')

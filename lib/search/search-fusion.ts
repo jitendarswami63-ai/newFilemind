@@ -16,6 +16,8 @@ export interface HybridSearchOptions {
   documentId?: string
   minSimilarity?: number
   deduplicateByDocument?: boolean
+  enableSemantic?: boolean
+  apiKey?: string
 }
 
 export interface SemanticCandidate {

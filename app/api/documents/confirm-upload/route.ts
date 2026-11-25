@@ -130,7 +130,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Upload validation failed. Please try again.' }, { status: 400 })
   }
 
+  let createdWithAdminFallback = false
+
   if (storageProvider === 'r2') {
+    // Re-check authoritative storage sum with service role right before insert to prevent concurrent R2 quota race
+    const admin = createSupabaseAdminClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    )
+    const { data: currentDocs } = await admin
+      .from('documents')
+      .select('file_size')
+      .eq('user_id', user.id)
+    const liveUsedBytes = Array.isArray(currentDocs)
+      ? currentDocs.reduce((acc, row) => acc + (Number(row.file_size) || 0), 0)
+      : entitlements.usedStorageBytes
+
+    if (liveUsedBytes + actualSize > entitlements.totalStorageBytes) {
+      await storageService.deleteFile(storagePath, storageProvider)
+      return NextResponse.json(
+        {
+          error: `Storage quota exceeded (${formatBytes(entitlements.totalStorageBytes)} limit). Please delete old documents or purchase additional storage.`,
+          code: 'STORAGE_QUOTA_EXCEEDED',
+        },
+        { status: 403 }
+      )
+    }
+
     const { error: insertError } = await supabase
       .from('documents')
       .insert({
@@ -224,27 +250,63 @@ export async function POST(request: Request) {
     }
 
     if (resultStatus === 'storage_quota_exceeded') {
-      await storageService.deleteFile(storagePath, storageProvider)
-      return NextResponse.json(
-        { error: `Storage quota exceeded (${formatBytes(entitlements.totalStorageBytes)} limit). Please delete old documents or upgrade your storage.` },
-        { status: 403 }
-      )
-    }
-
-    try {
+      // Check if user has >2GB dynamic quota (Elite 10 GB or Add-on Storage Packs) where legacy 2GB RPC rejected prematurely
       const admin = createSupabaseAdminClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!
       )
-      await admin
+      const { data: currentDocs } = await admin
         .from('documents')
-        .update({
-          mime_type: detectedFormat.mimeType,
-          doc_category: detectedFormat.category,
-        })
-        .eq('id', documentId)
-    } catch (updateErr) {
-      console.warn('[ConfirmUpload] Failed to update format metadata:', updateErr)
+        .select('file_size')
+        .eq('user_id', user.id)
+      const liveUsedBytes = Array.isArray(currentDocs)
+        ? currentDocs.reduce((acc, row) => acc + (Number(row.file_size) || 0), 0)
+        : entitlements.usedStorageBytes
+
+      if (liveUsedBytes + actualSize <= entitlements.totalStorageBytes) {
+        const { error: fallbackInsertErr } = await admin
+          .from('documents')
+          .insert({
+            id: documentId,
+            user_id: user.id,
+            filename: displayFilename,
+            storage_path: storagePath,
+            file_size: actualSize,
+            mime_type: detectedFormat.mimeType,
+            doc_category: detectedFormat.category,
+            status: 'pending',
+          })
+
+        if (fallbackInsertErr) {
+          await storageService.deleteFile(storagePath, storageProvider)
+          return NextResponse.json({ error: 'Upload failed. Please try again.' }, { status: 500 })
+        }
+        createdWithAdminFallback = true
+      } else {
+        await storageService.deleteFile(storagePath, storageProvider)
+        return NextResponse.json(
+          { error: `Storage quota exceeded (${formatBytes(entitlements.totalStorageBytes)} limit). Please delete old documents or upgrade your storage.` },
+          { status: 403 }
+        )
+      }
+    }
+
+    if (!createdWithAdminFallback) {
+      try {
+        const admin = createSupabaseAdminClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        )
+        await admin
+          .from('documents')
+          .update({
+            mime_type: detectedFormat.mimeType,
+            doc_category: detectedFormat.category,
+          })
+          .eq('id', documentId)
+      } catch (updateErr) {
+        console.warn('[ConfirmUpload] Failed to update format metadata:', updateErr)
+      }
     }
   }
 
@@ -264,17 +326,28 @@ export async function POST(request: Request) {
           } catch {}
         }
 
-        await admin
+        const freeUpdatePayload = {
+          status: 'completed',
+          page_count: pageCount,
+          doc_category: detectedFormat.category || 'Standard Document',
+          tags: ['Free Tier'],
+          extracted_data: { notice: 'Free Tier storage - AI document understanding available on Pro & Elite' },
+        }
+
+        const { error: freeUpdateErr } = await admin
           .from('documents')
           .update({
-            status: 'completed',
-            page_count: pageCount,
+            ...freeUpdatePayload,
             storage_provider: storageProvider,
-            doc_category: detectedFormat.category || 'Standard Document',
-            tags: ['Free Tier'],
-            extracted_data: { notice: 'Free Tier storage - AI document understanding available on Pro & Elite' },
           })
           .eq('id', documentId)
+
+        if (freeUpdateErr && (freeUpdateErr.code === '42703' || freeUpdateErr.message?.includes('storage_provider'))) {
+          await admin
+            .from('documents')
+            .update(freeUpdatePayload)
+            .eq('id', documentId)
+        }
       } catch (freeErr) {
         console.warn('[ConfirmUpload] Error setting completed status for free user doc:', freeErr)
       }
@@ -282,10 +355,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, documentId, plan: 'free' })
   }
 
+  const byokApiKey =
+    typeof user.user_metadata?.byok_gemini_key === 'string' && user.user_metadata.byok_gemini_key.trim()
+      ? user.user_metadata.byok_gemini_key.trim()
+      : undefined
+
   const skipImmediate = body.skipImmediateProcessing
   if (!skipImmediate) {
     after(async () => {
-      await processUniversalFile(documentId)
+      await processUniversalFile(documentId, undefined, byokApiKey)
     })
   }
 

@@ -149,30 +149,78 @@ export function PDFViewer({
     }
   }, [status, reloadSignedUrl])
 
+  const [embeddingProgressNote, setEmbeddingProgressNote] = useState<string | null>(null)
+
   useEffect(() => {
-    if (status === 'completed' || status === 'failed') {
+    const isExtracting = status === 'pending' || status === 'processing'
+    const isIndexing = status === 'completed' && (embeddingStatus === 'pending' || embeddingStatus === 'processing')
+    if (!isExtracting && !isIndexing) {
       return
     }
 
-    const interval = setInterval(async () => {
+    let cancelled = false
+    let lastResumeTriggerAt = 0
+    let autoResumeCount = 0
+    let lastEmbedResumeAt = 0
+
+    const pollOnce = async () => {
       try {
         const res = await fetch(`/api/documents/${documentId}`)
-        if (!res.ok) return
+        if (!res.ok || cancelled) return
         const data = await res.json()
+        if (cancelled) return
 
         if (data.status && data.status !== status) {
           setStatus(data.status)
-          if (data.embedding_status) setEmbeddingStatus(data.embedding_status)
-          if (data.error_message) setErrorMessage(data.error_message)
-          if (data.doc_category) setDocCategory(data.doc_category)
-          if (data.tags) setTags(data.tags)
-          if (data.processing_locked_at) setProcessingLockedAt(data.processing_locked_at)
+        }
+        if ('embedding_status' in data) setEmbeddingStatus(data.embedding_status ?? null)
+        if ('embedding_error' in data) setEmbeddingProgressNote(data.embedding_error ?? null)
+        if ('error_message' in data) setErrorMessage(data.error_message ?? null)
+        if (data.doc_category) setDocCategory(data.doc_category)
+        if (data.tags) setTags(data.tags)
+        if ('processing_locked_at' in data) setProcessingLockedAt(data.processing_locked_at ?? null)
+
+        const nowMs = Date.now()
+
+        const lockAgeMs = data.processing_locked_at
+          ? nowMs - new Date(data.processing_locked_at).getTime()
+          : Infinity
+        const shouldAutoResume =
+          data.status === 'pending' ||
+          (data.status === 'processing' && (!data.processing_locked_at || lockAgeMs > 2 * 60 * 1000))
+
+        if (shouldAutoResume && autoResumeCount < 10 && nowMs - lastResumeTriggerAt > 15_000) {
+          lastResumeTriggerAt = nowMs
+          autoResumeCount++
+          fetch('/api/documents/process-queue', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ documentId }),
+          }).catch(() => {})
+        }
+
+        if (
+          data.status === 'completed' &&
+          data.embedding_status === 'processing' &&
+          !data.embedding_locked_at &&
+          data.updated_at
+        ) {
+          const cooldownAge = nowMs - new Date(data.updated_at).getTime()
+          if (cooldownAge >= 65_000 && nowMs - lastEmbedResumeAt >= 65_000) {
+            lastEmbedResumeAt = nowMs
+            fetch(`/api/documents/${documentId}/reindex?resume=true`, { method: 'POST' }).catch(() => {})
+          }
         }
       } catch {}
-    }, 3000)
+    }
 
-    return () => clearInterval(interval)
-  }, [status, documentId])
+    const interval = setInterval(pollOnce, 3000)
+
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [status, embeddingStatus, documentId])
 
   const handleRetry = async () => {
     setRetrying(true)
@@ -188,7 +236,9 @@ export function PDFViewer({
         throw new Error(data.error || 'Failed to trigger processing')
       }
 
+      setErrorMessage(null)
       setStatus('processing')
+      setProcessingLockedAt(new Date().toISOString())
       setShowPendingRetry(false)
       setIsStaleLock(false)
       setRetryMessage('Processing initiated successfully...')
@@ -218,6 +268,7 @@ export function PDFViewer({
       }
 
       setEmbeddingStatus('processing')
+      setEmbeddingProgressNote(null)
       setReindexMessage('Reindexing started...')
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -293,7 +344,7 @@ export function PDFViewer({
         {isStaleLock ? (
           <div className="flex flex-col items-center gap-3">
             <p className="text-xs text-[#B45309] max-w-xs font-medium">
-              Processing appears stalled (locked for &gt; 10 minutes). You can reclaim the lease and retry.
+              Processing appears stalled (locked for &gt; 2 minutes). You can reclaim the lease and retry.
             </p>
             <Button
               onClick={handleRetry}
@@ -478,11 +529,22 @@ export function PDFViewer({
         </div>
       )}
 
+      {status === 'completed' && embeddingStatus === 'processing' && (
+        <div className="px-5 py-2.5 bg-[#FAF5EC] border-b border-[#E5DED1] flex flex-wrap items-center justify-between gap-3 text-xs text-[#856837]">
+          <div className="flex items-center gap-2">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-[#9C7D47] shrink-0" />
+            <span>
+              {embeddingProgressNote || 'Generating semantic vector embeddings in rate-limited waves. Keyword Search and Ask AI are already available.'}
+            </span>
+          </div>
+        </div>
+      )}
+
       {status === 'completed' && embeddingStatus === 'failed' && (
         <div className="px-5 py-2.5 bg-[#FEF8EC] border-b border-[#FDE68A] flex flex-wrap items-center justify-between gap-3 text-xs text-[#B45309]">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4 text-[#B45309] shrink-0" />
-            <span>Document text was extracted, but search indexing failed. AI search and Ask AI are unavailable for this document.</span>
+            <span>Document text is extracted and available for keyword Search &amp; Ask AI. Semantic vector indexing hit an API quota limit.</span>
           </div>
           <div className="flex items-center gap-2">
             <Button

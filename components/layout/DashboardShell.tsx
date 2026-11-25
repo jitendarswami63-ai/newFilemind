@@ -7,7 +7,7 @@ import { MobileNav } from './MobileNav'
 import { UpgradeModalProvider } from '@/components/subscription/UpgradeModalContext'
 import { UserPlanProvider } from '@/lib/subscription/plan'
 
-type ShellUser = { id?: string; email?: string; user_metadata?: Record<string, any> } | null
+type ShellUser = { id?: string; email?: string; user_metadata?: Record<string, unknown> } | null
 
 function DashboardInnerShell({
   user,

@@ -6,6 +6,7 @@ import {
   downgradeUserToFree,
 } from '@/lib/subscription/plan-server'
 import { PLAN_CONFIGS } from '@/lib/subscription/plans'
+import { isSameOrigin } from '@/lib/validation/origin'
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
 
 export const dynamic = 'force-dynamic'
@@ -59,15 +60,19 @@ export async function GET() {
     response.cookies.set('filemind_plan', '', { path: '/', expires: new Date(0) })
 
     return response
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error?.message || 'Error checking subscription status' },
+      { error: error instanceof Error ? error.message : 'Error checking subscription status' },
       { status: 500 }
     )
   }
 }
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ error: 'Invalid origin' }, { status: 403 })
+  }
+
   try {
     const supabase = await createClient()
     const {
@@ -94,7 +99,7 @@ export async function POST(req: Request) {
 
     if (action === 'save_byok') {
       const { apiKey } = body
-      if (typeof apiKey !== 'string' || apiKey.trim().length < 10) {
+      if (typeof apiKey !== 'string' || apiKey.trim().length < 10 || apiKey.trim().length > 200) {
         return NextResponse.json({ error: 'Invalid Gemini API key provided' }, { status: 400 })
       }
 
@@ -140,9 +145,9 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error?.message || 'Failed to update subscription' },
+      { error: error instanceof Error ? error.message : 'Failed to update subscription' },
       { status: 500 }
     )
   }

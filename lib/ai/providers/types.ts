@@ -13,6 +13,7 @@ export interface ProviderGenerateOptions {
   maxTokens?: number
   model?: string
   timeoutMs?: number
+  apiKey?: string
 }
 
 export interface ProviderGenerateResult {

@@ -8,7 +8,10 @@ import { createClient } from '@/lib/supabase/client'
 
 declare global {
   interface Window {
-    Razorpay?: any
+    Razorpay?: new (options: Record<string, unknown>) => {
+      open: () => void
+      on: (event: string, cb: (resp: { error?: { description?: string } }) => void) => void
+    }
   }
 }
 
@@ -48,9 +51,12 @@ export function RazorpayCheckoutButton({
   const [resolvedPhone, setResolvedPhone] = useState<string>(userPhone || '')
 
   useEffect(() => {
-    if (userEmail) setResolvedEmail(userEmail)
-    if (userName) setResolvedName(userName)
-    if (userPhone) setResolvedPhone(userPhone)
+    const timer = setTimeout(() => {
+      if (userEmail) setResolvedEmail(userEmail)
+      if (userName) setResolvedName(userName)
+      if (userPhone) setResolvedPhone(userPhone)
+    }, 0)
+    return () => clearTimeout(timer)
   }, [userEmail, userName, userPhone])
 
   useEffect(() => {
@@ -59,7 +65,7 @@ export function RazorpayCheckoutButton({
         const supabase = createClient()
         supabase.auth
           .getUser()
-          .then((response: any) => {
+          .then((response: { data?: { user?: { email?: string; phone?: string; user_metadata?: { full_name?: string; phone?: string; phone_number?: string } } | null } }) => {
             const user = response?.data?.user
             if (user?.email) {
               setResolvedEmail(user.email)
@@ -203,8 +209,8 @@ export function RazorpayCheckoutButton({
             } else {
               setErrorMsg(verifyData.error || 'Payment signature verification failed.')
             }
-          } catch (err: any) {
-            setErrorMsg(err.message || 'Error verifying payment.')
+          } catch (err: unknown) {
+            setErrorMsg(err instanceof Error ? err.message : 'Error verifying payment.')
           } finally {
             setLoading(false)
           }
@@ -224,14 +230,17 @@ export function RazorpayCheckoutButton({
         },
       }
 
+      if (!window.Razorpay) {
+        throw new Error('Razorpay checkout SDK not initialized.')
+      }
       const rzp = new window.Razorpay(options)
-      rzp.on('payment.failed', function (resp: any) {
+      rzp.on('payment.failed', function (resp: { error?: { description?: string } }) {
         setErrorMsg(resp.error?.description || 'Payment transaction failed or cancelled.')
         setLoading(false)
       })
       rzp.open()
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Error initiating Razorpay checkout.')
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Error initiating Razorpay checkout.')
       setLoading(false)
     }
   }

@@ -12,8 +12,10 @@ export async function GET(req: Request) {
   const page = parseInt(searchParams.get('page') || '1', 10)
   const limit = parseInt(searchParams.get('limit') || '20', 10)
   const search = searchParams.get('search') || ''
-  const tier = (searchParams.get('tier') || 'all') as any
-  const status = (searchParams.get('status') || 'all') as any
+  const rawTier = searchParams.get('tier') || 'all'
+  const rawStatus = searchParams.get('status') || 'all'
+  const tier = (['all', 'free', 'pro', 'elite'].includes(rawTier) ? rawTier : 'all') as 'all' | 'free' | 'pro' | 'elite'
+  const status = (['all', 'active', 'suspended'].includes(rawStatus) ? rawStatus : 'all') as 'all' | 'active' | 'suspended'
 
   try {
     const data = await getAdminUsersList({
@@ -24,9 +26,9 @@ export async function GET(req: Request) {
       status,
     })
     return NextResponse.json(data)
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error?.message || 'Failed to list users' },
+      { error: error instanceof Error ? error.message : 'Failed to list users' },
       { status: 500 }
     )
   }

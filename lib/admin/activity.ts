@@ -7,7 +7,7 @@ export interface UserActivityEntry {
   eventType: string
   authMethod?: string | null
   sessionStatus?: string
-  details?: Record<string, any>
+  details?: Record<string, unknown>
 }
 
 export async function recordUserActivity(entry: UserActivityEntry): Promise<boolean> {

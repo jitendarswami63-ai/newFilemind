@@ -3,10 +3,15 @@ import { getRazorpayClient } from '@/lib/payments/razorpay'
 import { PLAN_CONFIGS, STORAGE_PACKS } from '@/lib/subscription/plans'
 import { getLivePlanConfigs } from '@/lib/subscription/dynamic-plans'
 import { createClient } from '@/lib/supabase/server'
+import { isSameOrigin } from '@/lib/validation/origin'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ error: 'Invalid origin' }, { status: 403 })
+  }
+
   try {
     const supabase = await createClient()
     const {
@@ -24,8 +29,17 @@ export async function POST(req: Request) {
       )
     }
 
-    const body = await req.json().catch(() => ({}))
-    const { planTier, packId, currency = 'INR', notes = {} } = body
+    const body = (await req.json().catch(() => ({}))) as Record<string, unknown>
+    const requestedTier = typeof body.planTier === 'string' ? body.planTier.trim().toLowerCase() : undefined
+    const requestedPackId = typeof body.packId === 'string' ? body.packId.trim().toLowerCase() : undefined
+    const requestedCurrency = typeof body.currency === 'string' ? body.currency.trim().toUpperCase() : 'INR'
+
+    if (requestedCurrency !== 'INR') {
+      return NextResponse.json(
+        { error: 'Unsupported currency. All plans and storage packs are billed in INR.' },
+        { status: 400 }
+      )
+    }
 
     const liveConfig = await getLivePlanConfigs().catch(() => null)
     const activePlans = liveConfig?.plans || PLAN_CONFIGS
@@ -33,29 +47,42 @@ export async function POST(req: Request) {
 
     let amountInPaise: number | null = null
     let orderDescription = 'FileMind Order'
+    let authoritativeType: 'subscription' | 'storage_pack' = 'subscription'
+    let authoritativeTier: 'pro' | 'elite' | undefined
+    let authoritativePackId: string | undefined
 
-    if (planTier && activePlans[planTier as keyof typeof activePlans]) {
-      const plan = activePlans[planTier as keyof typeof activePlans]
-      amountInPaise = plan.priceINR * 100
-      orderDescription = `${plan.name} Subscription`
-      notes.type = 'subscription'
-      notes.planTier = planTier
-    } else if (packId && activePacks[packId]) {
-      const pack = activePacks[packId]
-      amountInPaise = pack.priceINR * 100
+    if (requestedPackId) {
+      const pack = activePacks[requestedPackId]
+      if (!pack) {
+        return NextResponse.json({ error: 'Invalid storage pack identifier' }, { status: 400 })
+      }
+      amountInPaise = Math.round(pack.priceINR * 100)
       orderDescription = `${pack.name} Storage Add-on`
-      notes.type = 'storage_pack'
-      notes.packId = packId
-    } else if (typeof body.amount === 'number' && body.amount > 0) {
-      amountInPaise = body.amount > 1000 ? Math.round(body.amount) : Math.round(body.amount * 100)
-      orderDescription = body.planName || 'FileMind Service'
-      notes.type = body.type || 'custom'
+      authoritativeType = 'storage_pack'
+      authoritativePackId = pack.id
+    } else if (requestedTier) {
+      if (requestedTier !== 'pro' && requestedTier !== 'elite') {
+        return NextResponse.json(
+          { error: 'Invalid subscription tier. Only Pro or Elite plans are purchasable.' },
+          { status: 400 }
+        )
+      }
+      const plan = activePlans[requestedTier]
+      amountInPaise = Math.round(plan.priceINR * 100)
+      orderDescription = `${plan.name} Subscription`
+      authoritativeType = 'subscription'
+      authoritativeTier = requestedTier
+    } else if (body.amount !== undefined) {
+      return NextResponse.json(
+        { error: 'Valid planTier or packId is required to initiate checkout.' },
+        { status: 400 }
+      )
     } else {
       const defaultPro = activePlans.pro || PLAN_CONFIGS.pro
-      amountInPaise = defaultPro.priceINR * 100
+      amountInPaise = Math.round(defaultPro.priceINR * 100)
       orderDescription = `${defaultPro.name} Subscription`
-      notes.type = 'subscription'
-      notes.planTier = 'pro'
+      authoritativeType = 'subscription'
+      authoritativeTier = 'pro'
     }
 
     if (!amountInPaise || amountInPaise < 100) {
@@ -66,15 +93,44 @@ export async function POST(req: Request) {
     }
 
     const userMetadata = user.user_metadata || {}
-    const registeredName = (userMetadata.full_name || userMetadata.name || body.userName || '').trim() || 'FileMind User'
-    const registeredEmail = user.email || body.userEmail || ''
-    const registeredPhone = (user.phone || userMetadata.phone || userMetadata.phone_number || body.userPhone || '').trim()
+    const registeredName =
+      String(userMetadata.full_name || userMetadata.name || '').trim() || 'FileMind User'
+    const registeredEmail = user.email || ''
+    const registeredPhone = String(
+      user.phone || userMetadata.phone || userMetadata.phone_number || ''
+    ).trim()
     const userId = user.id
 
     const receipt = `rcpt_${userId.slice(0, 8)}_${Date.now()}`
     const razorpay = getRazorpayClient()
 
-    const orderNotes = {
+    const safeClientNotes: Record<string, string> = {}
+    if (body.notes && typeof body.notes === 'object' && !Array.isArray(body.notes)) {
+      const reservedKeys = new Set([
+        'userId',
+        'user_id',
+        'type',
+        'planTier',
+        'packId',
+        'expectedAmountPaise',
+        'expectedCurrency',
+        'description',
+        'customerName',
+        'customerEmail',
+        'customerPhone',
+        'user_name',
+        'user_email',
+        'user_phone',
+      ])
+      for (const [k, v] of Object.entries(body.notes as Record<string, unknown>)) {
+        if (!reservedKeys.has(k) && typeof v === 'string' && v.length <= 250) {
+          safeClientNotes[k] = v
+        }
+      }
+    }
+
+    const orderNotes: Record<string, string> = {
+      ...safeClientNotes,
       description: orderDescription,
       userId,
       user_id: userId,
@@ -84,15 +140,16 @@ export async function POST(req: Request) {
       user_name: registeredName,
       user_email: registeredEmail,
       user_phone: registeredPhone,
-      type: notes.type || (packId ? 'storage_pack' : 'subscription'),
-      planTier: planTier || undefined,
-      packId: packId || undefined,
-      ...notes,
+      type: authoritativeType,
+      ...(authoritativeTier ? { planTier: authoritativeTier } : {}),
+      ...(authoritativePackId ? { packId: authoritativePackId } : {}),
+      expectedAmountPaise: String(amountInPaise),
+      expectedCurrency: 'INR',
     }
 
     const order = await razorpay.orders.create({
       amount: amountInPaise,
-      currency,
+      currency: 'INR',
       receipt,
       notes: orderNotes,
     })
@@ -119,15 +176,16 @@ export async function POST(req: Request) {
       customerEmail: registeredEmail,
       customerPhone: registeredPhone,
     })
-  } catch (error: any) {
-    if (error?.statusCode === 401 || error?.error?.code === 'BAD_REQUEST_ERROR') {
+  } catch (error: unknown) {
+    const errObj = error as { statusCode?: number; error?: { code?: string; description?: string }; message?: string }
+    if (errObj?.statusCode === 401 || errObj?.error?.code === 'BAD_REQUEST_ERROR') {
       return NextResponse.json(
-        { error: error.error?.description || 'Razorpay authentication failed' },
+        { error: errObj.error?.description || 'Razorpay authentication failed' },
         { status: 401 }
       )
     }
     return NextResponse.json(
-      { error: error.message || 'Failed to create Razorpay order' },
+      { error: error instanceof Error ? error.message : 'Failed to create Razorpay order' },
       { status: 500 }
     )
   }

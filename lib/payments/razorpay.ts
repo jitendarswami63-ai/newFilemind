@@ -70,8 +70,11 @@ export function verifyRazorpaySignature({
     .update(`${orderId}|${paymentId}`)
     .digest('hex')
 
-  return crypto.timingSafeEqual(
-    Buffer.from(generatedSignature),
-    Buffer.from(signature)
-  )
+  const generatedBuf = Buffer.from(generatedSignature, 'utf8')
+  const providedBuf = Buffer.from(signature, 'utf8')
+  if (generatedBuf.length !== providedBuf.length) {
+    return false
+  }
+
+  return crypto.timingSafeEqual(generatedBuf, providedBuf)
 }

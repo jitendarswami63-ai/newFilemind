@@ -387,23 +387,27 @@ function CodeViewer({
 
   useEffect(() => {
     let ignore = false
-    setLoading(true)
-    fetch(`/api/documents/${documentId}/view`)
-      .then((res) => res.text())
-      .then((text) => {
-        if (!ignore) {
-          setContent(text)
-          setLoading(false)
-        }
-      })
-      .catch(() => {
-        if (!ignore) {
-          setContent('Failed to load text content.')
-          setLoading(false)
-        }
-      })
+    const timer = setTimeout(() => {
+      if (ignore) return
+      setLoading(true)
+      fetch(`/api/documents/${documentId}/view`)
+        .then((res) => res.text())
+        .then((text) => {
+          if (!ignore) {
+            setContent(text)
+            setLoading(false)
+          }
+        })
+        .catch(() => {
+          if (!ignore) {
+            setContent('Failed to load text content.')
+            setLoading(false)
+          }
+        })
+    }, 0)
     return () => {
       ignore = true
+      clearTimeout(timer)
     }
   }, [documentId])
 
@@ -487,38 +491,40 @@ function SpreadsheetViewer({
 
   useEffect(() => {
     let ignore = false
-    setLoading(true)
+    const timer = setTimeout(() => {
+      if (ignore) return
+      setLoading(true)
 
-    // If pre-extracted preview rows are present in extractedData:
-    if (extractedData?.previewRows && Array.isArray(extractedData.previewRows)) {
-      const parsed = (extractedData.previewRows as string[]).map((r) =>
-        r.split('|').map((c) => c.trim())
-      )
-      setRows(parsed)
-      setLoading(false)
-      return
-    }
+      if (extractedData?.previewRows && Array.isArray(extractedData.previewRows)) {
+        const parsed = (extractedData.previewRows as string[]).map((r) =>
+          r.split('|').map((c) => c.trim())
+        )
+        setRows(parsed)
+        setLoading(false)
+        return
+      }
 
-    // Otherwise fetch CSV / raw stream
-    fetch(`/api/documents/${documentId}/view`)
-      .then((res) => res.text())
-      .then((text) => {
-        if (!ignore) {
-          const parsed = text
-            .split(/\r?\n/)
-            .filter(Boolean)
-            .slice(0, 100)
-            .map((r) => r.split(',').map((c) => c.replace(/^["']|["']$/g, '').trim()))
-          setRows(parsed)
-          setLoading(false)
-        }
-      })
-      .catch(() => {
-        if (!ignore) setLoading(false)
-      })
+      fetch(`/api/documents/${documentId}/view`)
+        .then((res) => res.text())
+        .then((text) => {
+          if (!ignore) {
+            const parsed = text
+              .split(/\r?\n/)
+              .filter(Boolean)
+              .slice(0, 100)
+              .map((r) => r.split(',').map((c) => c.replace(/^["']|["']$/g, '').trim()))
+            setRows(parsed)
+            setLoading(false)
+          }
+        })
+        .catch(() => {
+          if (!ignore) setLoading(false)
+        })
+    }, 0)
 
     return () => {
       ignore = true
+      clearTimeout(timer)
     }
   }, [documentId, extractedData])
 
@@ -663,7 +669,7 @@ function GenericFileViewer({
           {filename}
         </h3>
         <p className="text-xs text-[#777064]">
-          {format.label} • Stored securely in Cloudflare R2
+          {format.label} • Stored securely in FileMind Encrypted Vault
         </p>
       </div>
 

@@ -66,7 +66,7 @@ export async function generateAnswerWithProvider(
         nvidiaErr instanceof Error ? nvidiaErr.message : nvidiaErr
       )
 
-      if (process.env.GEMINI_API_KEY) {
+      if (process.env.GEMINI_API_KEY || options.apiKey) {
         console.log('[AI Provider] Executing fallback to Gemini provider.')
         return generateWithGemini(options)
       }

@@ -190,7 +190,7 @@ export default async function CheckoutPage({ searchParams }: CheckoutPageProps) 
             <div className="pt-4 border-t border-[#E5DED1]">
               <RazorpayCheckoutButton
                 planTier={!isStoragePack ? selectedTier : undefined}
-                packId={isStoragePack ? (requestedPackId as any) : undefined}
+                packId={isStoragePack ? (requestedPackId as 'pack_1gb' | 'pack_5gb' | 'pack_10gb') : undefined}
                 amount={isStoragePack ? selectedPack?.priceINR : selectedPlan.priceINR}
                 currency="INR"
                 planName={isStoragePack ? selectedPack?.name : selectedPlan.name}

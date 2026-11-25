@@ -133,15 +133,17 @@ test('Scenario 7: sanitizeDeepgramError shields users from leaking raw headers o
 })
 
 test('Scenario 8: isDeepgramConfigured correctly checks API key presence including STT/TTS fallbacks', () => {
-  assert.equal(isDeepgramConfigured(''), false, 'Empty key should be false')
-  assert.equal(isDeepgramConfigured('   '), false, 'Whitespace key should be false')
-  assert.equal(isDeepgramConfigured(undefined), false, 'Undefined key should be false')
-  assert.equal(isDeepgramConfigured('dg_valid_key_sample'), true, 'Valid key should be true')
-
-  // Check fallback when DEEPGRAM_STT_API_KEY is present
   const originalEnv = { ...process.env }
   try {
     delete process.env.DEEPGRAM_API_KEY
+    delete process.env.DEEPGRAM_STT_API_KEY
+    delete process.env.DEEPGRAM_TTS_API_KEY
+    assert.equal(isDeepgramConfigured(''), false, 'Empty key should be false')
+    assert.equal(isDeepgramConfigured('   '), false, 'Whitespace key should be false')
+    assert.equal(isDeepgramConfigured(undefined), false, 'Undefined key should be false')
+    assert.equal(isDeepgramConfigured('dg_valid_key_sample'), true, 'Valid key should be true')
+
+    // Check fallback when DEEPGRAM_STT_API_KEY / TTS is present
     process.env.DEEPGRAM_STT_API_KEY = 'stt_key_123'
     assert.equal(isDeepgramConfigured(), true, 'Should detect DEEPGRAM_STT_API_KEY')
     delete process.env.DEEPGRAM_STT_API_KEY

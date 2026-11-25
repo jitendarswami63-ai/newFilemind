@@ -28,10 +28,6 @@ export default function AdminCMSPage() {
   const [isPublishing, setIsPublishing] = useState(false)
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null)
 
-  useEffect(() => {
-    fetchCMS()
-  }, [])
-
   const fetchCMS = async () => {
     setIsLoading(true)
     try {
@@ -49,7 +45,14 @@ export default function AdminCMSPage() {
     }
   }
 
-  const handleFieldChange = (section: keyof CMSData, field: string, value: any) => {
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void fetchCMS()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [])
+
+  const handleFieldChange = (section: keyof CMSData, field: string, value: string | boolean) => {
     setData((prev) => ({
       ...prev,
       [section]: {
@@ -230,7 +233,7 @@ export default function AdminCMSPage() {
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id as 'hero' | 'announcement' | 'pricing' | 'settings')}
               className={`flex items-center gap-2 px-4 py-2.5 text-xs font-bold border-b-2 transition-all whitespace-nowrap ${
                 active
                   ? 'border-[#9C7D47] text-[#9C7D47] bg-[#FAF5EC]/50'

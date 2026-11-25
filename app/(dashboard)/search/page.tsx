@@ -187,12 +187,21 @@ export default function SearchPage() {
               </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold text-[#9C7D47] bg-[#FAF5EC] border border-[#E5DED1]">
                 <Sparkles className="h-3 w-3 text-[#9C7D47]" />
-                Ranked via RRF Fusion
+                Hybrid Keyword &amp; Semantic Match
               </span>
             </div>
 
             <div className="space-y-3.5">
-              {results.map((result) => {
+              {(() => {
+                const topScore = Math.max(...results.map((r) => Number(r.score) || 0), 0.0001)
+                return results.map((result, idx) => {
+                const rawScore = Number(result.score) || 0
+                const relevancePct =
+                  rawScore >= 0.85
+                    ? Math.min(99, Math.round(rawScore * 100))
+                    : Math.max(55, Math.min(98, Math.round((rawScore / topScore) * 96)))
+                const relevanceLabel =
+                  relevancePct >= 85 ? 'Strong Match' : relevancePct >= 70 ? 'Good Match' : 'Relevant Match'
                 const hasOtherPages = result.matching_pages && result.matching_pages.length > 1
                 const otherPages = hasOtherPages
                   ? result.matching_pages!.filter((p) => p !== result.page_start)
@@ -246,8 +255,11 @@ export default function SearchPage() {
                       </div>
 
                       <div className="mt-3.5 flex items-center justify-between text-xs text-[#777064]">
-                        <span className="font-mono text-[11px] text-[#777064]">
-                          Score: <span className="text-[#292720] font-bold">{result.score}</span>
+                        <span className="inline-flex items-center gap-2 text-[11px]">
+                          <span className="font-semibold text-[#292720] bg-[#FAF5EC] border border-[#E5DED1] px-2 py-0.5 rounded-full">
+                            {relevancePct}% {relevanceLabel}
+                          </span>
+                          <span className="text-[#777064]">Rank #{idx + 1}</span>
                         </span>
                         <span className="flex items-center gap-1.5 text-xs text-[#9C7D47] font-semibold group-hover:translate-x-0.5 transition-transform">
                           <span>Open in Reader</span>
@@ -257,7 +269,8 @@ export default function SearchPage() {
                     </div>
                   </Link>
                 )
-              })}
+              })
+              })()}
             </div>
           </div>
         )}

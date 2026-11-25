@@ -174,9 +174,15 @@ export async function synthesizeDocumentMetadataWithGemini({
 Sample Content:
 ${introText.slice(0, 6000)}`
 
+  const synthStartedAt = Date.now()
+  const TOTAL_SYNTH_BUDGET_MS = 9_000
+
   for (const model of candidateModels) {
+    if (Date.now() - synthStartedAt >= TOTAL_SYNTH_BUDGET_MS) {
+      break
+    }
     try {
-      const response = await geminiClient.models.generateContent({
+      const genPromise = geminiClient.models.generateContent({
         model,
         contents: [prompt],
         config: {
@@ -187,6 +193,20 @@ ${introText.slice(0, 6000)}`
           temperature: 0.1,
         },
       })
+
+      let timeoutHandle: NodeJS.Timeout | null = null
+      const remainingBudget = Math.max(1_500, TOTAL_SYNTH_BUDGET_MS - (Date.now() - synthStartedAt))
+      const modelTimeoutMs = Math.min(5_000, remainingBudget)
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => reject(new Error(`Metadata synthesis timeout (${modelTimeoutMs}ms) on ${model}`)), modelTimeoutMs)
+      })
+
+      let response: { text?: string }
+      try {
+        response = await Promise.race([genPromise, timeoutPromise])
+      } finally {
+        if (timeoutHandle) clearTimeout(timeoutHandle)
+      }
 
       const rawJson = response.text?.trim()
       if (rawJson) {
@@ -236,7 +256,7 @@ export async function analyzeImageWithGemini({
 
   for (const model of candidateModels) {
     try {
-      const response = await geminiClient.models.generateContent({
+      const genPromise = geminiClient.models.generateContent({
         model,
         contents: [
           {
@@ -255,6 +275,18 @@ export async function analyzeImageWithGemini({
           temperature: 0.1,
         },
       })
+
+      let timeoutHandle: NodeJS.Timeout | null = null
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => reject(new Error(`Image analysis timeout (18s) on ${model}`)), 18_000)
+      })
+
+      let response: { text?: string }
+      try {
+        response = await Promise.race([genPromise, timeoutPromise])
+      } finally {
+        if (timeoutHandle) clearTimeout(timeoutHandle)
+      }
 
       const rawJson = response.text?.trim()
       if (rawJson) {

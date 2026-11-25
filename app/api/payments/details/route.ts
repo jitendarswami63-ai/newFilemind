@@ -23,10 +23,12 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const meta = user.user_metadata || {}
-    const billingHistory: any[] = Array.isArray(meta.billing_history) ? meta.billing_history : []
-    const purchasedPacks: any[] = Array.isArray(meta.purchased_storage_packs)
-      ? meta.purchased_storage_packs
+    const meta = (user.user_metadata || {}) as Record<string, unknown>
+    const billingHistory = Array.isArray(meta.billing_history)
+      ? (meta.billing_history as Array<{ paymentId?: string; orderId?: string; id?: string }>)
+      : []
+    const purchasedPacks = Array.isArray(meta.purchased_storage_packs)
+      ? (meta.purchased_storage_packs as Array<{ paymentId?: string; orderId?: string }>)
       : []
 
     const userOwnsPayment =
@@ -38,11 +40,33 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Payment not found in user records' }, { status: 404 })
     }
 
-    let liveDetails: Record<string, any> = {}
+    let liveDetails: Record<string, unknown> = {}
 
     try {
       const razorpay = getRazorpayClient()
-      const payment: any = await razorpay.payments.fetch(paymentId)
+      const payment = (await razorpay.payments.fetch(paymentId)) as unknown as {
+        entity?: string
+        amount?: number
+        currency?: string
+        status?: string
+        method?: string
+        order_id?: string
+        description?: string
+        international?: boolean
+        refund_status?: string | null
+        amount_refunded?: number
+        captured?: boolean
+        email?: string
+        contact?: string | number
+        fee?: number
+        tax?: number
+        created_at?: number
+        bank?: string | null
+        wallet?: string | null
+        vpa?: string | null
+        card?: { network?: string; last4?: string; type?: string } | null
+        acquirer_data?: Record<string, unknown> | null
+      }
 
       if (payment) {
         liveDetails = {
@@ -81,7 +105,7 @@ export async function GET(req: Request) {
       success: true,
       liveDetails,
     })
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
+  } catch (error: unknown) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Internal server error' }, { status: 500 })
   }
 }

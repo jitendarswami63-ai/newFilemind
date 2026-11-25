@@ -11,9 +11,9 @@ export async function GET() {
         'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
       },
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error?.message || 'Failed to fetch active plans' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch active plans' },
       { status: 500 }
     )
   }

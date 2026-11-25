@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { verifyAdminApi } from '@/lib/admin/auth'
+import { isSameOrigin } from '@/lib/validation/origin'
 import {
   grantManualSubscription,
   revokeManualSubscription,
@@ -21,15 +22,19 @@ export async function GET(req: Request) {
   try {
     const data = await listManualGrants({ page, limit, status })
     return NextResponse.json(data)
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error?.message || 'Failed to list manual grants' },
+      { error: error instanceof Error ? error.message : 'Failed to list manual grants' },
       { status: 500 }
     )
   }
 }
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ error: 'Invalid origin' }, { status: 403 })
+  }
+
   const auth = await verifyAdminApi()
   if (auth instanceof NextResponse) return auth
 
@@ -96,15 +101,19 @@ export async function POST(req: Request) {
       message: `Successfully granted ${tier.toUpperCase()} access`,
       grant,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error?.message || 'Failed to grant subscription' },
+      { error: error instanceof Error ? error.message : 'Failed to grant subscription' },
       { status: 500 }
     )
   }
 }
 
 export async function DELETE(req: Request) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ error: 'Invalid origin' }, { status: 403 })
+  }
+
   const auth = await verifyAdminApi()
   if (auth instanceof NextResponse) return auth
 
@@ -129,9 +138,9 @@ export async function DELETE(req: Request) {
       success: true,
       message: 'Subscription successfully revoked and reverted to Free tier',
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { error: error?.message || 'Failed to revoke subscription' },
+      { error: error instanceof Error ? error.message : 'Failed to revoke subscription' },
       { status: 500 }
     )
   }

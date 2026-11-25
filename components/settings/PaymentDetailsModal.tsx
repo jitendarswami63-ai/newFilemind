@@ -30,7 +30,30 @@ export interface PaymentItem {
   orderId?: string
   paymentId?: string
   status?: string
-  [key: string]: any
+  customerName?: string
+  customerEmail?: string
+  customerPhone?: string
+  paymentMethod?: string
+  userId?: string
+  userEmail?: string
+  userName?: string
+  storageBytes?: number
+  storageFormatted?: string
+}
+
+interface LivePaymentDetails {
+  method?: string
+  vpa?: string | null
+  card?: {
+    network?: string
+    last4?: string
+    type?: string
+  } | null
+  acquirerData?: {
+    rrn?: string
+    [key: string]: unknown
+  } | null
+  [key: string]: unknown
 }
 
 interface PaymentDetailsModalProps {
@@ -47,28 +70,32 @@ export function PaymentDetailsModal({
   userName,
 }: PaymentDetailsModalProps) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
-  const [liveDetails, setLiveDetails] = useState<Record<string, any> | null>(null)
+  const [liveDetails, setLiveDetails] = useState<LivePaymentDetails | null>(null)
   const [loadingLive, setLoadingLive] = useState(false)
 
   useEffect(() => {
     if (!payment?.paymentId) return
     let ignore = false
-    setLoadingLive(true)
+    const timer = setTimeout(() => {
+      if (ignore) return
+      setLoadingLive(true)
 
-    fetch(`/api/payments/details?paymentId=${encodeURIComponent(payment.paymentId)}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!ignore && data?.success && data?.liveDetails) {
-          setLiveDetails(data.liveDetails)
-        }
-      })
-      .catch(() => {})
-      .finally(() => {
-        if (!ignore) setLoadingLive(false)
-      })
+      fetch(`/api/payments/details?paymentId=${encodeURIComponent(payment.paymentId || '')}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (!ignore && data?.success && data?.liveDetails) {
+            setLiveDetails(data.liveDetails)
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          if (!ignore) setLoadingLive(false)
+        })
+    }, 0)
 
     return () => {
       ignore = true
+      clearTimeout(timer)
     }
   }, [payment?.paymentId])
 

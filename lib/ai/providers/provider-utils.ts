@@ -17,6 +17,9 @@ export const CANDIDATE_NVIDIA_MODELS = [
 export function normalizeNvidiaModel(model?: string): string {
   if (!model || !model.trim()) return DEFAULT_NVIDIA_MODEL
   const trimmed = model.trim()
+  if (trimmed === 'nemotron-3.5--30b-a3blightning') {
+    return 'nvidia/nemotron-3.5-lightning-30b-a3b'
+  }
   if (trimmed.includes('/')) return trimmed
   if (trimmed.toLowerCase().startsWith('nemotron')) return `nvidia/${trimmed}`
   if (trimmed.toLowerCase().startsWith('llama-3.1-nemotron')) return `nvidia/${trimmed}`

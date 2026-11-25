@@ -2,32 +2,38 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createClient as createSupabaseAdminClient } from '@supabase/supabase-js'
 import { UserProfileData, calculateProfileCompletion } from '@/lib/profile/types'
+import { isSameOrigin } from '@/lib/validation/origin'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-function buildDefaultProfile(user: any): UserProfileData {
-  const meta = user.user_metadata || {}
-  const saved = meta.profile_data || {}
+interface ProfileUserLike {
+  email?: string | null
+  user_metadata?: Record<string, unknown> | null
+}
+
+function buildDefaultProfile(user: ProfileUserLike): UserProfileData {
+  const meta = (user.user_metadata || {}) as Record<string, unknown>
+  const saved = ((meta.profile_data as Record<string, unknown>) || {})
 
   const defaultUsername = user.email ? user.email.split('@')[0].toLowerCase().replace(/[^a-z0-9_-]/g, '') : 'researcher'
 
   return {
-    full_name: saved.full_name || meta.full_name || meta.name || '',
+    full_name: String(saved.full_name || meta.full_name || meta.name || ''),
     email: user.email || '',
-    username: saved.username || defaultUsername,
-    bio: saved.bio || '',
-    occupation_role: saved.occupation_role || '',
-    institution: saved.institution || '',
-    primary_domain: saved.primary_domain || '',
-    document_volume: saved.document_volume || '1–15 documents/week',
-    preferred_ai_provider: saved.preferred_ai_provider || 'Dual-Engine (Gemini 3.8 + NVIDIA NIM)',
-    citation_precision: saved.citation_precision || 'Page-Precise Academic Quotes',
-    audio_voice_speed: saved.audio_voice_speed || 'Deepgram Neural (1.0x Normal)',
+    username: String(saved.username || defaultUsername),
+    bio: String(saved.bio || ''),
+    occupation_role: String(saved.occupation_role || ''),
+    institution: String(saved.institution || ''),
+    primary_domain: String(saved.primary_domain || ''),
+    document_volume: String(saved.document_volume || '1–15 documents/week'),
+    preferred_ai_provider: String(saved.preferred_ai_provider || 'Dual-Engine (Gemini 3.8 + NVIDIA NIM)'),
+    citation_precision: String(saved.citation_precision || 'Page-Precise Academic Quotes'),
+    audio_voice_speed: String(saved.audio_voice_speed || 'Deepgram Neural (1.0x Normal)'),
     email_digest: typeof saved.email_digest === 'boolean' ? saved.email_digest : true,
-    biometric_hardware_vault: saved.biometric_hardware_vault || 'FIDO2 WebAuthn Hardware Passkey',
-    vault_recovery_hint: saved.vault_recovery_hint || '',
-    auto_lock_interval: saved.auto_lock_interval || '1 hour',
+    biometric_hardware_vault: String(saved.biometric_hardware_vault || 'FIDO2 WebAuthn Hardware Passkey'),
+    vault_recovery_hint: String(saved.vault_recovery_hint || ''),
+    auto_lock_interval: String(saved.auto_lock_interval || '1 hour'),
     zero_knowledge_ack: Boolean(saved.zero_knowledge_ack),
   }
 }
@@ -59,16 +65,20 @@ export async function GET() {
       },
       completion,
     })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[Profile API GET Error]:', err)
     return NextResponse.json(
-      { error: err?.message || 'Failed to fetch profile' },
+      { error: err instanceof Error ? err.message : 'Failed to fetch profile' },
       { status: 500 }
     )
   }
 }
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) {
+    return NextResponse.json({ error: 'Invalid origin' }, { status: 403 })
+  }
+
   try {
     const supabase = await createClient()
     const {
@@ -152,10 +162,10 @@ export async function POST(req: Request) {
       profile: updated,
       completion,
     })
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error('[Profile API POST Error]:', err)
     return NextResponse.json(
-      { error: err?.message || 'Failed to save profile' },
+      { error: err instanceof Error ? err.message : 'Failed to save profile' },
       { status: 500 }
     )
   }

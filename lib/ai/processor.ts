@@ -1,7 +1,7 @@
 import 'server-only'
 import { GoogleGenAI, FileState, Type } from '@google/genai'
 import crypto from 'crypto'
-import { PDFDocument } from 'pdf-lib'
+import type { PDFDocument } from 'pdf-lib'
 import {
   getAuthoritativeDocument,
   acquireLock,
@@ -26,6 +26,7 @@ import {
   MAX_DOCUMENT_PAGES,
   MAX_TOTAL_DOCUMENT_PAGES,
   getAndValidatePdfPageCount,
+  loadAndValidatePdf,
   categorizeDocumentError,
 } from './pdf-page-validator'
 import {
@@ -181,9 +182,11 @@ async function extractStructuredDataWithGemini({
       new Set(
         [
           process.env.GEMINI_MODEL,
-          'gemini-flash-lite-latest',
-          'gemini-3.5-flash',
+          'gemini-3.5-flash-lite',
+          'gemini-3.1-flash-lite',
           'gemini-flash-latest',
+          'gemini-3.8-flash',
+          'gemini-flash-lite-latest',
           process.env.GEMINI_FALLBACK_MODEL,
         ].filter(Boolean) as string[]
       )
@@ -461,7 +464,8 @@ async function processSegmentWithAdaptiveBisection({
 
 export async function processDocument(
   documentId: string,
-  preAcquiredToken?: string
+  preAcquiredToken?: string,
+  apiKeyOverride?: string
 ): Promise<boolean> {
   const doc = await getAuthoritativeDocument(documentId)
   if (!doc) {
@@ -593,12 +597,27 @@ export async function processDocument(
     }
 
     console.log(`[DocumentAI] docId=${documentId} stage=validate_page_count attempt=${activeAttempt} status=started`)
-    const validatedPageCount = await getAndValidatePdfPageCount(canonicalBuffer, MAX_TOTAL_DOCUMENT_PAGES)
+    const { pageCount: validatedPageCount, pdfDoc: loadedPdfDoc } = await loadAndValidatePdf(
+      canonicalBuffer,
+      MAX_TOTAL_DOCUMENT_PAGES
+    )
     console.log(
       `[DocumentAI] docId=${documentId} stage=validate_page_count attempt=${activeAttempt} status=completed pages=${validatedPageCount} max=${MAX_TOTAL_DOCUMENT_PAGES}`
     )
 
-    const apiKey = process.env.GEMINI_API_KEY
+    let effectiveApiKey = apiKeyOverride?.trim() || ''
+    if (!effectiveApiKey) {
+      try {
+        const adminClient = getServiceRoleClient()
+        const { data: ownerData } = await adminClient.auth.admin.getUserById(authoritativeUserId)
+        const ownerByok = ownerData?.user?.user_metadata?.byok_gemini_key
+        if (typeof ownerByok === 'string' && ownerByok.trim()) {
+          effectiveApiKey = ownerByok.trim()
+        }
+      } catch {}
+    }
+
+    const apiKey = effectiveApiKey || process.env.GEMINI_API_KEY
     if (!apiKey) {
       throw new Error('GEMINI_API_KEY is not configured on the server')
     }
@@ -606,11 +625,6 @@ export async function processDocument(
     const geminiClient = new GoogleGenAI({ apiKey })
 
     const segmentPlan = computeSegmentPlan(validatedPageCount, canonicalBuffer.length)
-
-    const loadedPdfDoc = await PDFDocument.load(canonicalBuffer, {
-      ignoreEncryption: true,
-      throwOnInvalidObject: false,
-    })
 
     const alreadyCompletedPages = await getCompletedPageNumbers(documentId)
     savedPagesCount = alreadyCompletedPages.size
@@ -666,9 +680,11 @@ export async function processDocument(
           new Set(
             [
               process.env.GEMINI_MODEL,
-              'gemini-flash-lite-latest',
-              'gemini-3.5-flash',
+              'gemini-3.5-flash-lite',
+              'gemini-3.1-flash-lite',
               'gemini-flash-latest',
+              'gemini-3.8-flash',
+              'gemini-flash-lite-latest',
               process.env.GEMINI_FALLBACK_MODEL,
             ].filter(Boolean) as string[]
           )
@@ -807,13 +823,19 @@ export async function processDocument(
         .eq('id', documentId)
     } catch {}
 
-      try {
-        await indexDocument(documentId)
-      } catch (idxErr) {
-        console.error(`[DocumentIndex] Indexing failed for doc ${documentId}:`, idxErr)
-      }
-      return true
+    // Clear the extraction timeout before embedding so long vector indexing never rolls back finalized completion
+    if (timeoutTimer) {
+      clearTimeout(timeoutTimer)
+      timeoutTimer = null
     }
+
+    try {
+      await indexDocument(documentId, effectiveApiKey || undefined)
+    } catch (idxErr) {
+      console.error(`[DocumentIndex] Indexing failed for doc ${documentId}:`, idxErr)
+    }
+    return true
+  }
 
     return await Promise.race([runProcessing(), timeoutPromise])
   } catch (err: unknown) {

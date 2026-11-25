@@ -75,11 +75,18 @@ const navItems = [
   },
 ]
 
-export function AdminSidebar({ adminEmail }: AdminSidebarProps) {
-  const pathname = usePathname()
-  const [mobileOpen, setMobileOpen] = useState(false)
+interface AdminSidebarNavContentProps {
+  pathname: string
+  adminEmail: string
+  onCloseMobile: () => void
+}
 
-  const NavContent = () => (
+function AdminSidebarNavContent({
+  pathname,
+  adminEmail,
+  onCloseMobile,
+}: AdminSidebarNavContentProps) {
+  return (
     <div className="flex flex-col h-full justify-between">
       <div>
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#2C2E35]">
@@ -109,7 +116,7 @@ export function AdminSidebar({ adminEmail }: AdminSidebarProps) {
           </Link>
 
           <button
-            onClick={() => setMobileOpen(false)}
+            onClick={onCloseMobile}
             className="md:hidden p-1.5 rounded-lg text-[#A8A49B] hover:text-[#F5F1E9] hover:bg-[#2A2C32]"
             aria-label="Close admin menu"
           >
@@ -135,7 +142,7 @@ export function AdminSidebar({ adminEmail }: AdminSidebarProps) {
                 <Link
                   key={item.name}
                   href={item.href}
-                  onClick={() => setMobileOpen(false)}
+                  onClick={onCloseMobile}
                   className={`flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-medium transition-all ${
                     isActive
                       ? 'bg-[#31333B] text-[#F5F1E9] font-semibold border-l-2 border-[#D4AF37] shadow-xs'
@@ -186,6 +193,11 @@ export function AdminSidebar({ adminEmail }: AdminSidebarProps) {
       </div>
     </div>
   )
+}
+
+export function AdminSidebar({ adminEmail }: AdminSidebarProps) {
+  const pathname = usePathname()
+  const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
     <>
@@ -215,7 +227,11 @@ export function AdminSidebar({ adminEmail }: AdminSidebarProps) {
       </div>
 
       <aside className="hidden md:flex flex-col w-64 h-screen fixed top-0 left-0 z-30 bg-[#1B1D21] border-r border-[#2C2E35]">
-        <NavContent />
+        <AdminSidebarNavContent
+          pathname={pathname}
+          adminEmail={adminEmail}
+          onCloseMobile={() => setMobileOpen(false)}
+        />
       </aside>
 
       {mobileOpen && (
@@ -227,7 +243,11 @@ export function AdminSidebar({ adminEmail }: AdminSidebarProps) {
             onClick={(e) => e.stopPropagation()}
             className="w-72 h-full bg-[#1B1D21] border-r border-[#2C2E35] shadow-2xl"
           >
-            <NavContent />
+            <AdminSidebarNavContent
+              pathname={pathname}
+              adminEmail={adminEmail}
+              onCloseMobile={() => setMobileOpen(false)}
+            />
           </div>
         </div>
       )}

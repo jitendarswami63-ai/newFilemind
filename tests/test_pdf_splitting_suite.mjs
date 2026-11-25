@@ -36,8 +36,8 @@ function test(name, fn) {
     passedTests++
   } catch (error) {
     console.error(`❌ FAIL: ${name}`)
-    console.error(`   Error: ${err.message}`)
-    if (err.stack) console.error(err.stack)
+    console.error(`   Error: ${error instanceof Error ? error.message : String(error)}`)
+    if (error instanceof Error && error.stack) console.error(error.stack)
   }
 }
 
@@ -49,8 +49,8 @@ async function testAsync(name, fn) {
     passedTests++
   } catch (error) {
     console.error(`❌ FAIL: ${name}`)
-    console.error(`   Error: ${err.message}`)
-    if (err.stack) console.error(err.stack)
+    console.error(`   Error: ${error instanceof Error ? error.message : String(error)}`)
+    if (error instanceof Error && error.stack) console.error(error.stack)
   }
 }
 
@@ -65,36 +65,36 @@ async function createSyntheticPdf(pageCount) {
 
 test('Scenario 1: Dynamic segment sizing adapts to density and respects bounds', () => {
   const size1 = calculateSegmentSize(1250, 20 * 1024 * 1024)
-  assert.equal(size1, DEFAULT_SEGMENT_PAGE_SIZE, 'Standard density should use default 60')
+  assert.equal(size1, 20, 'Standard multi-segment PDF should scale to 20 pages/segment')
 
   const size2 = calculateSegmentSize(400, 48 * 1024 * 1024)
-  assert.equal(size2, 40, 'Moderate scanned density should scale down to 40')
+  assert.equal(size2, 12, 'Moderate scanned density (>100KB/page) should scale down to 12')
 
   const size3 = calculateSegmentSize(200, 48 * 1024 * 1024)
-  assert.equal(size3, 25, 'Dense scanned density should scale down to 25')
+  assert.equal(size3, 10, 'Dense scanned density (>200KB/page) should scale down to 10')
 
-  const size4 = calculateSegmentSize(20, 1024 * 1024)
-  assert.equal(size4, 20, 'Small doc should return totalPages directly')
+  const size4 = calculateSegmentSize(10, 512 * 1024)
+  assert.equal(size4, 10, 'Small doc should return totalPages directly')
 })
 
-test('Scenario 2: Segment plan for 1,250-page PDF produces exactly 21 contiguous segments', () => {
+test('Scenario 2: Segment plan for 1,250-page PDF produces exactly 63 contiguous segments', () => {
   const plan = computeSegmentPlan(1250, 20 * 1024 * 1024)
 
   assert.equal(plan.requiresSplitting, true, '1,250 pages requires internal splitting')
-  assert.equal(plan.totalSegments, 21, '1,250 pages at 60/segment produces 21 segments')
-  assert.equal(plan.segments.length, 21)
+  assert.equal(plan.totalSegments, 63, '1,250 pages at 20/segment produces 63 segments')
+  assert.equal(plan.segments.length, 63)
 
   for (let i = 0; i < plan.segments.length; i++) {
     const seg = plan.segments[i]
     assert.equal(seg.segmentIndex, i + 1)
-    assert.equal(seg.totalSegments, 21)
+    assert.equal(seg.totalSegments, 63)
     if (i === 0) {
       assert.equal(seg.pageStart, 1)
-      assert.equal(seg.pageEnd, 60)
-    } else if (i === 20) {
-      assert.equal(seg.pageStart, 1201)
+      assert.equal(seg.pageEnd, 20)
+    } else if (i === 62) {
+      assert.equal(seg.pageStart, 1241)
       assert.equal(seg.pageEnd, 1250)
-      assert.equal(seg.pageCount, 50)
+      assert.equal(seg.pageCount, 10)
     }
   }
 
@@ -114,15 +114,15 @@ test('Scenario 3: Segment plan for 3,520-page PDF covers all pages under Gemini 
   const plan = computeSegmentPlan(3520, 35 * 1024 * 1024)
 
   assert.equal(plan.requiresSplitting, true)
-  assert.equal(plan.totalSegments, 59, '58 segments of 60 + 1 segment of 40 = 59')
+  assert.equal(plan.totalSegments, 176, '3,520 pages at 20/segment = 176 segments')
 
   assert.equal(plan.segments[0].pageStart, 1)
-  assert.equal(plan.segments[0].pageEnd, 60)
+  assert.equal(plan.segments[0].pageEnd, 20)
 
-  const lastSeg = plan.segments[58]
-  assert.equal(lastSeg.pageStart, 3481)
+  const lastSeg = plan.segments[175]
+  assert.equal(lastSeg.pageStart, 3501)
   assert.equal(lastSeg.pageEnd, 3520)
-  assert.equal(lastSeg.pageCount, 40)
+  assert.equal(lastSeg.pageCount, 20)
 
   for (const seg of plan.segments) {
     assert.ok(
@@ -182,7 +182,7 @@ test('Scenario 6: remapSegmentPagesToOriginal maps relative segment pages to ori
   assert.equal(remapped[4].text, 'Text of page 255')
 })
 
-test('Scenario 7: validateSegmentExtractionCompleteness and remapSegmentPages reject missing pages', () => {
+test('Scenario 7: validateSegmentExtractionCompleteness flags missing pages while allowing tolerant blank fill, and total miss throws', () => {
   const partialPages = [
     { page_number: 1, text: 'Page 101 text' },
     { page_number: 2, text: 'Page 102 text' },
@@ -191,14 +191,19 @@ test('Scenario 7: validateSegmentExtractionCompleteness and remapSegmentPages re
   ]
 
   const validation = validateSegmentExtractionCompleteness(partialPages, 5)
-  assert.equal(validation.isValid, false, 'Validation must fail when a page is missing')
-  assert.deepEqual(validation.missingPages, [3], 'Missing page 3 must be flagged')
+  assert.equal(validation.isValid, true, 'Tolerant validation accepts partial non-empty segment extraction')
+  assert.deepEqual(validation.missingPages, [3], 'Missing page 3 must still be tracked diagnostically')
+
+  const remappedPartial = remapSegmentPagesToOriginal(partialPages, 101, 105)
+  assert.equal(remappedPartial.length, 5)
+  assert.equal(remappedPartial[2].page_number, 103)
+  assert.equal(remappedPartial[2].text, '')
 
   assert.throws(
-    () => remapSegmentPagesToOriginal(partialPages, 101, 105),
+    () => remapSegmentPagesToOriginal([], 101, 105),
     (err) => {
       assert.ok(err instanceof ExtractionIncompleteError)
-      assert.ok(err.message.includes('missing pages [103]'))
+      assert.ok(err.message.includes('missing all pages [101, 102, 103, 104, 105]'))
       return true
     }
   )
@@ -245,14 +250,14 @@ test('Scenario 8: subdivideSegmentRange halves segment range for adaptive bisect
   assert.equal(subdivideSegmentRange(singlePage), null)
 })
 
-test('Scenario 9: Documents with <= 60 pages bypass segmentation overhead', () => {
-  const plan = computeSegmentPlan(20, 2 * 1024 * 1024)
+test('Scenario 9: Small documents bypass segmentation overhead', () => {
+  const plan = computeSegmentPlan(12, 1024 * 1024)
 
-  assert.equal(plan.requiresSplitting, false, 'Standard PDF must not trigger splitting')
+  assert.equal(plan.requiresSplitting, false, 'Standard small PDF must not trigger splitting')
   assert.equal(plan.totalSegments, 1)
   assert.equal(plan.segments[0].pageStart, 1)
-  assert.equal(plan.segments[0].pageEnd, 20)
-  assert.equal(plan.segments[0].pageCount, 20)
+  assert.equal(plan.segments[0].pageEnd, 12)
+  assert.equal(plan.segments[0].pageCount, 12)
 })
 
 test('Scenario 10: Chunker produces unified original page spans across segment boundaries', () => {
